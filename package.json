@@ -1,0 +1,26 @@
+{
+  "name": "@l2/studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --host 0.0.0.0 --port 3001",
+    "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^8.0.0",
+    "@l2/ui": "workspace:*",
+    "@nuxt/ui": "^4.0.0",
+    "@pinia/nuxt": "^0.11.0",
+    "nuxt": "^4.0.0",
+    "pinia": "^3.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0",
+    "vue-tsc": "^3.0.0"
+  }
+}
