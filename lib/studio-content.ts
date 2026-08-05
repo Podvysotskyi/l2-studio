@@ -1,11 +1,11 @@
 export interface NpcRecord {
   id: number
   level: number
-  name: string
+  name: string | null
   npcTypeId: number
   npcType: string
-  npcRaceId: number
-  npcRace: string
+  npcRaceId: number | null
+  npcRace: string | null
   npcSexId: number
   npcSex: string
 }
@@ -17,12 +17,35 @@ export interface NpcPage {
   pageSize: number
 }
 
+export interface SkillRecord {
+  id: number
+  levels: number
+  name: string
+  skillOperateTypeId: number | null
+  skillOperateType: string | null
+  skillTargetTypeId: number | null
+  skillTargetType: string | null
+  iconCount: number
+}
+
+export interface SkillPage {
+  items: SkillRecord[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface LookupRecord {
   id: number
   name: string
 }
 
-export type LookupKind = 'npc-races' | 'npc-sexes' | 'npc-types'
+export type LookupKind =
+  | 'npc-races'
+  | 'npc-sexes'
+  | 'npc-types'
+  | 'skill-operate-types'
+  | 'skill-target-types'
 
 export function npcDirectoryUrl(
   apiBase: string,
@@ -38,6 +61,18 @@ export function npcDirectoryUrl(
 
 export function lookupUrl(apiBase: string, kind: LookupKind): string {
   return contentUrl(apiBase, kind).toString()
+}
+
+export function skillDirectoryUrl(
+  apiBase: string,
+  options: { query?: string; page?: number; pageSize?: number } = {}
+): string {
+  const url = contentUrl(apiBase, 'skills')
+  const query = options.query?.trim()
+  if (query) url.searchParams.set('query', query)
+  url.searchParams.set('page', String(options.page ?? 1))
+  url.searchParams.set('pageSize', String(options.pageSize ?? 25))
+  return url.toString()
 }
 
 export function positiveInteger(value: unknown, fallback: number): number {

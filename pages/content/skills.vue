@@ -3,10 +3,10 @@ import type { TableColumn } from '@nuxt/ui'
 import { onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  npcDirectoryUrl,
   positiveInteger,
-  type NpcPage,
-  type NpcRecord
+  skillDirectoryUrl,
+  type SkillPage,
+  type SkillRecord
 } from '../../lib/studio-content'
 
 const config = useRuntimeConfig()
@@ -17,24 +17,24 @@ const query = ref(
 )
 const page = ref(positiveInteger(route.query.page, 1))
 const pageSize = ref(positiveInteger(route.query.pageSize, 25))
-const result = ref<NpcPage>()
+const result = ref<SkillPage>()
 const loading = ref(true)
 const error = ref<string>()
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 let requestVersion = 0
 
-const columns: TableColumn<NpcRecord>[] = [
+const columns: TableColumn<SkillRecord>[] = [
   { accessorKey: 'id', header: 'ID' },
-  { accessorKey: 'name', header: 'NPC' },
-  { accessorKey: 'level', header: 'Level' },
-  { accessorKey: 'npcType', header: 'Type' },
-  { accessorKey: 'npcRace', header: 'Race' },
-  { accessorKey: 'npcSex', header: 'Sex' }
+  { accessorKey: 'name', header: 'Skill' },
+  { accessorKey: 'levels', header: 'Levels' },
+  { accessorKey: 'skillOperateType', header: 'Operate type' },
+  { accessorKey: 'skillTargetType', header: 'Target type' },
+  { accessorKey: 'iconCount', header: 'Icons' }
 ]
 
 function syncRoute() {
   void router.replace({
-    path: '/content/npcs',
+    path: '/content/skills',
     query: {
       ...(query.value.trim() ? { query: query.value.trim() } : {}),
       ...(page.value > 1 ? { page: String(page.value) } : {}),
@@ -43,13 +43,13 @@ function syncRoute() {
   })
 }
 
-async function loadNpcs() {
+async function loadSkills() {
   const version = ++requestVersion
   loading.value = true
   error.value = undefined
   try {
-    const response = await $fetch<NpcPage>(
-      npcDirectoryUrl(config.public.apiBase, {
+    const response = await $fetch<SkillPage>(
+      skillDirectoryUrl(config.public.apiBase, {
         query: query.value,
         page: page.value,
         pageSize: pageSize.value
@@ -58,7 +58,8 @@ async function loadNpcs() {
     if (version === requestVersion) result.value = response
   } catch {
     if (version === requestVersion) {
-      error.value = 'The NPC directory could not be loaded from the Studio API.'
+      error.value =
+        'The skill directory could not be loaded from the Studio API.'
     }
   } finally {
     if (version === requestVersion) loading.value = false
@@ -71,25 +72,25 @@ watch(query, () => {
     if (page.value !== 1) page.value = 1
     else {
       syncRoute()
-      void loadNpcs()
+      void loadSkills()
     }
   }, 300)
 })
 
 watch(page, () => {
   syncRoute()
-  void loadNpcs()
+  void loadSkills()
 })
 
 watch(pageSize, () => {
   if (page.value !== 1) page.value = 1
   else {
     syncRoute()
-    void loadNpcs()
+    void loadSkills()
   }
 })
 
-onMounted(loadNpcs)
+onMounted(loadSkills)
 onBeforeUnmount(() => clearTimeout(searchTimer))
 </script>
 
@@ -97,9 +98,9 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
   <div class="space-y-6">
     <StudioPageHeader
       eyebrow="Game content"
-      title="NPC definitions"
-      description="Browse normalized NPC records and the lookup values that classify their server behavior."
-      icon="i-lucide-users-round"
+      title="Skill definitions"
+      description="Browse normalized skill records, activation modes, targeting modes, and level-specific icon coverage."
+      icon="i-lucide-sparkles"
     >
       <template #actions>
         <UButton
@@ -108,7 +109,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
           color="neutral"
           variant="outline"
           :loading="loading"
-          @click="loadNpcs"
+          @click="loadSkills"
         />
       </template>
     </StudioPageHeader>
@@ -118,11 +119,11 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
       color="error"
       variant="subtle"
       icon="i-lucide-circle-alert"
-      title="NPC directory unavailable"
+      title="Skill directory unavailable"
       :description="error"
     >
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" @click="loadNpcs">
+        <UButton color="error" variant="soft" size="sm" @click="loadSkills">
           Try again
         </UButton>
       </template>
@@ -133,7 +134,7 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
         class="flex flex-wrap items-center justify-between gap-4 border-b border-default px-4 py-3"
       >
         <div>
-          <p class="text-sm font-medium text-highlighted">NPC catalog</p>
+          <p class="text-sm font-medium text-highlighted">Skill catalog</p>
           <p class="text-xs text-muted">
             {{ result?.total.toLocaleString() ?? 0 }} definitions
           </p>
@@ -141,8 +142,8 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
         <UInput
           v-model="query"
           icon="i-lucide-search"
-          placeholder="Search NPC name"
-          aria-label="Search NPC name"
+          placeholder="Search skill name"
+          aria-label="Search skill name"
           maxlength="100"
           class="w-full sm:w-80"
         />
@@ -153,8 +154,8 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
           :data="result?.items ?? []"
           :columns="columns"
           :loading="loading"
-          empty="No NPC definitions match this search."
-          class="min-w-[58rem]"
+          empty="No skill definitions match this search."
+          class="min-w-[62rem]"
         >
           <template #id-cell="{ row }">
             <code class="text-xs text-muted">{{ row.original.id }}</code>
@@ -164,45 +165,44 @@ onBeforeUnmount(() => clearTimeout(searchTimer))
               <span
                 class="grid size-8 shrink-0 place-items-center rounded-lg bg-elevated"
               >
-                <UIcon name="i-lucide-user-round" class="size-4 text-muted" />
+                <UIcon name="i-lucide-sparkles" class="size-4 text-muted" />
               </span>
               <span class="font-medium text-highlighted">
-                {{ row.original.name ?? 'Unnamed NPC' }}
+                {{ row.original.name || 'Unnamed skill' }}
               </span>
             </div>
           </template>
-          <template #level-cell="{ row }">
+          <template #levels-cell="{ row }">
             <UBadge color="neutral" variant="subtle">
-              {{ row.original.level }}
+              {{ row.original.levels }}
             </UBadge>
           </template>
-          <template #npcType-cell="{ row }">
-            <div>
-              <span class="text-sm">{{ row.original.npcType }}</span>
-              <span class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcTypeId }}</span
-              >
-            </div>
-          </template>
-          <template #npcRace-cell="{ row }">
+          <template #skillOperateType-cell="{ row }">
             <div>
               <span class="text-sm">{{
-                row.original.npcRace ?? 'No race'
+                row.original.skillOperateType ?? 'Unassigned'
               }}</span>
               <span
-                v-if="row.original.npcRaceId !== null"
+                v-if="row.original.skillOperateTypeId !== null"
                 class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcRaceId }}</span
+                >#{{ row.original.skillOperateTypeId }}</span
               >
             </div>
           </template>
-          <template #npcSex-cell="{ row }">
+          <template #skillTargetType-cell="{ row }">
             <div>
-              <span class="text-sm">{{ row.original.npcSex }}</span>
-              <span class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcSexId }}</span
+              <span class="text-sm">{{
+                row.original.skillTargetType ?? 'Unassigned'
+              }}</span>
+              <span
+                v-if="row.original.skillTargetTypeId !== null"
+                class="ml-2 text-xs text-dimmed"
+                >#{{ row.original.skillTargetTypeId }}</span
               >
             </div>
+          </template>
+          <template #iconCount-cell="{ row }">
+            <span class="text-sm text-muted">{{ row.original.iconCount }}</span>
           </template>
         </UTable>
       </div>

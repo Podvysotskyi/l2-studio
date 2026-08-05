@@ -26,24 +26,33 @@ const navigation: NavigationMenuItem[] = [
     type: 'label'
   },
   {
-    label: 'NPC definitions',
+    label: 'NPCs',
     icon: 'i-lucide-users-round',
-    to: '/content/npcs'
+    defaultOpen: true,
+    children: [
+      { label: 'Definitions', icon: 'i-lucide-list', to: '/content/npcs' },
+      { label: 'Races', icon: 'i-lucide-orbit', to: '/content/races' },
+      { label: 'Sexes', icon: 'i-lucide-tags', to: '/content/sexes' },
+      { label: 'Types', icon: 'i-lucide-workflow', to: '/content/types' }
+    ]
   },
   {
-    label: 'NPC races',
-    icon: 'i-lucide-orbit',
-    to: '/content/races'
-  },
-  {
-    label: 'NPC sexes',
-    icon: 'i-lucide-tags',
-    to: '/content/sexes'
-  },
-  {
-    label: 'NPC types',
-    icon: 'i-lucide-workflow',
-    to: '/content/types'
+    label: 'Skills',
+    icon: 'i-lucide-sparkles',
+    defaultOpen: true,
+    children: [
+      { label: 'Definitions', icon: 'i-lucide-list', to: '/content/skills' },
+      {
+        label: 'Operate types',
+        icon: 'i-lucide-play',
+        to: '/content/skill-operate-types'
+      },
+      {
+        label: 'Target types',
+        icon: 'i-lucide-crosshair',
+        to: '/content/skill-target-types'
+      }
+    ]
   }
 ]
 
@@ -53,6 +62,10 @@ const routeTitle = computed(() => {
   if (route.path === '/content/races') return 'NPC races'
   if (route.path === '/content/sexes') return 'NPC sexes'
   if (route.path === '/content/types') return 'NPC types'
+  if (route.path === '/content/skills') return 'Skill definitions'
+  if (route.path === '/content/skill-operate-types')
+    return 'Skill operate types'
+  if (route.path === '/content/skill-target-types') return 'Skill target types'
   return 'Studio'
 })
 const statusColor = computed<'success' | 'error' | 'neutral'>(() =>

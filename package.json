@@ -19,6 +19,7 @@
     "pinia": "^3.0.0"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.121",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0",
     "vue-tsc": "^3.0.0"

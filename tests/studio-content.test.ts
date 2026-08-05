@@ -4,7 +4,8 @@ import {
   npcDirectoryUrl,
   paginate,
   paginationRange,
-  positiveInteger
+  positiveInteger,
+  skillDirectoryUrl
 } from '../lib/studio-content'
 
 describe('Studio content client', () => {
@@ -23,6 +24,21 @@ describe('Studio content client', () => {
   it('builds lookup URLs from the configured API base', () => {
     expect(lookupUrl('http://localhost:5101/', 'npc-types')).toBe(
       'http://localhost:5101/api/content/npc-types'
+    )
+    expect(lookupUrl('http://localhost:5101/', 'skill-target-types')).toBe(
+      'http://localhost:5101/api/content/skill-target-types'
+    )
+  })
+
+  it('builds a normalized skill directory URL', () => {
+    expect(
+      skillDirectoryUrl('https://studio.example.com/root/', {
+        query: ' Triple Slash ',
+        page: 2,
+        pageSize: 10
+      })
+    ).toBe(
+      'https://studio.example.com/root/api/content/skills?query=Triple+Slash&page=2&pageSize=10'
     )
   })
 
