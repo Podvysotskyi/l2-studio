@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",
+    "@babylonjs/loaders": "^8.56.2",
     "@l2/ui": "workspace:*",
     "@nuxt/ui": "4.10.0",
     "@pinia/nuxt": "^0.11.0",

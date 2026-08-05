@@ -6,7 +6,7 @@ import type {
 } from '@l2/ui'
 import { textureManifestUrl } from '@l2/ui'
 import { computed, onBeforeUnmount, watch } from 'vue'
-import { textureImportsUrl, type AssetImportJob } from '../lib/studio-content'
+import { assetImportsUrl, type AssetImportJob } from '../lib/studio-content'
 
 const props = defineProps<{
   kind: TextureImportKind
@@ -105,7 +105,7 @@ async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
     jobs.value = await $fetch<AssetImportJob[]>(
-      textureImportsUrl(config.public.apiBase, props.kind),
+      assetImportsUrl(config.public.apiBase, props.kind),
       { query: { limit: 20 } }
     )
     error.value = undefined
@@ -123,7 +123,7 @@ async function queueImport() {
   queueing.value = true
   error.value = undefined
   try {
-    await $fetch(textureImportsUrl(config.public.apiBase, props.kind), {
+    await $fetch(assetImportsUrl(config.public.apiBase, props.kind), {
       method: 'POST'
     })
     await loadJobs()

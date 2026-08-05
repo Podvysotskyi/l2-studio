@@ -1,4 +1,4 @@
-import type { TextureImportKind } from '@l2/ui'
+import type { AssetImportKind } from '@l2/ui'
 
 export interface NpcRecord {
   id: number
@@ -54,7 +54,7 @@ export type AssetImportStatus =
 
 export interface AssetImportJob {
   id: string
-  kind: TextureImportKind
+  kind: AssetImportKind
   status: AssetImportStatus
   sourcePath: string
   sourceHash: string | null
@@ -96,9 +96,9 @@ export function skillDirectoryUrl(
   return url.toString()
 }
 
-export function textureImportsUrl(
+export function assetImportsUrl(
   apiBase: string,
-  kind: TextureImportKind,
+  kind: AssetImportKind,
   id?: string
 ): string {
   const base = apiBase.replace(/\/$/, '')

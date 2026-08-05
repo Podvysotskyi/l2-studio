@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   lookupUrl,
+  assetImportsUrl,
   npcDirectoryUrl,
   paginate,
   paginationRange,
   positiveInteger,
-  skillDirectoryUrl,
-  textureImportsUrl
+  skillDirectoryUrl
 } from '../lib/studio-content'
 
 describe('Studio content client', () => {
@@ -51,12 +51,24 @@ describe('Studio content client', () => {
   })
 
   it('builds texture import URLs', () => {
-    expect(textureImportsUrl('http://localhost:5101/', 'systextures')).toBe(
+    expect(assetImportsUrl('http://localhost:5101/', 'systextures')).toBe(
       'http://localhost:5101/api/assets/systextures/imports'
     )
-    expect(
-      textureImportsUrl('http://localhost:5101', 'textures', 'job-id')
-    ).toBe('http://localhost:5101/api/assets/textures/imports/job-id')
+    expect(assetImportsUrl('http://localhost:5101', 'textures', 'job-id')).toBe(
+      'http://localhost:5101/api/assets/textures/imports/job-id'
+    )
+  })
+
+  it('builds music import URLs', () => {
+    expect(assetImportsUrl('http://localhost:5101/', 'music')).toBe(
+      'http://localhost:5101/api/assets/music/imports'
+    )
+  })
+
+  it('builds static mesh import URLs', () => {
+    expect(assetImportsUrl('http://localhost:5101/', 'staticmeshes')).toBe(
+      'http://localhost:5101/api/assets/staticmeshes/imports'
+    )
   })
 
   it('paginates local catalogs without mutating their records', () => {

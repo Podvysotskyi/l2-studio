@@ -1,52 +1,208 @@
 <script setup lang="ts">
+import type {
+  AssetImportKind,
+  MusicManifest,
+  StaticMeshManifest,
+  TextureManifest
+} from '@l2/ui'
+import {
+  musicManifestUrl,
+  staticMeshManifestUrl,
+  textureManifestUrl
+} from '@l2/ui'
 import { computed } from 'vue'
 import {
+  assetImportsUrl,
   lookupUrl,
   npcDirectoryUrl,
+  skillDirectoryUrl,
+  type AssetImportJob,
   type LookupKind,
   type LookupRecord,
-  type NpcPage
+  type NpcPage,
+  type SkillPage
 } from '../lib/studio-content'
+
+interface AssetSummary {
+  kind: AssetImportKind
+  label: string
+  description: string
+  icon: string
+  to: string
+  total: number
+  resolved: number
+  skipped: number
+  groups: number | null
+  groupLabel: string
+  available: boolean
+}
 
 const config = useRuntimeConfig()
 const loading = ref(true)
-const error = ref<string>()
-const counts = ref({ npcs: 0, races: 0, sexes: 0, types: 0 })
+const contentError = ref(false)
+const assetError = ref(false)
+const jobsError = ref(false)
+const counts = ref({
+  npcs: 0,
+  skills: 0,
+  npcRaces: 0,
+  npcSexes: 0,
+  npcTypes: 0,
+  skillOperateTypes: 0,
+  skillTargetTypes: 0
+})
+const assets = ref<AssetSummary[]>(createEmptyAssetSummaries())
+const jobs = ref<AssetImportJob[]>([])
 
-const sections = computed(() => [
+const totalDefinitions = computed(() => counts.value.npcs + counts.value.skills)
+const totalLookups = computed(
+  () =>
+    counts.value.npcRaces +
+    counts.value.npcSexes +
+    counts.value.npcTypes +
+    counts.value.skillOperateTypes +
+    counts.value.skillTargetTypes
+)
+const totalAssets = computed(() =>
+  assets.value.reduce((total, asset) => total + asset.resolved, 0)
+)
+const skippedAssets = computed(() =>
+  assets.value.reduce((total, asset) => total + asset.skipped, 0)
+)
+const activeJobs = computed(() =>
+  jobs.value.filter(
+    (job) => job.status === 'queued' || job.status === 'running'
+  )
+)
+const recentJobs = computed(() => jobs.value.slice(0, 6))
+const latestFinishedJob = computed(() =>
+  jobs.value.find((job) => job.finishedAt !== null)
+)
+
+const headlineStats = computed(() => [
   {
-    label: 'NPC definitions',
-    value: counts.value.npcs,
-    description: 'Authoritative world actors',
-    icon: 'i-lucide-users-round',
-    to: '/content/npcs',
+    label: 'Content definitions',
+    value: totalDefinitions.value,
+    detail: `${counts.value.npcs.toLocaleString()} NPCs · ${counts.value.skills.toLocaleString()} skills`,
+    icon: 'i-lucide-database',
     color: 'text-primary'
   },
   {
-    label: 'Race values',
-    value: counts.value.races,
-    description: 'Stable reference vocabulary',
-    icon: 'i-lucide-orbit',
-    to: '/content/races',
+    label: 'Lookup values',
+    value: totalLookups.value,
+    detail: 'Five normalized vocabularies',
+    icon: 'i-lucide-tags',
     color: 'text-info'
   },
   {
-    label: 'Sex values',
-    value: counts.value.sexes,
-    description: 'Stable reference vocabulary',
-    icon: 'i-lucide-tags',
-    to: '/content/sexes',
-    color: 'text-warning'
+    label: 'Generated assets',
+    value: totalAssets.value,
+    detail: `${assets.value.filter((asset) => asset.available).length} collections available`,
+    icon: 'i-lucide-package-open',
+    color: 'text-success'
   },
   {
-    label: 'Behavior types',
-    value: counts.value.types,
-    description: 'Server behavior categories',
-    icon: 'i-lucide-workflow',
-    to: '/content/types',
-    color: 'text-success'
+    label: 'Needs attention',
+    value: skippedAssets.value,
+    detail: activeJobs.value.length
+      ? `${activeJobs.value.length} imports currently active`
+      : 'Skipped generated assets',
+    icon: 'i-lucide-circle-alert',
+    color: skippedAssets.value ? 'text-warning' : 'text-success'
   }
 ])
+
+const contentCatalogs = computed(() => [
+  {
+    label: 'NPC definitions',
+    value: counts.value.npcs,
+    description: 'World actors with race, sex, and behavior classifications.',
+    icon: 'i-lucide-users-round',
+    to: '/content/npcs'
+  },
+  {
+    label: 'Skill definitions',
+    value: counts.value.skills,
+    description: 'Skills with levels, icons, operate types, and target types.',
+    icon: 'i-lucide-sparkles',
+    to: '/content/skills'
+  }
+])
+
+const lookupCatalogs = computed(() => [
+  { label: 'NPC races', value: counts.value.npcRaces, to: '/content/races' },
+  { label: 'NPC sexes', value: counts.value.npcSexes, to: '/content/sexes' },
+  { label: 'NPC types', value: counts.value.npcTypes, to: '/content/types' },
+  {
+    label: 'Skill operate types',
+    value: counts.value.skillOperateTypes,
+    to: '/content/skill-operate-types'
+  },
+  {
+    label: 'Skill target types',
+    value: counts.value.skillTargetTypes,
+    to: '/content/skill-target-types'
+  }
+])
+
+function createEmptyAssetSummaries(): AssetSummary[] {
+  return [
+    {
+      kind: 'systextures',
+      label: 'System textures',
+      description:
+        'Interface, icons, effects, and shared presentation textures.',
+      icon: 'i-lucide-panels-top-left',
+      to: '/assets/systextures',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'packages',
+      available: false
+    },
+    {
+      kind: 'textures',
+      label: 'World textures',
+      description:
+        'Terrain, architecture, environment, and world presentation.',
+      icon: 'i-lucide-mountain',
+      to: '/assets/textures',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'packages',
+      available: false
+    },
+    {
+      kind: 'music',
+      label: 'Music',
+      description: 'Validated browser-playable Ogg Vorbis soundtrack assets.',
+      icon: 'i-lucide-music-2',
+      to: '/assets/music',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'tracks',
+      available: false
+    },
+    {
+      kind: 'staticmeshes',
+      label: 'Static meshes',
+      description: 'UE2 world geometry converted to interactive GLB previews.',
+      icon: 'i-lucide-box',
+      to: '/assets/staticmeshes',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'packages',
+      available: false
+    }
+  ]
+}
 
 async function fetchLookupCount(kind: LookupKind): Promise<number> {
   const records = await $fetch<LookupRecord[]>(
@@ -55,24 +211,166 @@ async function fetchLookupCount(kind: LookupKind): Promise<number> {
   return records.length
 }
 
-async function loadSummary() {
-  loading.value = true
-  error.value = undefined
+async function loadContentSummary() {
   try {
-    const [npcs, races, sexes, types] = await Promise.all([
+    const [
+      npcs,
+      skills,
+      npcRaces,
+      npcSexes,
+      npcTypes,
+      skillOperateTypes,
+      skillTargetTypes
+    ] = await Promise.all([
       $fetch<NpcPage>(
         npcDirectoryUrl(config.public.apiBase, { page: 1, pageSize: 1 })
       ),
+      $fetch<SkillPage>(
+        skillDirectoryUrl(config.public.apiBase, { page: 1, pageSize: 1 })
+      ),
       fetchLookupCount('npc-races'),
       fetchLookupCount('npc-sexes'),
-      fetchLookupCount('npc-types')
+      fetchLookupCount('npc-types'),
+      fetchLookupCount('skill-operate-types'),
+      fetchLookupCount('skill-target-types')
     ])
-    counts.value = { npcs: npcs.total, races, sexes, types }
+    counts.value = {
+      npcs: npcs.total,
+      skills: skills.total,
+      npcRaces,
+      npcSexes,
+      npcTypes,
+      skillOperateTypes,
+      skillTargetTypes
+    }
+    contentError.value = false
   } catch {
-    error.value = 'Studio could not read the game-content catalog.'
-  } finally {
-    loading.value = false
+    contentError.value = true
   }
+}
+
+async function loadAssetSummary() {
+  const requests = [
+    $fetch<TextureManifest>(textureManifestUrl('systextures'), {
+      query: { refresh: Date.now() }
+    }),
+    $fetch<TextureManifest>(textureManifestUrl('textures'), {
+      query: { refresh: Date.now() }
+    }),
+    $fetch<MusicManifest>(musicManifestUrl(), {
+      query: { refresh: Date.now() }
+    }),
+    $fetch<StaticMeshManifest>(staticMeshManifestUrl(), {
+      query: { refresh: Date.now() }
+    })
+  ] as const
+  const results = await Promise.allSettled(requests)
+  const summaries = createEmptyAssetSummaries()
+
+  const systemTextures = results[0]
+  if (systemTextures.status === 'fulfilled') {
+    summaries[0] = textureSummary(summaries[0]!, systemTextures.value)
+  }
+  const worldTextures = results[1]
+  if (worldTextures.status === 'fulfilled') {
+    summaries[1] = textureSummary(summaries[1]!, worldTextures.value)
+  }
+  const music = results[2]
+  if (music.status === 'fulfilled') {
+    summaries[2] = {
+      ...summaries[2]!,
+      total: music.value.tracks.length,
+      resolved: music.value.tracks.filter(
+        (track) => track.status === 'resolved'
+      ).length,
+      skipped: music.value.tracks.filter((track) => track.status === 'skipped')
+        .length,
+      groups: music.value.tracks.length,
+      available: true
+    }
+  }
+  const staticMeshes = results[3]
+  if (staticMeshes.status === 'fulfilled') {
+    summaries[3] = {
+      ...summaries[3]!,
+      total: staticMeshes.value.meshes.length,
+      resolved: staticMeshes.value.meshes.filter(
+        (mesh) => mesh.status === 'resolved'
+      ).length,
+      skipped: staticMeshes.value.meshes.filter(
+        (mesh) => mesh.status === 'skipped'
+      ).length,
+      groups: staticMeshes.value.packages.length,
+      available: true
+    }
+  }
+
+  assets.value = summaries
+  assetError.value = results.some((result) => result.status === 'rejected')
+}
+
+function textureSummary(
+  base: AssetSummary,
+  manifest: TextureManifest
+): AssetSummary {
+  return {
+    ...base,
+    total: manifest.textures.length,
+    resolved: manifest.textures.filter(
+      (texture) => texture.status === 'resolved'
+    ).length,
+    skipped: manifest.textures.filter((texture) => texture.status === 'skipped')
+      .length,
+    groups: manifest.packages.length,
+    available: true
+  }
+}
+
+async function loadJobs() {
+  try {
+    const results = await Promise.all(
+      (['systextures', 'textures', 'music', 'staticmeshes'] as const).map(
+        (kind) =>
+          $fetch<AssetImportJob[]>(
+            assetImportsUrl(config.public.apiBase, kind),
+            {
+              query: { limit: 10 }
+            }
+          )
+      )
+    )
+    jobs.value = results
+      .flat()
+      .sort(
+        (left, right) =>
+          new Date(right.requestedAt).getTime() -
+          new Date(left.requestedAt).getTime()
+      )
+    jobsError.value = false
+  } catch {
+    jobsError.value = true
+  }
+}
+
+async function loadSummary() {
+  loading.value = true
+  await Promise.all([loadContentSummary(), loadAssetSummary(), loadJobs()])
+  loading.value = false
+}
+
+function kindLabel(kind: AssetImportKind) {
+  return assets.value.find((asset) => asset.kind === kind)?.label ?? kind
+}
+
+function statusColor(status: AssetImportJob['status']) {
+  if (status === 'succeeded') return 'success'
+  if (status === 'succeeded_with_warnings') return 'warning'
+  if (status === 'failed') return 'error'
+  return 'info'
+}
+
+function formatDate(value: string | null) {
+  return value ? new Date(value).toLocaleString() : 'Pending'
 }
 
 onMounted(loadSummary)
@@ -83,10 +381,17 @@ onMounted(loadSummary)
     <StudioPageHeader
       eyebrow="Content operations"
       title="Studio overview"
-      description="Inspect the authoritative PostgreSQL content model and track the catalogs available to the game server."
+      description="A live summary of authoritative content, generated game assets, and the pipelines that maintain them."
       icon="i-lucide-panels-top-left"
     >
       <template #actions>
+        <UButton
+          label="Import jobs"
+          icon="i-lucide-history"
+          color="neutral"
+          variant="outline"
+          to="/assets/jobs"
+        />
         <UButton
           label="Refresh data"
           icon="i-lucide-refresh-cw"
@@ -98,56 +403,224 @@ onMounted(loadSummary)
       </template>
     </StudioPageHeader>
 
-    <UAlert
-      v-if="error"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-database-zap"
-      title="Content API unavailable"
-      :description="error"
-    >
-      <template #actions>
-        <UButton color="error" variant="soft" size="sm" @click="loadSummary">
-          Try again
-        </UButton>
-      </template>
-    </UAlert>
+    <div v-if="contentError || assetError || jobsError" class="space-y-3">
+      <UAlert
+        v-if="contentError"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-database-zap"
+        title="Content summary unavailable"
+        description="Studio could not read the PostgreSQL content catalogs. Asset summaries remain available below."
+      />
+      <UAlert
+        v-if="assetError"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-package-x"
+        title="Some asset collections are unavailable"
+        description="Missing manifests are shown as not imported; available collections still report their current inventory."
+      />
+      <UAlert
+        v-if="jobsError"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-history"
+        title="Import activity unavailable"
+        description="Recent import jobs could not be read from the Studio API."
+      />
+    </div>
 
-    <section aria-labelledby="catalog-summary">
+    <section aria-labelledby="workspace-summary">
       <div class="mb-3 flex items-center justify-between">
-        <h2 id="catalog-summary" class="text-sm font-semibold text-highlighted">
-          Catalog summary
+        <h2
+          id="workspace-summary"
+          class="text-sm font-semibold text-highlighted"
+        >
+          Workspace summary
         </h2>
-        <UBadge color="neutral" variant="subtle">PostgreSQL · content</UBadge>
+        <UBadge color="neutral" variant="subtle">Live inventory</UBadge>
       </div>
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <UCard
-          v-for="section in sections"
-          :key="section.to"
-          :ui="{ body: 'flex min-h-40 flex-col gap-5' }"
+          v-for="stat in headlineStats"
+          :key="stat.label"
+          :ui="{ body: 'flex min-h-36 flex-col gap-4' }"
         >
           <div class="flex items-start justify-between gap-4">
             <div class="grid size-10 place-items-center rounded-lg bg-elevated">
-              <UIcon
-                :name="section.icon"
-                class="size-5"
-                :class="section.color"
-              />
+              <UIcon :name="stat.icon" class="size-5" :class="stat.color" />
             </div>
-            <USkeleton v-if="loading" class="h-8 w-16" />
+            <USkeleton v-if="loading" class="h-8 w-20" />
             <strong v-else class="text-3xl font-semibold tabular-nums">
-              {{ section.value.toLocaleString() }}
+              {{ stat.value.toLocaleString() }}
             </strong>
           </div>
           <div class="mt-auto">
-            <p class="text-sm font-medium text-highlighted">
-              {{ section.label }}
+            <p class="text-sm font-medium text-highlighted">{{ stat.label }}</p>
+            <p class="mt-1 text-xs text-muted">{{ stat.detail }}</p>
+          </div>
+        </UCard>
+      </div>
+    </section>
+
+    <section aria-labelledby="content-summary">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2
+            id="content-summary"
+            class="text-sm font-semibold text-highlighted"
+          >
+            Content catalogs
+          </h2>
+          <p class="mt-1 text-xs text-muted">
+            Authoritative definitions and normalized server vocabularies.
+          </p>
+        </div>
+        <UBadge color="neutral" variant="subtle">PostgreSQL · content</UBadge>
+      </div>
+      <div
+        class="grid gap-4 xl:grid-cols-[repeat(2,minmax(0,1fr))_minmax(20rem,1.1fr)]"
+      >
+        <UCard
+          v-for="catalog in contentCatalogs"
+          :key="catalog.to"
+          :ui="{ body: 'flex h-full flex-col gap-4' }"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div
+              class="grid size-11 place-items-center rounded-lg bg-primary/10 text-primary"
+            >
+              <UIcon :name="catalog.icon" class="size-5" />
+            </div>
+            <strong class="text-3xl font-semibold tabular-nums">{{
+              catalog.value.toLocaleString()
+            }}</strong>
+          </div>
+          <div>
+            <h3 class="text-sm font-medium text-highlighted">
+              {{ catalog.label }}
+            </h3>
+            <p class="mt-1 text-xs leading-5 text-muted">
+              {{ catalog.description }}
             </p>
-            <p class="mt-1 text-xs text-muted">{{ section.description }}</p>
           </div>
           <UButton
-            :to="section.to"
+            class="mt-auto"
+            :to="catalog.to"
             label="Open catalog"
+            trailing-icon="i-lucide-arrow-right"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            block
+          />
+        </UCard>
+
+        <UCard :ui="{ body: 'p-0 sm:p-0' }">
+          <template #header>
+            <div class="flex items-center gap-3">
+              <UIcon name="i-lucide-tags" class="size-5 text-info" />
+              <div>
+                <h3 class="text-sm font-semibold text-highlighted">
+                  Lookup vocabularies
+                </h3>
+                <p class="text-xs text-muted">
+                  {{ totalLookups }} stable values
+                </p>
+              </div>
+            </div>
+          </template>
+          <div class="divide-y divide-default">
+            <NuxtLink
+              v-for="lookup in lookupCatalogs"
+              :key="lookup.to"
+              :to="lookup.to"
+              class="flex items-center justify-between gap-4 px-4 py-3 text-sm hover:bg-elevated sm:px-6"
+            >
+              <span class="text-muted">{{ lookup.label }}</span>
+              <span class="flex items-center gap-2"
+                ><strong class="tabular-nums text-highlighted">{{
+                  lookup.value
+                }}</strong
+                ><UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-4 text-dimmed"
+              /></span>
+            </NuxtLink>
+          </div>
+        </UCard>
+      </div>
+    </section>
+
+    <section aria-labelledby="asset-summary">
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 id="asset-summary" class="text-sm font-semibold text-highlighted">
+            Asset library
+          </h2>
+          <p class="mt-1 text-xs text-muted">
+            Locally generated, browser-ready assets grouped by source
+            collection.
+          </p>
+        </div>
+        <UBadge color="neutral" variant="subtle">
+          Generated · Git ignored
+        </UBadge>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <UCard
+          v-for="asset in assets"
+          :key="asset.kind"
+          :ui="{ body: 'flex h-full flex-col gap-4' }"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div
+              class="grid size-11 place-items-center rounded-lg bg-elevated text-primary"
+            >
+              <UIcon :name="asset.icon" class="size-5" />
+            </div>
+            <UBadge
+              :color="
+                asset.available
+                  ? asset.skipped
+                    ? 'warning'
+                    : 'success'
+                  : 'neutral'
+              "
+              variant="subtle"
+            >
+              {{
+                asset.available
+                  ? asset.skipped
+                    ? `${asset.skipped} skipped`
+                    : 'Ready'
+                  : 'Not imported'
+              }}
+            </UBadge>
+          </div>
+          <div>
+            <strong class="text-3xl font-semibold tabular-nums">{{
+              asset.resolved.toLocaleString()
+            }}</strong>
+            <h3 class="mt-2 text-sm font-medium text-highlighted">
+              {{ asset.label }}
+            </h3>
+            <p class="mt-1 text-xs leading-5 text-muted">
+              {{ asset.description }}
+            </p>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-muted">
+            <span>{{ asset.total.toLocaleString() }} inventoried</span
+            ><span aria-hidden="true">·</span
+            ><span
+              >{{ asset.groups?.toLocaleString() ?? '—' }}
+              {{ asset.groupLabel }}</span
+            >
+          </div>
+          <UButton
+            class="mt-auto"
+            :to="asset.to"
+            label="Manage assets"
             trailing-icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
@@ -158,69 +631,120 @@ onMounted(loadSummary)
       </div>
     </section>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-      <UCard>
+    <section
+      class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]"
+      aria-labelledby="import-activity"
+    >
+      <UCard :ui="{ body: 'p-0 sm:p-0' }">
         <template #header>
-          <div class="flex items-center gap-3">
-            <UIcon name="i-lucide-route" class="size-5 text-primary" />
-            <div>
-              <h2 class="text-sm font-semibold text-highlighted">
-                Content flow
-              </h2>
-              <p class="text-xs text-muted">Current authoring architecture</p>
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <UIcon name="i-lucide-activity" class="size-5 text-primary" />
+              <div>
+                <h2
+                  id="import-activity"
+                  class="text-sm font-semibold text-highlighted"
+                >
+                  Recent import activity
+                </h2>
+                <p class="text-xs text-muted">
+                  Latest jobs across every asset collection
+                </p>
+              </div>
             </div>
+            <UButton
+              label="View all"
+              to="/assets/jobs"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              trailing-icon="i-lucide-arrow-right"
+            />
           </div>
         </template>
-        <ol class="grid gap-3 sm:grid-cols-3">
-          <li class="rounded-lg bg-elevated p-4">
-            <span class="text-xs font-semibold text-primary">01 · SOURCE</span>
-            <p class="mt-2 text-sm font-medium">Reference datapack</p>
-            <p class="mt-1 text-xs leading-5 text-muted">
-              XML remains an import source, not a runtime dependency.
-            </p>
-          </li>
-          <li class="rounded-lg bg-elevated p-4">
-            <span class="text-xs font-semibold text-primary">02 · AUTHOR</span>
-            <p class="mt-2 text-sm font-medium">Content schema</p>
-            <p class="mt-1 text-xs leading-5 text-muted">
-              Studio reads normalized definitions from PostgreSQL.
-            </p>
-          </li>
-          <li class="rounded-lg bg-elevated p-4">
-            <span class="text-xs font-semibold text-primary">03 · SERVE</span>
-            <p class="mt-2 text-sm font-medium">Game runtime</p>
-            <p class="mt-1 text-xs leading-5 text-muted">
-              The game server caches published definitions in memory.
-            </p>
-          </li>
-        </ol>
+        <div v-if="recentJobs.length" class="divide-y divide-default">
+          <div
+            v-for="job in recentJobs"
+            :key="job.id"
+            class="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6"
+          >
+            <UBadge color="neutral" variant="subtle">
+              {{ kindLabel(job.kind) }}
+            </UBadge>
+            <UBadge :color="statusColor(job.status)" variant="subtle">
+              {{ job.status.replaceAll('_', ' ') }}
+            </UBadge>
+            <span class="min-w-32 flex-1 text-xs text-muted"
+              >{{ job.processedCount.toLocaleString() }} /
+              {{ job.totalCount.toLocaleString() }} processed</span
+            >
+            <time
+              class="text-xs text-dimmed"
+              :datetime="job.finishedAt ?? job.requestedAt"
+              >{{ formatDate(job.finishedAt ?? job.requestedAt) }}</time
+            >
+          </div>
+        </div>
+        <div
+          v-else
+          class="grid min-h-48 place-items-center p-8 text-sm text-muted"
+        >
+          {{
+            loading
+              ? 'Loading import activity…'
+              : 'No asset imports have been recorded.'
+          }}
+        </div>
       </UCard>
 
       <UCard>
         <template #header>
           <h2 class="text-sm font-semibold text-highlighted">
-            Workspace state
+            Pipeline health
           </h2>
         </template>
         <dl class="space-y-4 text-sm">
           <div class="flex items-center justify-between gap-4">
-            <dt class="text-muted">Schema</dt>
-            <dd><UBadge color="neutral" variant="subtle">content</UBadge></dd>
+            <dt class="text-muted">Active imports</dt>
+            <dd>
+              <UBadge
+                :color="activeJobs.length ? 'info' : 'success'"
+                variant="subtle"
+              >
+                {{ activeJobs.length || 'None' }}
+              </UBadge>
+            </dd>
           </div>
           <div class="flex items-center justify-between gap-4">
-            <dt class="text-muted">Access</dt>
-            <dd><UBadge color="info" variant="subtle">Read only</UBadge></dd>
+            <dt class="text-muted">Available collections</dt>
+            <dd class="font-medium tabular-nums text-highlighted">
+              {{ assets.filter((asset) => asset.available).length }} /
+              {{ assets.length }}
+            </dd>
           </div>
           <div class="flex items-center justify-between gap-4">
-            <dt class="text-muted">Lookup seeds</dt>
-            <dd><UBadge color="success" variant="subtle">Enabled</UBadge></dd>
+            <dt class="text-muted">Skipped assets</dt>
+            <dd>
+              <UBadge
+                :color="skippedAssets ? 'warning' : 'success'"
+                variant="subtle"
+              >
+                {{ skippedAssets.toLocaleString() }}
+              </UBadge>
+            </dd>
           </div>
-          <div class="flex items-center justify-between gap-4">
-            <dt class="text-muted">NPC importer</dt>
-            <dd><UBadge color="warning" variant="subtle">Planned</UBadge></dd>
+          <div class="flex items-start justify-between gap-4">
+            <dt class="text-muted">Last completed</dt>
+            <dd class="max-w-44 text-right text-xs text-highlighted">
+              {{
+                latestFinishedJob
+                  ? `${kindLabel(latestFinishedJob.kind)} · ${formatDate(latestFinishedJob.finishedAt)}`
+                  : 'No completed imports'
+              }}
+            </dd>
           </div>
         </dl>
       </UCard>
-    </div>
+    </section>
   </div>
 </template>

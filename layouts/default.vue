@@ -59,8 +59,8 @@ const navigation: NavigationMenuItem[] = [
     type: 'label'
   },
   {
-    label: 'Texture imports',
-    icon: 'i-lucide-images',
+    label: 'Asset library',
+    icon: 'i-lucide-package-open',
     defaultOpen: true,
     children: [
       {
@@ -73,6 +73,27 @@ const navigation: NavigationMenuItem[] = [
         icon: 'i-lucide-mountain',
         to: '/assets/textures'
       },
+      {
+        label: 'Music',
+        icon: 'i-lucide-music-2',
+        to: '/assets/music'
+      },
+      {
+        label: 'Static meshes',
+        icon: 'i-lucide-box',
+        to: '/assets/staticmeshes'
+      }
+    ]
+  },
+  {
+    label: 'Operations',
+    type: 'label'
+  },
+  {
+    label: 'Background jobs',
+    icon: 'i-lucide-activity',
+    defaultOpen: true,
+    children: [
       {
         label: 'Import jobs',
         icon: 'i-lucide-history',
@@ -95,7 +116,9 @@ const routeTitle = computed(() => {
   if (route.path === '/assets/imports') return 'System texture imports'
   if (route.path === '/assets/systextures') return 'System texture imports'
   if (route.path === '/assets/textures') return 'World texture imports'
-  if (route.path === '/assets/jobs') return 'Texture import jobs'
+  if (route.path === '/assets/music') return 'Music assets'
+  if (route.path === '/assets/staticmeshes') return 'Static meshes'
+  if (route.path === '/assets/jobs') return 'Asset import jobs'
   return 'Studio'
 })
 const statusColor = computed<'success' | 'error' | 'neutral'>(() =>

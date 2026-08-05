@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import type { TextureImportKind } from '@l2/ui'
+import type { AssetImportKind } from '@l2/ui'
 import { computed, onBeforeUnmount } from 'vue'
-import {
-  textureImportsUrl,
-  type AssetImportJob
-} from '../../lib/studio-content'
+import { assetImportsUrl, type AssetImportJob } from '../../lib/studio-content'
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const kindFilter = ref<'all' | TextureImportKind>('all')
+const kindFilter = ref<'all' | AssetImportKind>('all')
 const loading = ref(true)
 const error = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
@@ -16,7 +13,9 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 const kindOptions = [
   { label: 'All collections', value: 'all' },
   { label: 'System textures', value: 'systextures' },
-  { label: 'World textures', value: 'textures' }
+  { label: 'World textures', value: 'textures' },
+  { label: 'Music', value: 'music' },
+  { label: 'Static meshes', value: 'staticmeshes' }
 ]
 const visibleJobs = computed(() =>
   jobs.value.filter(
@@ -34,8 +33,10 @@ function statusColor(status: AssetImportJob['status']) {
   return 'info'
 }
 
-function kindLabel(kind: TextureImportKind) {
-  return kind === 'systextures' ? 'System textures' : 'World textures'
+function kindLabel(kind: AssetImportKind) {
+  if (kind === 'systextures') return 'System textures'
+  if (kind === 'textures') return 'World textures'
+  return kind === 'music' ? 'Music' : 'Static meshes'
 }
 
 function formatDate(value: string | null) {
@@ -47,11 +48,14 @@ async function loadJobs(schedule = true) {
   loading.value = true
   try {
     const results = await Promise.all(
-      (['systextures', 'textures'] as const).map((kind) =>
-        $fetch<AssetImportJob[]>(
-          textureImportsUrl(config.public.apiBase, kind),
-          { query: { limit: 100 } }
-        )
+      (['systextures', 'textures', 'music', 'staticmeshes'] as const).map(
+        (kind) =>
+          $fetch<AssetImportJob[]>(
+            assetImportsUrl(config.public.apiBase, kind),
+            {
+              query: { limit: 100 }
+            }
+          )
       )
     )
     jobs.value = results
@@ -82,7 +86,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     <StudioPageHeader
       eyebrow="Asset pipeline"
       title="Import jobs"
-      description="Review import history for both system and world texture collections."
+      description="Review import history for texture, music, and static-mesh collections."
       icon="i-lucide-history"
     >
       <template #actions>
