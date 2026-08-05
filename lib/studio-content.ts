@@ -1,3 +1,5 @@
+import type { TextureImportKind } from '@l2/ui'
+
 export interface NpcRecord {
   id: number
   level: number
@@ -47,6 +49,25 @@ export type LookupKind =
   | 'skill-operate-types'
   | 'skill-target-types'
 
+export type AssetImportStatus =
+  'queued' | 'running' | 'succeeded' | 'succeeded_with_warnings' | 'failed'
+
+export interface AssetImportJob {
+  id: string
+  kind: TextureImportKind
+  status: AssetImportStatus
+  sourcePath: string
+  sourceHash: string | null
+  requestedAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  totalCount: number
+  processedCount: number
+  skippedCount: number
+  warnings: string[]
+  error: string | null
+}
+
 export function npcDirectoryUrl(
   apiBase: string,
   options: { query?: string; page?: number; pageSize?: number } = {}
@@ -73,6 +94,16 @@ export function skillDirectoryUrl(
   url.searchParams.set('page', String(options.page ?? 1))
   url.searchParams.set('pageSize', String(options.pageSize ?? 25))
   return url.toString()
+}
+
+export function textureImportsUrl(
+  apiBase: string,
+  kind: TextureImportKind,
+  id?: string
+): string {
+  const base = apiBase.replace(/\/$/, '')
+  const suffix = id ? `/${encodeURIComponent(id)}` : ''
+  return `${base}/api/assets/${kind}/imports${suffix}`
 }
 
 export function positiveInteger(value: unknown, fallback: number): number {

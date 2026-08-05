@@ -5,7 +5,8 @@ import {
   paginate,
   paginationRange,
   positiveInteger,
-  skillDirectoryUrl
+  skillDirectoryUrl,
+  textureImportsUrl
 } from '../lib/studio-content'
 
 describe('Studio content client', () => {
@@ -47,6 +48,15 @@ describe('Studio content client', () => {
     expect(positiveInteger('0', 25)).toBe(25)
     expect(positiveInteger('-4', 25)).toBe(25)
     expect(positiveInteger(['10'], 25)).toBe(25)
+  })
+
+  it('builds texture import URLs', () => {
+    expect(textureImportsUrl('http://localhost:5101/', 'systextures')).toBe(
+      'http://localhost:5101/api/assets/systextures/imports'
+    )
+    expect(
+      textureImportsUrl('http://localhost:5101', 'textures', 'job-id')
+    ).toBe('http://localhost:5101/api/assets/textures/imports/job-id')
   })
 
   it('paginates local catalogs without mutating their records', () => {

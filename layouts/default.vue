@@ -53,6 +53,32 @@ const navigation: NavigationMenuItem[] = [
         to: '/content/skill-target-types'
       }
     ]
+  },
+  {
+    label: 'Assets',
+    type: 'label'
+  },
+  {
+    label: 'Texture imports',
+    icon: 'i-lucide-images',
+    defaultOpen: true,
+    children: [
+      {
+        label: 'System textures',
+        icon: 'i-lucide-panels-top-left',
+        to: '/assets/systextures'
+      },
+      {
+        label: 'World textures',
+        icon: 'i-lucide-mountain',
+        to: '/assets/textures'
+      },
+      {
+        label: 'Import jobs',
+        icon: 'i-lucide-history',
+        to: '/assets/jobs'
+      }
+    ]
   }
 ]
 
@@ -66,6 +92,10 @@ const routeTitle = computed(() => {
   if (route.path === '/content/skill-operate-types')
     return 'Skill operate types'
   if (route.path === '/content/skill-target-types') return 'Skill target types'
+  if (route.path === '/assets/imports') return 'System texture imports'
+  if (route.path === '/assets/systextures') return 'System texture imports'
+  if (route.path === '/assets/textures') return 'World texture imports'
+  if (route.path === '/assets/jobs') return 'Texture import jobs'
   return 'Studio'
 })
 const statusColor = computed<'success' | 'error' | 'neutral'>(() =>

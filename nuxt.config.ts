@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   css: ['~/assets/css/main.css'],
@@ -8,6 +10,9 @@ export default defineNuxtConfig({
     }
   },
   modules: ['@nuxt/ui', '@pinia/nuxt'],
+  dir: {
+    public: fileURLToPath(new URL('../../assets', import.meta.url))
+  },
   runtimeConfig: {
     public: {
       apiBase:
