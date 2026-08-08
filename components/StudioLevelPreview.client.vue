@@ -297,9 +297,15 @@ function frameMap(topDown = false) {
 async function containerFor(url: string) {
   const existing = containers.get(url)
   if (existing) return existing
-  const loaded = LoadAssetContainerAsync(url, scene!, {
-    pluginExtension: '.glb'
-  }).then((container) => {
+  const rootRelative = url.startsWith('/')
+  const loaded = LoadAssetContainerAsync(
+    rootRelative ? url.slice(1) : url,
+    scene!,
+    {
+      rootUrl: rootRelative ? '/' : undefined,
+      pluginExtension: '.glb'
+    }
+  ).then((container) => {
     applyL2MaterialMetadata(container, scene!)
     return container
   })

@@ -27,9 +27,15 @@ async function loadMesh() {
     .filter((mesh) => mesh.name !== '__root__')
     .forEach((mesh) => mesh.dispose())
   try {
-    const container = await LoadAssetContainerAsync(props.url, scene, {
-      pluginExtension: '.glb'
-    })
+    const rootRelative = props.url.startsWith('/')
+    const container = await LoadAssetContainerAsync(
+      rootRelative ? props.url.slice(1) : props.url,
+      scene,
+      {
+        rootUrl: rootRelative ? '/' : undefined,
+        pluginExtension: '.glb'
+      }
+    )
     applyL2MaterialMetadata(container, scene)
     if (version !== loadVersion) {
       container.dispose()
