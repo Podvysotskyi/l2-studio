@@ -42,6 +42,15 @@ const resolvedCount = computed(
     manifest.value?.meshes.filter((mesh) => mesh.status === 'resolved')
       .length ?? 0
 )
+const materialCounts = computed(() =>
+  (manifest.value?.meshes ?? []).reduce(
+    (total, mesh) => ({
+      resolved: total.resolved + (mesh.resolvedMaterialCount ?? 0),
+      available: total.available + (mesh.materialCount ?? 0)
+    }),
+    { resolved: 0, available: 0 }
+  )
+)
 
 watch([query, selectedPackage, pageSize], () => (page.value = 1))
 
@@ -104,7 +113,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     <StudioPageHeader
       eyebrow="Asset pipeline"
       title="Static meshes"
-      description="Convert Interlude StaticMesh packages into browser-previewable GLB geometry."
+      description="Convert Interlude StaticMesh geometry, sections, and classic materials into browser-previewable GLB assets."
       icon="i-lucide-box"
     >
       <template #actions>
@@ -164,7 +173,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             <h2 class="text-sm font-semibold text-highlighted">Mesh library</h2>
             <p class="text-xs text-muted">
               {{ resolvedCount }} resolved ·
-              {{ (manifest?.meshes.length ?? 0) - resolvedCount }} skipped
+              {{ (manifest?.meshes.length ?? 0) - resolvedCount }} skipped ·
+              {{ materialCounts.resolved.toLocaleString() }} /
+              {{ materialCounts.available.toLocaleString() }} materials
             </p>
           </div>
           <UInput
@@ -233,13 +244,24 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                   >{{ mesh.packageName }} ·
                   {{ mesh.vertexCount.toLocaleString() }} vertices ·
                   {{ mesh.triangleCount.toLocaleString() }} triangles ·
-                  {{ mesh.sectionCount }} sections</span
+                  {{ mesh.sectionCount }} sections ·
+                  {{ mesh.resolvedMaterialCount ?? 0 }} /
+                  {{ mesh.materialCount ?? 0 }} materials</span
                 ><span
-                  v-if="mesh.error"
+                  v-if="mesh.materialError || mesh.error"
                   class="mt-1 block truncate text-xs text-error"
-                  >{{ mesh.error }}</span
+                  >{{ mesh.materialError || mesh.error }}</span
                 ></span
               >
+              <UBadge
+                v-if="mesh.materialStatus && mesh.materialStatus !== 'none'"
+                :color="
+                  mesh.materialStatus === 'resolved' ? 'success' : 'warning'
+                "
+                variant="subtle"
+              >
+                {{ mesh.materialStatus }} materials
+              </UBadge>
               <UBadge
                 :color="mesh.status === 'resolved' ? 'success' : 'warning'"
                 variant="subtle"

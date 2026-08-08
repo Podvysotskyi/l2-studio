@@ -38,7 +38,8 @@ const manifest: SceneManifest = {
   actions: [],
   ambientSounds: [],
   effects: [],
-  unsupportedActorClasses: {}
+  waterVolumes: [],
+  unrepresentedObjectClasses: {}
 }
 
 describe('scene cinematics', () => {

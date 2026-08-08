@@ -10,6 +10,7 @@ import {
   Vector3
 } from '@babylonjs/core'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
+import { applyL2MaterialMetadata } from '@l2/babylon-runtime'
 
 const props = defineProps<{ url: string }>()
 const emit = defineEmits<{ error: [message: string] }>()
@@ -29,6 +30,7 @@ async function loadMesh() {
     const container = await LoadAssetContainerAsync(props.url, scene, {
       pluginExtension: '.glb'
     })
+    applyL2MaterialMetadata(container, scene)
     if (version !== loadVersion) {
       container.dispose()
       return
