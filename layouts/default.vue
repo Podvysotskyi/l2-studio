@@ -82,6 +82,16 @@ const navigation: NavigationMenuItem[] = [
         label: 'Static meshes',
         icon: 'i-lucide-box',
         to: '/assets/staticmeshes'
+      },
+      {
+        label: 'Levels',
+        icon: 'i-lucide-map',
+        to: '/assets/levels'
+      },
+      {
+        label: 'Scenes',
+        icon: 'i-lucide-clapperboard',
+        to: '/assets/scenes'
       }
     ]
   },
@@ -118,6 +128,10 @@ const routeTitle = computed(() => {
   if (route.path === '/assets/textures') return 'World texture imports'
   if (route.path === '/assets/music') return 'Music assets'
   if (route.path === '/assets/staticmeshes') return 'Static meshes'
+  if (route.path === '/assets/levels') return 'Levels'
+  if (route.path.startsWith('/assets/levels/')) return 'Level map'
+  if (route.path === '/assets/scenes') return 'Scenes'
+  if (route.path.startsWith('/assets/scenes/')) return 'Client scene'
   if (route.path === '/assets/jobs') return 'Asset import jobs'
   return 'Studio'
 })

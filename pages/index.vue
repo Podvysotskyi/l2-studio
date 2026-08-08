@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type {
   AssetImportKind,
+  LevelCatalogManifest,
   MusicManifest,
+  SceneCatalogManifest,
   StaticMeshManifest,
   TextureManifest
 } from '@l2/ui'
 import {
   musicManifestUrl,
+  levelCatalogManifestUrl,
+  sceneCatalogManifestUrl,
   staticMeshManifestUrl,
   textureManifestUrl
 } from '@l2/ui'
@@ -200,6 +204,32 @@ function createEmptyAssetSummaries(): AssetSummary[] {
       groups: null,
       groupLabel: 'packages',
       available: false
+    },
+    {
+      kind: 'levels',
+      label: 'Levels',
+      description: 'Coordinate-named geographic world tiles and placements.',
+      icon: 'i-lucide-map',
+      to: '/assets/levels',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'maps',
+      available: false
+    },
+    {
+      kind: 'scenes',
+      label: 'Scenes',
+      description: 'Client entry, lobby, sky, and support scene packages.',
+      icon: 'i-lucide-clapperboard',
+      to: '/assets/scenes',
+      total: 0,
+      resolved: 0,
+      skipped: 0,
+      groups: null,
+      groupLabel: 'scenes',
+      available: false
     }
   ]
 }
@@ -262,6 +292,12 @@ async function loadAssetSummary() {
     }),
     $fetch<StaticMeshManifest>(staticMeshManifestUrl(), {
       query: { refresh: Date.now() }
+    }),
+    $fetch<LevelCatalogManifest>(levelCatalogManifestUrl(), {
+      query: { refresh: Date.now() }
+    }),
+    $fetch<SceneCatalogManifest>(sceneCatalogManifestUrl(), {
+      query: { refresh: Date.now() }
     })
   ] as const
   const results = await Promise.allSettled(requests)
@@ -304,6 +340,34 @@ async function loadAssetSummary() {
       available: true
     }
   }
+  const levels = results[4]
+  if (levels.status === 'fulfilled') {
+    summaries[4] = {
+      ...summaries[4]!,
+      total: levels.value.levels.length,
+      resolved: levels.value.levels.filter(
+        (level) => level.status === 'resolved'
+      ).length,
+      skipped: levels.value.levels.filter((level) => level.status === 'skipped')
+        .length,
+      groups: levels.value.levels.length,
+      available: true
+    }
+  }
+  const scenes = results[5]
+  if (scenes.status === 'fulfilled') {
+    summaries[5] = {
+      ...summaries[5]!,
+      total: scenes.value.scenes.length,
+      resolved: scenes.value.scenes.filter(
+        (scene) => scene.status === 'resolved'
+      ).length,
+      skipped: scenes.value.scenes.filter((scene) => scene.status === 'skipped')
+        .length,
+      groups: scenes.value.scenes.length,
+      available: true
+    }
+  }
 
   assets.value = summaries
   assetError.value = results.some((result) => result.status === 'rejected')
@@ -329,14 +393,19 @@ function textureSummary(
 async function loadJobs() {
   try {
     const results = await Promise.all(
-      (['systextures', 'textures', 'music', 'staticmeshes'] as const).map(
-        (kind) =>
-          $fetch<AssetImportJob[]>(
-            assetImportsUrl(config.public.apiBase, kind),
-            {
-              query: { limit: 10 }
-            }
-          )
+      (
+        [
+          'systextures',
+          'textures',
+          'music',
+          'staticmeshes',
+          'levels',
+          'scenes'
+        ] as const
+      ).map((kind) =>
+        $fetch<AssetImportJob[]>(assetImportsUrl(config.public.apiBase, kind), {
+          query: { limit: 10 }
+        })
       )
     )
     jobs.value = results

@@ -71,6 +71,15 @@ describe('Studio content client', () => {
     )
   })
 
+  it('builds level import URLs', () => {
+    expect(assetImportsUrl('http://localhost:5101/', 'levels')).toBe(
+      'http://localhost:5101/api/assets/levels/imports'
+    )
+    expect(assetImportsUrl('http://localhost:5101/', 'scenes')).toBe(
+      'http://localhost:5101/api/assets/scenes/imports'
+    )
+  })
+
   it('paginates local catalogs without mutating their records', () => {
     const records = [1, 2, 3, 4, 5]
     expect(paginate(records, 2, 2)).toEqual([3, 4])

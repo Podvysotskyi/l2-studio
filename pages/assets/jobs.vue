@@ -15,7 +15,9 @@ const kindOptions = [
   { label: 'System textures', value: 'systextures' },
   { label: 'World textures', value: 'textures' },
   { label: 'Music', value: 'music' },
-  { label: 'Static meshes', value: 'staticmeshes' }
+  { label: 'Static meshes', value: 'staticmeshes' },
+  { label: 'Levels', value: 'levels' },
+  { label: 'Scenes', value: 'scenes' }
 ]
 const visibleJobs = computed(() =>
   jobs.value.filter(
@@ -36,7 +38,9 @@ function statusColor(status: AssetImportJob['status']) {
 function kindLabel(kind: AssetImportKind) {
   if (kind === 'systextures') return 'System textures'
   if (kind === 'textures') return 'World textures'
-  return kind === 'music' ? 'Music' : 'Static meshes'
+  if (kind === 'music') return 'Music'
+  if (kind === 'staticmeshes') return 'Static meshes'
+  return kind === 'levels' ? 'Levels' : 'Scenes'
 }
 
 function formatDate(value: string | null) {
@@ -48,14 +52,19 @@ async function loadJobs(schedule = true) {
   loading.value = true
   try {
     const results = await Promise.all(
-      (['systextures', 'textures', 'music', 'staticmeshes'] as const).map(
-        (kind) =>
-          $fetch<AssetImportJob[]>(
-            assetImportsUrl(config.public.apiBase, kind),
-            {
-              query: { limit: 100 }
-            }
-          )
+      (
+        [
+          'systextures',
+          'textures',
+          'music',
+          'staticmeshes',
+          'levels',
+          'scenes'
+        ] as const
+      ).map((kind) =>
+        $fetch<AssetImportJob[]>(assetImportsUrl(config.public.apiBase, kind), {
+          query: { limit: 100 }
+        })
       )
     )
     jobs.value = results
@@ -86,7 +95,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     <StudioPageHeader
       eyebrow="Asset pipeline"
       title="Import jobs"
-      description="Review import history for texture, music, and static-mesh collections."
+      description="Review import history for textures, music, meshes, world levels, and client scenes."
       icon="i-lucide-history"
     >
       <template #actions>
