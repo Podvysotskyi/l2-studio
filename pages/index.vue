@@ -6,11 +6,13 @@ import {
   assetImportsUrl,
   lookupUrl,
   npcDirectoryUrl,
+  playerClassDirectoryUrl,
   skillDirectoryUrl,
   type AssetImportJob,
   type LookupKind,
   type LookupRecord,
   type NpcPage,
+  type PlayerClassRecord,
   type SkillPage
 } from '../lib/studio-content'
 
@@ -36,6 +38,9 @@ const jobsError = ref(false)
 const counts = ref({
   npcs: 0,
   skills: 0,
+  playerClasses: 0,
+  playerRaces: 0,
+  playerSexes: 0,
   npcRaces: 0,
   npcSexes: 0,
   npcTypes: 0,
@@ -45,12 +50,16 @@ const counts = ref({
 const assets = ref<AssetSummary[]>(createEmptyAssetSummaries())
 const jobs = ref<AssetImportJob[]>([])
 
-const totalDefinitions = computed(() => counts.value.npcs + counts.value.skills)
+const totalDefinitions = computed(
+  () => counts.value.npcs + counts.value.skills + counts.value.playerClasses
+)
 const totalLookups = computed(
   () =>
     counts.value.npcRaces +
     counts.value.npcSexes +
     counts.value.npcTypes +
+    counts.value.playerRaces +
+    counts.value.playerSexes +
     counts.value.skillOperateTypes +
     counts.value.skillTargetTypes
 )
@@ -74,14 +83,14 @@ const headlineStats = computed(() => [
   {
     label: 'Content definitions',
     value: totalDefinitions.value,
-    detail: `${counts.value.npcs.toLocaleString()} NPCs · ${counts.value.skills.toLocaleString()} skills`,
+    detail: `${counts.value.npcs.toLocaleString()} NPCs · ${counts.value.skills.toLocaleString()} skills · ${counts.value.playerClasses.toLocaleString()} classes`,
     icon: 'i-lucide-database',
     color: 'text-primary'
   },
   {
     label: 'Lookup values',
     value: totalLookups.value,
-    detail: 'Five normalized vocabularies',
+    detail: 'Seven normalized vocabularies',
     icon: 'i-lucide-tags',
     color: 'text-info'
   },
@@ -117,10 +126,28 @@ const contentCatalogs = computed(() => [
     description: 'Skills with levels, icons, operate types, and target types.',
     icon: 'i-lucide-sparkles',
     to: '/content/skills'
+  },
+  {
+    label: 'Player classes',
+    value: counts.value.playerClasses,
+    description:
+      'Expandable progression from base professions to third classes.',
+    icon: 'i-lucide-git-branch',
+    to: '/content/player-classes'
   }
 ])
 
 const lookupCatalogs = computed(() => [
+  {
+    label: 'Player races',
+    value: counts.value.playerRaces,
+    to: '/content/player-races'
+  },
+  {
+    label: 'Player sexes',
+    value: counts.value.playerSexes,
+    to: '/content/player-sexes'
+  },
   { label: 'NPC races', value: counts.value.npcRaces, to: '/content/races' },
   { label: 'NPC sexes', value: counts.value.npcSexes, to: '/content/sexes' },
   { label: 'NPC types', value: counts.value.npcTypes, to: '/content/types' },
@@ -233,6 +260,9 @@ async function loadContentSummary() {
     const [
       npcs,
       skills,
+      playerClasses,
+      playerRaces,
+      playerSexes,
       npcRaces,
       npcSexes,
       npcTypes,
@@ -245,6 +275,11 @@ async function loadContentSummary() {
       $fetch<SkillPage>(
         skillDirectoryUrl(config.public.apiBase, { page: 1, pageSize: 1 })
       ),
+      $fetch<PlayerClassRecord[]>(
+        playerClassDirectoryUrl(config.public.apiBase)
+      ),
+      fetchLookupCount('player-races'),
+      fetchLookupCount('player-sexes'),
       fetchLookupCount('npc-races'),
       fetchLookupCount('npc-sexes'),
       fetchLookupCount('npc-types'),
@@ -254,6 +289,9 @@ async function loadContentSummary() {
     counts.value = {
       npcs: npcs.total,
       skills: skills.total,
+      playerClasses: playerClasses.length,
+      playerRaces,
+      playerSexes,
       npcRaces,
       npcSexes,
       npcTypes,
@@ -448,9 +486,7 @@ onMounted(loadSummary)
         </div>
         <UBadge color="neutral" variant="subtle">PostgreSQL · content</UBadge>
       </div>
-      <div
-        class="grid gap-4 xl:grid-cols-[repeat(2,minmax(0,1fr))_minmax(20rem,1.1fr)]"
-      >
+      <div class="grid gap-4 xl:grid-cols-4">
         <UCard
           v-for="catalog in contentCatalogs"
           :key="catalog.to"

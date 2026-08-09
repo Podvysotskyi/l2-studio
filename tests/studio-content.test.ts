@@ -1,16 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
   lookupUrl,
+  buildPlayerClassHierarchy,
+  flattenPlayerClassHierarchy,
   assetCatalogEntryUrl,
   assetCatalogsUrl,
   assetCatalogUrl,
   assetImportsUrl,
   npcDirectoryUrl,
+  playerClassDirectoryUrl,
   paginate,
   paginationRange,
   positiveInteger,
   skillDirectoryUrl
 } from '../lib/studio-content'
+
+const humanAvailability = [
+  {
+    id: 0,
+    name: 'Human',
+    allowedSexes: [
+      { id: 0, name: 'Male' },
+      { id: 1, name: 'Female' }
+    ]
+  }
+]
 
 describe('Studio content client', () => {
   it('builds a normalized NPC directory URL', () => {
@@ -32,6 +46,125 @@ describe('Studio content client', () => {
     expect(lookupUrl('http://localhost:5101/', 'skill-target-types')).toBe(
       'http://localhost:5101/api/content/skill-target-types'
     )
+    expect(lookupUrl('http://localhost:5101/', 'player-races')).toBe(
+      'http://localhost:5101/api/content/player-races'
+    )
+    expect(lookupUrl('http://localhost:5101/', 'player-sexes')).toBe(
+      'http://localhost:5101/api/content/player-sexes'
+    )
+  })
+
+  it('builds the player class directory URL', () => {
+    expect(playerClassDirectoryUrl('http://localhost:5101/')).toBe(
+      'http://localhost:5101/api/content/player-classes'
+    )
+  })
+
+  it('builds and expands the player class hierarchy', () => {
+    const roots = buildPlayerClassHierarchy([
+      {
+        id: 88,
+        name: 'Duelist',
+        parentClassId: 2,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 2,
+        name: 'Gladiator',
+        parentClassId: 1,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 0,
+        name: 'Human Fighter',
+        parentClassId: null,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 1,
+        name: 'Warrior',
+        parentClassId: 0,
+        isMage: false,
+        allowedRaces: humanAvailability
+      }
+    ])
+
+    expect(roots).toHaveLength(1)
+    expect(roots[0]).toMatchObject({
+      id: 0,
+      depth: 0,
+      stage: 'Base',
+      parentName: null
+    })
+    expect(roots[0]?.children[0]).toMatchObject({
+      id: 1,
+      depth: 1,
+      stage: 'First',
+      parentName: 'Human Fighter'
+    })
+
+    expect(flattenPlayerClassHierarchy(roots, new Set([0]))).toMatchObject([
+      { id: 0 },
+      { id: 1 }
+    ])
+    expect(
+      flattenPlayerClassHierarchy(roots, new Set([0, 1, 2]))
+    ).toMatchObject([{ id: 0 }, { id: 1 }, { id: 2 }, { id: 88 }])
+  })
+
+  it('includes ancestor paths while searching player classes', () => {
+    const roots = buildPlayerClassHierarchy([
+      {
+        id: 0,
+        name: 'Human Fighter',
+        parentClassId: null,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 1,
+        name: 'Warrior',
+        parentClassId: 0,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 2,
+        name: 'Gladiator',
+        parentClassId: 1,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 88,
+        name: 'Duelist',
+        parentClassId: 2,
+        isMage: false,
+        allowedRaces: humanAvailability
+      },
+      {
+        id: 3,
+        name: 'Warlord',
+        parentClassId: 1,
+        isMage: false,
+        allowedRaces: humanAvailability
+      }
+    ])
+
+    expect(
+      flattenPlayerClassHierarchy(roots, new Set(), 'duelist')
+    ).toMatchObject([{ id: 0 }, { id: 1 }, { id: 2 }, { id: 88 }])
+    expect(flattenPlayerClassHierarchy(roots, new Set(), '3')).toMatchObject([
+      { id: 0 },
+      { id: 1 },
+      { id: 3 }
+    ])
+    expect(
+      flattenPlayerClassHierarchy(roots, new Set(), 'female')
+    ).toHaveLength(5)
   })
 
   it('builds a normalized skill directory URL', () => {

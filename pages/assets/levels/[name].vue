@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   LevelActorManifestEntry,
+  LevelBspMeshManifestEntry,
   LevelCatalogEntry,
   LevelLightManifestEntry,
   LevelManifest,
@@ -23,11 +24,14 @@ import { assetCatalogEntryUrl, paginate } from '../../../lib/studio-content'
 
 interface LevelPreviewApi {
   focusActor(name: string): void
+  focusBsp(name: string): void
   focusLight(name: string): void
   focusWater(name: string): void
+  focusWaterSurface(name: string): void
+  frameBsp(): void
 }
 
-type InspectorTab = 'actors' | 'bsp' | 'terrain' | 'lights' | 'water'
+type InspectorTab = 'actors' | 'bsp' | 'terrain' | 'lights' | 'water' | 'other'
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -35,13 +39,19 @@ const catalogEntry = ref<LevelCatalogEntry>()
 const manifest = ref<LevelManifest>()
 const preview = ref<LevelPreviewApi>()
 const selectedActorName = ref<string>()
+const selectedBspName = ref<string>()
 const selectedLightName = ref<string>()
 const selectedWaterName = ref<string>()
+const selectedWaterSurfaceName = ref<string>()
 const inspectorTab = ref<InspectorTab>('actors')
 const actorsVisible = ref(true)
 const bspVisible = ref(true)
+const skyZoneVisible = ref(true)
+const skyZoneChunkVisibility = ref<Record<string, boolean>>({})
+const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
+const waterSurfacesVisible = ref(true)
 const terrainLayerStates = ref<TerrainLayerStates>({})
 const query = ref('')
 const lightQuery = ref('')
@@ -74,8 +84,22 @@ const terrainMaterialsResolved = computed(
       (terrain) => terrain.materialStatus === 'resolved'
     ) ?? false
 )
+const worldBspMeshes = computed(() =>
+  (manifest.value?.bspMeshes ?? []).filter((mesh) => mesh.role === 'geometry')
+)
+const waterSurfaceMeshes = computed(() =>
+  (manifest.value?.bspMeshes ?? []).filter(
+    (mesh) => mesh.role === 'water-surface'
+  )
+)
+const skyZoneBspMeshes = computed(() =>
+  (manifest.value?.bspMeshes ?? []).filter((mesh) => mesh.role === 'sky-zone')
+)
+const worldBaseBspMeshes = computed(() =>
+  (manifest.value?.bspMeshes ?? []).filter((mesh) => mesh.role === 'world-base')
+)
 const bspTotals = computed(() =>
-  (manifest.value?.bspMeshes ?? []).reduce(
+  worldBspMeshes.value.reduce(
     (totals, mesh) => ({
       vertices: totals.vertices + mesh.vertexCount,
       triangles: totals.triangles + mesh.triangleCount,
@@ -102,6 +126,23 @@ const filteredLights = computed(() =>
 const filteredWaterVolumes = computed(() =>
   filterLevelWaterVolumes(manifest.value?.waterVolumes ?? [], waterQuery.value)
 )
+const filteredWaterSurfaces = computed(() => {
+  const normalized = waterQuery.value.trim().toLocaleLowerCase()
+  if (!normalized) return waterSurfaceMeshes.value
+  return waterSurfaceMeshes.value.filter(
+    (surface) =>
+      surface.name.toLocaleLowerCase().includes(normalized) ||
+      surface.waterVolumeNames.some((name) =>
+        name.toLocaleLowerCase().includes(normalized)
+      )
+  )
+})
+const enabledSkyZoneChunkCount = computed(
+  () =>
+    skyZoneBspMeshes.value.filter(
+      (mesh) => skyZoneChunkVisibility.value[mesh.name] !== false
+    ).length
+)
 const terrainLayerVisibility = computed(() =>
   Object.fromEntries(
     Object.entries(terrainLayerStates.value).map(([name, state]) => [
@@ -116,6 +157,23 @@ watch(routeName, () => void loadLevel(), { immediate: true })
 
 function selectActor(actor: LevelActorManifestEntry) {
   selectedActorName.value = actor.name
+}
+
+function selectBsp(bsp: LevelBspMeshManifestEntry) {
+  selectedBspName.value = bsp.name
+}
+
+async function focusBsp(bsp: LevelBspMeshManifestEntry) {
+  if (
+    !bsp.meshUrl ||
+    bsp.role === 'sky-zone' ||
+    (bsp.role === 'geometry' && !bspVisible.value) ||
+    (bsp.role === 'world-base' && !worldBaseVisible.value)
+  )
+    return
+  selectBsp(bsp)
+  await nextTick()
+  preview.value?.focusBsp(bsp.name)
 }
 
 async function focusActor(actor: LevelActorManifestEntry) {
@@ -173,6 +231,24 @@ async function focusWater(volume: LevelWaterVolumeManifestEntry) {
   preview.value?.focusWater(volume.name)
 }
 
+function selectWaterSurface(surface: LevelBspMeshManifestEntry) {
+  selectedWaterSurfaceName.value = surface.name
+}
+
+async function focusWaterSurface(surface: LevelBspMeshManifestEntry) {
+  if (!surface.meshUrl || !waterSurfacesVisible.value) return
+  selectWaterSurface(surface)
+  await nextTick()
+  preview.value?.focusWaterSurface(surface.name)
+}
+
+function setSkyZoneChunkVisible(name: string, visible: boolean) {
+  skyZoneChunkVisibility.value = {
+    ...skyZoneChunkVisibility.value,
+    [name]: visible
+  }
+}
+
 async function loadLevel() {
   loading.value = true
   error.value = undefined
@@ -181,13 +257,19 @@ async function loadLevel() {
   catalogEntry.value = undefined
   manifest.value = undefined
   selectedActorName.value = undefined
+  selectedBspName.value = undefined
   selectedLightName.value = undefined
   selectedWaterName.value = undefined
+  selectedWaterSurfaceName.value = undefined
   inspectorTab.value = 'actors'
   actorsVisible.value = true
   bspVisible.value = true
+  skyZoneVisible.value = true
+  skyZoneChunkVisibility.value = {}
+  worldBaseVisible.value = false
   lightHelpersVisible.value = false
   waterVolumesVisible.value = true
+  waterSurfacesVisible.value = true
   terrainLayerStates.value = {}
   query.value = ''
   lightQuery.value = ''
@@ -203,6 +285,11 @@ async function loadLevel() {
       return
     }
     manifest.value = await $fetch<LevelManifest>(entry.manifestUrl)
+    skyZoneChunkVisibility.value = Object.fromEntries(
+      manifest.value.bspMeshes
+        .filter((mesh) => mesh.role === 'sky-zone')
+        .map((mesh) => [mesh.name, true])
+    )
     terrainLayerStates.value = createTerrainLayerStates(manifest.value.terrains)
   } catch {
     error.value = 'Map “' + routeName.value + '” could not be loaded.'
@@ -257,7 +344,7 @@ async function loadLevel() {
         <UCard>
           <p class="text-xs text-muted">BSP</p>
           <p class="text-2xl font-semibold">
-            {{ manifest.bspMeshes.length.toLocaleString() }}
+            {{ worldBspMeshes.length.toLocaleString() }}
           </p>
           <p class="text-xs text-muted">
             {{ bspTotals.surfaces.toLocaleString() }} surfaces ·
@@ -321,11 +408,17 @@ async function loadLevel() {
             ref="preview"
             :manifest="manifest"
             :selected-actor-name="selectedActorName"
+            :selected-bsp-name="selectedBspName"
             :actors-visible="actorsVisible"
             :bsp-visible="bspVisible"
+            :sky-zone-visible="skyZoneVisible"
+            :sky-zone-chunk-visibility="skyZoneChunkVisibility"
+            :world-base-visible="worldBaseVisible"
             :terrain-layer-visibility="terrainLayerVisibility"
             :light-helpers-visible="lightHelpersVisible"
             :selected-light-name="selectedLightName"
+            :water-surfaces-visible="waterSurfacesVisible"
+            :selected-water-surface-name="selectedWaterSurfaceName"
             :water-volumes-visible="waterVolumesVisible"
             :selected-water-name="selectedWaterName"
             @error="previewError = $event"
@@ -341,7 +434,7 @@ async function loadLevel() {
         <UCard class="xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div
-              class="grid grid-cols-5 gap-1"
+              class="grid grid-cols-6 gap-1"
               role="tablist"
               aria-label="Level inspector"
             >
@@ -395,6 +488,16 @@ async function loadLevel() {
                 class="justify-center"
                 @click="inspectorTab = 'water'"
               />
+              <UButton
+                label="Other"
+                icon="i-lucide-shapes"
+                color="neutral"
+                :variant="inspectorTab === 'other' ? 'soft' : 'ghost'"
+                role="tab"
+                :aria-selected="inspectorTab === 'other'"
+                class="justify-center"
+                @click="inspectorTab = 'other'"
+              />
             </div>
           </template>
 
@@ -433,59 +536,86 @@ async function loadLevel() {
             </div>
             <div class="max-h-[52vh] divide-y divide-default overflow-y-auto">
               <div
-                v-for="bsp in manifest.bspMeshes"
+                v-for="bsp in worldBspMeshes"
                 :key="bsp.name"
-                class="space-y-1 p-4 text-xs"
+                class="flex items-center gap-2 p-2"
+                :class="selectedBspName === bsp.name ? 'bg-primary/10' : ''"
               >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="font-medium text-highlighted">{{ bsp.name }}</p>
-                  <UBadge
-                    :color="
-                      bsp.error && !bsp.meshUrl
-                        ? 'error'
-                        : bsp.materialStatus === 'resolved' ||
-                            bsp.materialStatus === 'none'
-                          ? 'success'
-                          : 'warning'
-                    "
-                    variant="subtle"
+                <button
+                  type="button"
+                  class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
+                  :aria-pressed="selectedBspName === bsp.name"
+                  @click="selectBsp(bsp)"
+                  @dblclick="focusBsp(bsp)"
+                >
+                  <span class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-highlighted">{{
+                      bsp.name
+                    }}</span>
+                    <span class="flex shrink-0 items-center gap-2">
+                      <UBadge
+                        :color="
+                          bsp.error && !bsp.meshUrl
+                            ? 'error'
+                            : bsp.materialStatus === 'resolved' ||
+                                bsp.materialStatus === 'none'
+                              ? 'success'
+                              : 'warning'
+                        "
+                        variant="subtle"
+                      >
+                        {{
+                          bsp.error && !bsp.meshUrl
+                            ? 'error'
+                            : bsp.materialStatus
+                        }}
+                      </UBadge>
+                    </span>
+                  </span>
+                  <span class="mt-1 block text-xs text-muted">
+                    {{ bsp.surfaceCount }} surfaces ·
+                    {{ bsp.triangleCount }} triangles ·
+                    {{ bsp.resolvedMaterialCount }}/{{ bsp.materialCount }}
+                    materials
+                  </span>
+                  <span
+                    v-if="bsp.error"
+                    class="mt-1 block text-xs"
+                    :class="bsp.meshUrl ? 'text-warning' : 'text-error'"
                   >
-                    {{
-                      bsp.error && !bsp.meshUrl ? 'error' : bsp.materialStatus
-                    }}
-                  </UBadge>
-                </div>
-                <p class="text-muted">
-                  {{ bsp.surfaceCount }} surfaces ·
-                  {{ bsp.triangleCount }} triangles ·
-                  {{ bsp.resolvedMaterialCount }}/{{ bsp.materialCount }}
-                  materials
-                </p>
-                <p
-                  v-if="bsp.error"
-                  :class="bsp.meshUrl ? 'text-warning' : 'text-error'"
-                >
-                  {{ bsp.error }}
-                </p>
-                <p
-                  v-if="
-                    bsp.invisibleSurfaceCount ||
-                    bsp.portalSurfaceCount ||
-                    bsp.fakeBackdropSurfaceCount ||
-                    bsp.malformedSurfaceCount
-                  "
-                  class="text-muted"
-                >
-                  Skipped: {{ bsp.invisibleSurfaceCount }} invisible,
-                  {{ bsp.portalSurfaceCount }} portal,
-                  {{ bsp.fakeBackdropSurfaceCount }} backdrop,
-                  {{ bsp.malformedSurfaceCount }} malformed
-                </p>
+                    {{ bsp.error }}
+                  </span>
+                  <span
+                    v-if="
+                      bsp.invisibleSurfaceCount ||
+                      bsp.portalSurfaceCount ||
+                      bsp.fakeBackdropSurfaceCount ||
+                      bsp.malformedSurfaceCount ||
+                      bsp.unresolvedMaterialReferenceCount
+                    "
+                    class="mt-1 block text-xs text-muted"
+                  >
+                    Skipped: {{ bsp.invisibleSurfaceCount }} invisible,
+                    {{ bsp.portalSurfaceCount }} portal,
+                    {{ bsp.fakeBackdropSurfaceCount }} backdrop,
+                    {{ bsp.malformedSurfaceCount }} malformed,
+                    {{ bsp.unresolvedMaterialReferenceCount }} neutral-material
+                  </span>
+                </button>
+                <UButton
+                  icon="i-lucide-focus"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :disabled="!bsp.meshUrl || !bspVisible"
+                  :aria-label="'Focus ' + bsp.name"
+                  @click="focusBsp(bsp)"
+                />
               </div>
             </div>
           </template>
 
-          <template v-if="inspectorTab === 'actors'">
+          <template v-else-if="inspectorTab === 'actors'">
             <div class="space-y-3 border-b border-default p-4">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -771,94 +901,315 @@ async function loadLevel() {
             </div>
           </template>
 
-          <template v-else>
+          <template v-else-if="inspectorTab === 'water'">
             <div class="space-y-3 border-b border-default p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h2 class="text-sm font-semibold text-highlighted">
-                    Water volumes
-                  </h2>
-                  <p class="text-xs text-muted">
-                    {{ filteredWaterVolumes.length }} of
-                    {{ manifest.waterVolumes.length }} volumes
-                  </p>
-                </div>
+              <div>
+                <h2 class="text-sm font-semibold text-highlighted">Water</h2>
+                <p class="text-xs text-muted">
+                  {{ waterSurfaceMeshes.length }} rendered surfaces ·
+                  {{ manifest.waterVolumes.length }} gameplay volumes
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <USwitch
+                  v-model="waterSurfacesVisible"
+                  label="Show surfaces"
+                  aria-label="Show water surfaces"
+                />
                 <USwitch
                   v-model="waterVolumesVisible"
-                  label="Show"
+                  label="Show volumes"
                   aria-label="Show water volumes"
                 />
               </div>
               <UInput
                 v-model="waterQuery"
                 icon="i-lucide-search"
-                placeholder="Search water or brush names"
-                aria-label="Search water volumes"
+                placeholder="Search surfaces, volumes, or brushes"
+                aria-label="Search water"
                 class="w-full"
               />
             </div>
-            <div class="max-h-[62vh] divide-y divide-default overflow-y-auto">
-              <div
-                v-for="volume in filteredWaterVolumes"
-                :key="volume.name"
-                class="flex items-center gap-2 p-2"
-                :class="
-                  selectedWaterName === volume.name ? 'bg-primary/10' : ''
-                "
+            <div class="max-h-[62vh] overflow-y-auto">
+              <section
+                v-if="waterSurfaceMeshes.length"
+                aria-label="Water surfaces"
               >
-                <button
-                  type="button"
-                  class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
-                  @click="selectWater(volume)"
-                  @dblclick="focusWater(volume)"
-                >
-                  <span class="flex items-center gap-2">
-                    <span class="truncate text-sm font-medium text-highlighted">
-                      {{ volume.name }}
-                    </span>
-                    <UBadge
-                      :color="
-                        volume.status === 'resolved' ? 'success' : 'warning'
-                      "
-                      variant="subtle"
-                      size="sm"
-                    >
-                      {{ volume.status }}
-                    </UBadge>
-                  </span>
-                  <span class="mt-1 block truncate text-xs text-muted">
-                    Brush {{ volume.brushName ?? 'unavailable' }} ·
-                    {{ volume.triangleCount }} triangles
-                  </span>
-                  <span class="mt-1 block truncate text-xs text-dimmed">
-                    X {{ volume.location.x.toFixed(0) }} · Y
-                    {{ volume.location.y.toFixed(0) }} · Z
-                    {{ volume.location.z.toFixed(0) }}
-                  </span>
-                  <span
-                    v-if="volume.error"
-                    class="mt-1 block text-xs text-warning"
+                <div class="border-b border-default bg-elevated/50 px-4 py-2">
+                  <p
+                    class="text-xs font-semibold tracking-wide text-muted uppercase"
                   >
-                    {{ volume.error }}
-                  </span>
-                </button>
-                <UButton
-                  icon="i-lucide-focus"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  :disabled="
-                    volume.status !== 'resolved' || !waterVolumesVisible
-                  "
-                  :aria-label="'Focus ' + volume.name"
-                  @click="focusWater(volume)"
-                />
-              </div>
+                    Water surfaces · {{ filteredWaterSurfaces.length }} of
+                    {{ waterSurfaceMeshes.length }}
+                  </p>
+                </div>
+                <div class="divide-y divide-default">
+                  <div
+                    v-for="surface in filteredWaterSurfaces"
+                    :key="surface.name"
+                    class="flex items-center gap-2 p-2"
+                    :class="
+                      selectedWaterSurfaceName === surface.name
+                        ? 'bg-primary/10'
+                        : ''
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
+                      @click="selectWaterSurface(surface)"
+                      @dblclick="focusWaterSurface(surface)"
+                    >
+                      <span class="flex items-center justify-between gap-2">
+                        <span
+                          class="truncate text-sm font-medium text-highlighted"
+                        >
+                          {{ surface.name }}
+                        </span>
+                        <UBadge
+                          :color="
+                            surface.materialStatus === 'resolved'
+                              ? 'success'
+                              : 'warning'
+                          "
+                          variant="subtle"
+                          size="sm"
+                        >
+                          {{ surface.materialStatus }}
+                        </UBadge>
+                      </span>
+                      <span class="mt-1 block text-xs text-muted">
+                        {{ surface.surfaceCount }} surfaces ·
+                        {{ surface.triangleCount }} triangles
+                      </span>
+                      <span class="mt-1 block text-xs text-dimmed">
+                        Volumes:
+                        {{
+                          surface.waterVolumeNames.length
+                            ? surface.waterVolumeNames.join(', ')
+                            : 'none in this coordinate map'
+                        }}
+                      </span>
+                    </button>
+                    <UButton
+                      icon="i-lucide-focus"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      :disabled="!surface.meshUrl || !waterSurfacesVisible"
+                      :aria-label="'Focus ' + surface.name"
+                      @click="focusWaterSurface(surface)"
+                    />
+                  </div>
+                </div>
+              </section>
+              <section
+                v-if="manifest.waterVolumes.length"
+                aria-label="Water volumes"
+              >
+                <div class="border-y border-default bg-elevated/50 px-4 py-2">
+                  <p
+                    class="text-xs font-semibold tracking-wide text-muted uppercase"
+                  >
+                    Water volumes · {{ filteredWaterVolumes.length }} of
+                    {{ manifest.waterVolumes.length }}
+                  </p>
+                </div>
+                <div class="divide-y divide-default">
+                  <div
+                    v-for="volume in filteredWaterVolumes"
+                    :key="volume.name"
+                    class="flex items-center gap-2 p-2"
+                    :class="
+                      selectedWaterName === volume.name ? 'bg-primary/10' : ''
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
+                      @click="selectWater(volume)"
+                      @dblclick="focusWater(volume)"
+                    >
+                      <span class="flex items-center gap-2">
+                        <span
+                          class="truncate text-sm font-medium text-highlighted"
+                        >
+                          {{ volume.name }}
+                        </span>
+                        <UBadge
+                          :color="
+                            volume.status === 'resolved' ? 'success' : 'warning'
+                          "
+                          variant="subtle"
+                          size="sm"
+                        >
+                          {{ volume.status }}
+                        </UBadge>
+                      </span>
+                      <span class="mt-1 block truncate text-xs text-muted">
+                        Brush {{ volume.brushName ?? 'unavailable' }} ·
+                        {{ volume.triangleCount }} triangles
+                      </span>
+                      <span class="mt-1 block truncate text-xs text-dimmed">
+                        X {{ volume.location.x.toFixed(0) }} · Y
+                        {{ volume.location.y.toFixed(0) }} · Z
+                        {{ volume.location.z.toFixed(0) }}
+                      </span>
+                    </button>
+                    <UButton
+                      icon="i-lucide-focus"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      :disabled="
+                        volume.status !== 'resolved' || !waterVolumesVisible
+                      "
+                      :aria-label="'Focus ' + volume.name"
+                      @click="focusWater(volume)"
+                    />
+                  </div>
+                </div>
+              </section>
               <div
-                v-if="filteredWaterVolumes.length === 0"
+                v-if="
+                  filteredWaterSurfaces.length === 0 &&
+                  filteredWaterVolumes.length === 0
+                "
                 class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted"
               >
-                This map has no water volumes matching this search.
+                This map has no water matching this search.
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="inspectorTab === 'other'">
+            <div class="border-b border-default p-4">
+              <div>
+                <h2 class="text-sm font-semibold text-highlighted">
+                  Special world geometry
+                </h2>
+                <p class="text-xs text-muted">
+                  Camera-relative atmosphere and diagnostic foundations
+                </p>
+              </div>
+            </div>
+            <div class="max-h-[58vh] overflow-y-auto">
+              <section v-if="skyZoneBspMeshes.length" aria-label="Sky Zones">
+                <div
+                  class="flex items-center justify-between gap-3 border-b border-default bg-elevated/50 px-4 py-3"
+                >
+                  <div>
+                    <p class="text-sm font-semibold text-highlighted">
+                      Sky Zones
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ enabledSkyZoneChunkCount }} of
+                      {{ skyZoneBspMeshes.length }} chunks enabled
+                    </p>
+                  </div>
+                  <USwitch
+                    v-model="skyZoneVisible"
+                    label="Show group"
+                    aria-label="Show sky zones group"
+                  />
+                </div>
+                <div class="divide-y divide-default">
+                  <div
+                    v-for="bsp in skyZoneBspMeshes"
+                    :key="bsp.name"
+                    class="flex items-center gap-3 p-3"
+                    :class="selectedBspName === bsp.name ? 'bg-primary/10' : ''"
+                  >
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 text-left"
+                      @click="selectBsp(bsp)"
+                    >
+                      <span
+                        class="block truncate text-sm font-medium text-highlighted"
+                      >
+                        {{ bsp.name }}
+                      </span>
+                      <span class="mt-1 block text-xs text-muted">
+                        {{ bsp.surfaceCount }} surfaces ·
+                        {{ bsp.triangleCount }} triangles · {{ bsp.skyZone }}
+                      </span>
+                    </button>
+                    <USwitch
+                      :model-value="skyZoneChunkVisibility[bsp.name] !== false"
+                      label="Show"
+                      :aria-label="'Show ' + bsp.name"
+                      @update:model-value="
+                        setSkyZoneChunkVisible(bsp.name, $event)
+                      "
+                    />
+                  </div>
+                </div>
+              </section>
+              <section
+                v-if="worldBaseBspMeshes.length"
+                aria-label="World Bases"
+              >
+                <div
+                  class="flex items-center justify-between gap-3 border-y border-default bg-elevated/50 px-4 py-3"
+                >
+                  <div>
+                    <p class="text-sm font-semibold text-highlighted">
+                      World Bases
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ worldBaseBspMeshes.length }} diagnostic foundations
+                    </p>
+                  </div>
+                  <USwitch
+                    v-model="worldBaseVisible"
+                    label="Show group"
+                    aria-label="Show world bases group"
+                  />
+                </div>
+                <div class="divide-y divide-default">
+                  <div
+                    v-for="bsp in worldBaseBspMeshes"
+                    :key="bsp.name"
+                    class="flex items-center gap-2 p-2"
+                    :class="selectedBspName === bsp.name ? 'bg-primary/10' : ''"
+                  >
+                    <button
+                      type="button"
+                      class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated"
+                      @click="selectBsp(bsp)"
+                      @dblclick="focusBsp(bsp)"
+                    >
+                      <span
+                        class="block truncate text-sm font-medium text-highlighted"
+                      >
+                        {{ bsp.name }}
+                      </span>
+                      <span class="mt-1 block text-xs text-muted">
+                        {{ bsp.surfaceCount }} surfaces ·
+                        {{ bsp.triangleCount }} triangles
+                      </span>
+                    </button>
+                    <UButton
+                      icon="i-lucide-focus"
+                      color="neutral"
+                      variant="ghost"
+                      size="sm"
+                      :disabled="!bsp.meshUrl || !worldBaseVisible"
+                      :aria-label="'Focus ' + bsp.name"
+                      @click="focusBsp(bsp)"
+                    />
+                  </div>
+                </div>
+              </section>
+              <div
+                v-if="
+                  skyZoneBspMeshes.length === 0 &&
+                  worldBaseBspMeshes.length === 0
+                "
+                class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted"
+              >
+                This map has no special BSP geometry.
               </div>
             </div>
           </template>

@@ -2,10 +2,12 @@
 import '@babylonjs/loaders/glTF/index.js'
 import type {
   LevelLightManifestEntry,
+  LevelBspMeshManifestEntry,
   LevelManifest,
   LevelRotation,
   LevelVector,
-  SceneManifest
+  SceneManifest,
+  SkyZoneManifestEntry
 } from '@l2/ui'
 import {
   AbstractMesh,
@@ -30,6 +32,8 @@ import {
 import {
   applyL2MaterialMetadata,
   composeAuthoredEffects,
+  LEVEL_GEOMETRY_RENDERING_GROUP_ID,
+  SKY_ZONE_RENDERING_GROUP_ID,
   type ComposedAuthoredEffects
 } from '@l2/babylon-runtime'
 import type { Light } from '@babylonjs/core'
@@ -49,21 +53,33 @@ const props = withDefaults(
   defineProps<{
     manifest: LevelManifest | SceneManifest
     selectedActorName?: string
+    selectedBspName?: string
     actorsVisible?: boolean
     bspVisible?: boolean
+    skyZoneVisible?: boolean
+    skyZoneChunkVisibility?: Record<string, boolean>
+    worldBaseVisible?: boolean
     terrainLayerVisibility?: Record<string, boolean[]>
     lightHelpersVisible?: boolean
     selectedLightName?: string
+    waterSurfacesVisible?: boolean
+    selectedWaterSurfaceName?: string
     waterVolumesVisible?: boolean
     selectedWaterName?: string
   }>(),
   {
     selectedActorName: undefined,
+    selectedBspName: undefined,
     actorsVisible: true,
     bspVisible: true,
+    skyZoneVisible: true,
+    skyZoneChunkVisibility: () => ({}),
+    worldBaseVisible: false,
     terrainLayerVisibility: () => ({}),
     lightHelpersVisible: false,
     selectedLightName: undefined,
+    waterSurfacesVisible: true,
+    selectedWaterSurfaceName: undefined,
     waterVolumesVisible: true,
     selectedWaterName: undefined
   }
@@ -81,7 +97,10 @@ let resizeObserver: ResizeObserver | undefined
 let loadVersion = 0
 const containers = new Map<string, Promise<AssetContainer>>()
 let terrainMeshes: AbstractMesh[] = []
-let bspMeshes: AbstractMesh[] = []
+const bspMeshes = new Map<string, AbstractMesh[]>()
+const waterSurfaceMeshes = new Map<string, AbstractMesh[]>()
+const skyZoneMeshes = new Map<string, AbstractMesh[]>()
+const worldBaseMeshes = new Map<string, AbstractMesh[]>()
 let terrainMaterials: PBRMaterial[] = []
 const terrainControllers = new Map<string, TerrainMaterialController>()
 const actorMeshes = new Map<string, AbstractMesh[]>()
@@ -94,10 +113,13 @@ const lightGizmos = new Map<string, LightGizmo>()
 let highlightLayer: HighlightLayer | undefined
 let lightGizmoLayer: UtilityLayerRenderer | undefined
 let pendingFocusActorName: string | undefined
+let pendingFocusBspName: string | undefined
 let pendingFocusLightName: string | undefined
 let pendingFocusWaterName: string | undefined
 let waterMaterial: PBRMaterial | undefined
 let authoredEffects: ComposedAuthoredEffects | undefined
+let activeSkyZone: SkyZoneManifestEntry | undefined
+let skyZonePlacement: TransformNode | undefined
 const highlightColor = new Color3(1, 0.55, 0.08)
 
 function instanceMeshes(rootNodes: TransformNode[]) {
@@ -122,6 +144,22 @@ function applySelectionHighlight() {
         highlightLayer.addMesh(mesh, highlightColor, false)
     }
   }
+  if (props.selectedBspName) {
+    const selected =
+      bspMeshes.get(props.selectedBspName) ??
+      worldBaseMeshes.get(props.selectedBspName)
+    for (const mesh of selected ?? []) {
+      if (mesh instanceof Mesh)
+        highlightLayer.addMesh(mesh, highlightColor, false)
+    }
+  }
+  if (props.waterSurfacesVisible && props.selectedWaterSurfaceName) {
+    for (const mesh of waterSurfaceMeshes.get(props.selectedWaterSurfaceName) ??
+      []) {
+      if (mesh instanceof Mesh)
+        highlightLayer.addMesh(mesh, new Color3(0.1, 0.65, 1), false)
+    }
+  }
   if (props.waterVolumesVisible && props.selectedWaterName) {
     for (const mesh of waterMeshes.get(props.selectedWaterName) ?? []) {
       if (mesh instanceof Mesh)
@@ -138,7 +176,26 @@ function applyActorVisibility() {
 }
 
 function applyBspVisibility() {
-  for (const mesh of bspMeshes) mesh.setEnabled(props.bspVisible)
+  for (const meshes of bspMeshes.values())
+    for (const mesh of meshes) mesh.setEnabled(props.bspVisible)
+  applySelectionHighlight()
+}
+
+function applySpecialBspVisibility() {
+  for (const [name, meshes] of skyZoneMeshes)
+    for (const mesh of meshes)
+      mesh.setEnabled(
+        props.skyZoneVisible && props.skyZoneChunkVisibility[name] !== false
+      )
+  for (const meshes of worldBaseMeshes.values())
+    for (const mesh of meshes) mesh.setEnabled(props.worldBaseVisible)
+  applySelectionHighlight()
+}
+
+function applyWaterSurfaceVisibility() {
+  for (const meshes of waterSurfaceMeshes.values())
+    for (const mesh of meshes) mesh.setEnabled(props.waterSurfacesVisible)
+  applySelectionHighlight()
 }
 
 function applyWaterVisibility() {
@@ -244,6 +301,38 @@ function focusActor(name: string) {
   camera.radius = Math.max(camera.radius * 1.35, camera.lowerRadiusLimit ?? 0)
 }
 
+function focusBsp(name: string) {
+  const source =
+    'bspMeshes' in props.manifest
+      ? props.manifest.bspMeshes.find((bsp) => bsp.name === name)
+      : undefined
+  if (
+    !source ||
+    source.role === 'sky-zone' ||
+    (source.role === 'geometry' && !props.bspVisible) ||
+    (source.role === 'world-base' && !props.worldBaseVisible)
+  )
+    return
+  pendingFocusBspName = name
+  if (!scene) return
+  const meshes = bspMeshes.get(name) ?? worldBaseMeshes.get(name)
+  if (!meshes?.length) return
+
+  pendingFocusBspName = undefined
+  for (const mesh of meshes) mesh.computeWorldMatrix(true)
+  const camera = scene.activeCamera as ArcRotateCamera
+  camera.zoomOn(meshes, true)
+  camera.radius = Math.max(camera.radius * 1.35, camera.lowerRadiusLimit ?? 0)
+}
+
+function updateSkyZonePlacement() {
+  if (!scene?.activeCamera || !activeSkyZone || !skyZonePlacement) return
+  skyZonePlacement.position.copyFrom(scene.activeCamera.globalPosition)
+  skyZonePlacement.position.subtractInPlace(
+    unrealVector(activeSkyZone.location)
+  )
+}
+
 function focusLight(name: string) {
   if (!scene) return
   const entry = levelLights.get(name)
@@ -276,6 +365,19 @@ function focusWater(name: string) {
   camera.radius = Math.max(camera.radius * 1.5, camera.lowerRadiusLimit ?? 0)
 }
 
+function focusWaterSurface(name: string) {
+  if (!props.waterSurfacesVisible) return
+  pendingFocusBspName = name
+  if (!scene) return
+  const meshes = waterSurfaceMeshes.get(name)
+  if (!meshes?.length) return
+  pendingFocusBspName = undefined
+  for (const mesh of meshes) mesh.computeWorldMatrix(true)
+  const camera = scene.activeCamera as ArcRotateCamera
+  camera.zoomOn(meshes, true)
+  camera.radius = Math.max(camera.radius * 1.35, camera.lowerRadiusLimit ?? 0)
+}
+
 function setCameraPose(location: LevelVector, rotation: LevelRotation) {
   if (!scene) return
   const camera = scene.activeCamera as ArcRotateCamera
@@ -284,15 +386,47 @@ function setCameraPose(location: LevelVector, rotation: LevelRotation) {
   camera.setTarget(position.add(unrealForward(rotation).scale(1024)))
 }
 
-defineExpose({ focusActor, focusLight, focusWater, setCameraPose, frameMap })
+defineExpose({
+  focusActor,
+  focusBsp,
+  focusLight,
+  focusWater,
+  focusWaterSurface,
+  setCameraPose,
+  frameMap,
+  frameBsp
+})
 
 function frameMap(topDown = false) {
   if (!scene) return
   const camera = scene.activeCamera as ArcRotateCamera
-  const worldMeshes = [...terrainMeshes, ...bspMeshes]
-  const meshes = worldMeshes.length
-    ? worldMeshes
-    : scene.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
+  const actors = [...actorMeshes.values()].flat()
+  const meshes = terrainMeshes.length
+    ? terrainMeshes
+    : actors.length
+      ? actors
+      : bspMeshes.size
+        ? [...bspMeshes.values()].flat()
+        : waterSurfaceMeshes.size
+          ? [...waterSurfaceMeshes.values()].flat()
+          : scene.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
+  frameMeshes(camera, meshes, topDown)
+}
+
+function frameBsp() {
+  if (!scene || !bspMeshes.size) return
+  frameMeshes(
+    scene.activeCamera as ArcRotateCamera,
+    [...bspMeshes.values()].flat(),
+    false
+  )
+}
+
+function frameMeshes(
+  camera: ArcRotateCamera,
+  meshes: AbstractMesh[],
+  topDown: boolean
+) {
   if (!meshes.length) return
 
   for (const mesh of meshes) mesh.computeWorldMatrix(true)
@@ -347,14 +481,103 @@ function transform(
   node.scaling.copyFrom(converted.scaling)
 }
 
+async function loadBspEntry(bsp: LevelBspMeshManifestEntry, version: number) {
+  if (bsp.error) emit('materialError', `${bsp.name}: ${bsp.error}`)
+  if (!scene || !bsp.meshUrl) return
+  if (
+    bspMeshes.has(bsp.name) ||
+    waterSurfaceMeshes.has(bsp.name) ||
+    skyZoneMeshes.has(bsp.name) ||
+    worldBaseMeshes.has(bsp.name)
+  )
+    return
+  const container = await containerFor(bsp.meshUrl)
+  if (!scene || version !== loadVersion) return
+  const instance = container.instantiateModelsToScene(
+    (name) => `${bsp.name}:${name}`,
+    false
+  )
+  const placement =
+    bsp.role === 'sky-zone' && skyZonePlacement
+      ? skyZonePlacement
+      : new TransformNode(`${bsp.name}:placement`, scene)
+  for (const root of instance.rootNodes) root.parent = placement
+  const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
+  for (const mesh of meshes) {
+    mesh.checkCollisions = false
+    mesh.isPickable = false
+    mesh.renderingGroupId =
+      bsp.role === 'sky-zone'
+        ? SKY_ZONE_RENDERING_GROUP_ID
+        : LEVEL_GEOMETRY_RENDERING_GROUP_ID
+    if (bsp.role === 'sky-zone') {
+      mesh.alwaysSelectAsActiveMesh = true
+      if (mesh.material) mesh.material.disableDepthWrite = true
+      mesh.setEnabled(
+        props.skyZoneVisible && props.skyZoneChunkVisibility[bsp.name] !== false
+      )
+    } else if (bsp.role === 'world-base') {
+      mesh.setEnabled(props.worldBaseVisible)
+    } else if (bsp.role === 'water-surface') {
+      mesh.setEnabled(props.waterSurfacesVisible)
+    } else {
+      mesh.setEnabled(props.bspVisible)
+    }
+  }
+  if (bsp.role === 'sky-zone') skyZoneMeshes.set(bsp.name, meshes)
+  else if (bsp.role === 'water-surface')
+    waterSurfaceMeshes.set(bsp.name, meshes)
+  else if (bsp.role === 'world-base') worldBaseMeshes.set(bsp.name, meshes)
+  else bspMeshes.set(bsp.name, meshes)
+  if (props.selectedBspName === bsp.name) applySelectionHighlight()
+  if (pendingFocusBspName === bsp.name) {
+    if (bsp.role === 'water-surface') focusWaterSurface(bsp.name)
+    else focusBsp(bsp.name)
+  }
+}
+
+async function loadWorldBaseMeshes() {
+  if (!props.worldBaseVisible || !('bspMeshes' in props.manifest)) return
+  const version = loadVersion
+  try {
+    for (const bsp of props.manifest.bspMeshes.filter(
+      (entry) => entry.role === 'world-base'
+    )) {
+      await loadBspEntry(bsp, version)
+    }
+    applySpecialBspVisibility()
+  } catch (error) {
+    emit(
+      'error',
+      error instanceof Error
+        ? error.message
+        : 'World-base BSP could not be loaded.'
+    )
+  }
+}
+
 async function loadLevel() {
   if (!scene) return
+  const isCoordinateLevel = 'bspMeshes' in props.manifest
+  if (isCoordinateLevel) {
+    scene.setRenderingAutoClearDepthStencil(
+      LEVEL_GEOMETRY_RENDERING_GROUP_ID,
+      true,
+      true,
+      true
+    )
+  }
   const version = ++loadVersion
   loading.value = true
   authoredEffects?.dispose()
   authoredEffects = undefined
   terrainMeshes = []
-  bspMeshes = []
+  bspMeshes.clear()
+  waterSurfaceMeshes.clear()
+  skyZoneMeshes.clear()
+  worldBaseMeshes.clear()
+  activeSkyZone = undefined
+  skyZonePlacement = undefined
   terrainMaterials.forEach((material) => material.dispose(true, true))
   terrainMaterials = []
   terrainControllers.clear()
@@ -367,6 +590,7 @@ async function loadLevel() {
   levelLights.clear()
   highlightLayer?.removeAllMeshes()
   pendingFocusActorName = undefined
+  pendingFocusBspName = undefined
   pendingFocusLightName = undefined
   pendingFocusWaterName = undefined
   scene.transformNodes.slice().forEach((node) => node.dispose())
@@ -382,24 +606,26 @@ async function loadLevel() {
 
   try {
     if ('bspMeshes' in props.manifest) {
-      for (const bsp of props.manifest.bspMeshes) {
-        if (bsp.error) emit('materialError', `${bsp.name}: ${bsp.error}`)
-        if (!bsp.meshUrl) continue
-        const container = await containerFor(bsp.meshUrl)
-        if (version !== loadVersion) return
-        const instance = container.instantiateModelsToScene(
-          (name) => `${bsp.name}:${name}`,
-          false
+      const linkedSkyZoneNames = new Set(
+        props.manifest.bspMeshes
+          .filter((bsp) => bsp.role === 'sky-zone' && bsp.skyZone)
+          .map((bsp) => bsp.skyZone!)
+      )
+      activeSkyZone = [...props.manifest.skyZones]
+        .filter((zone) => linkedSkyZoneNames.has(zone.name))
+        .sort((a, b) => b.order - a.order)[0]
+      if (activeSkyZone) {
+        skyZonePlacement = new TransformNode(
+          `${activeSkyZone.name}:sky-zone-placement`,
+          scene
         )
-        const placement = new TransformNode(`${bsp.name}:placement`, scene)
-        for (const root of instance.rootNodes) root.parent = placement
-        const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
-        for (const mesh of meshes) {
-          mesh.checkCollisions = false
-          mesh.isPickable = false
-          mesh.setEnabled(props.bspVisible)
-        }
-        bspMeshes.push(...meshes)
+        updateSkyZonePlacement()
+      }
+      for (const bsp of props.manifest.bspMeshes) {
+        if (bsp.role === 'world-base') continue
+        if (bsp.role === 'sky-zone' && bsp.skyZone !== activeSkyZone?.name)
+          continue
+        await loadBspEntry(bsp, version)
       }
     }
     for (const terrain of props.manifest.terrains) {
@@ -414,6 +640,10 @@ async function loadLevel() {
       transform(placement, terrain.location, terrain.rotation)
       for (const root of instance.rootNodes) root.parent = placement
       const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
+      if (isCoordinateLevel) {
+        for (const mesh of meshes)
+          mesh.renderingGroupId = LEVEL_GEOMETRY_RENDERING_GROUP_ID
+      }
       const terrainMaterial = createTerrainMaterial(terrain, scene)
       if (terrainMaterial.material) {
         try {
@@ -477,10 +707,12 @@ async function loadLevel() {
               actor.prePivot
             )
             for (const root of instance.rootNodes) root.parent = placement
-            actorMeshes.set(
-              actor.name,
-              instanceMeshes(instance.rootNodes as TransformNode[])
-            )
+            const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
+            if (isCoordinateLevel) {
+              for (const mesh of meshes)
+                mesh.renderingGroupId = LEVEL_GEOMETRY_RENDERING_GROUP_ID
+            }
+            actorMeshes.set(actor.name, meshes)
             for (const mesh of actorMeshes.get(actor.name) ?? [])
               mesh.setEnabled(props.actorsVisible)
             if (props.selectedActorName === actor.name)
@@ -529,6 +761,10 @@ async function loadLevel() {
       )
       for (const root of instance.rootNodes) root.parent = placement
       const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
+      if (isCoordinateLevel) {
+        for (const mesh of meshes)
+          mesh.renderingGroupId = LEVEL_GEOMETRY_RENDERING_GROUP_ID
+      }
       waterMeshes.set(water.name, meshes)
       for (const mesh of meshes) {
         mesh.material = waterMaterial
@@ -597,7 +833,10 @@ onMounted(() => {
     new Vector3(0.3, 1, -0.2),
     scene
   ).intensity = 1.2
-  engine.runRenderLoop(() => scene?.render())
+  engine.runRenderLoop(() => {
+    updateSkyZonePlacement()
+    scene?.render()
+  })
   resizeObserver = new ResizeObserver(() => engine?.resize())
   resizeObserver.observe(canvas.value)
   void loadLevel()
@@ -608,8 +847,22 @@ watch(
   () => void loadLevel()
 )
 watch(() => props.selectedActorName, applySelectionHighlight)
+watch(() => props.selectedBspName, applySelectionHighlight)
+watch(() => props.selectedWaterSurfaceName, applySelectionHighlight)
 watch(() => props.actorsVisible, applyActorVisibility)
 watch(() => props.bspVisible, applyBspVisibility)
+watch(() => props.skyZoneVisible, applySpecialBspVisibility)
+watch(() => props.skyZoneChunkVisibility, applySpecialBspVisibility, {
+  deep: true
+})
+watch(() => props.waterSurfacesVisible, applyWaterSurfaceVisibility)
+watch(
+  () => props.worldBaseVisible,
+  () => {
+    if (props.worldBaseVisible) void loadWorldBaseMeshes()
+    else applySpecialBspVisibility()
+  }
+)
 watch(() => props.terrainLayerVisibility, applyTerrainLayerVisibility, {
   deep: true
 })
@@ -651,6 +904,15 @@ onBeforeUnmount(() => {
         variant="solid"
         size="sm"
         @click="frameMap(true)"
+      />
+      <UButton
+        v-if="bspMeshes.size"
+        label="Frame BSP"
+        icon="i-lucide-blocks"
+        color="neutral"
+        variant="solid"
+        size="sm"
+        @click="frameBsp()"
       />
     </div>
     <div

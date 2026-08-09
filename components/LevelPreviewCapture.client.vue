@@ -26,11 +26,19 @@ function frameTopDown(
   composed: Awaited<ReturnType<typeof composeLevelManifest>>
 ) {
   if (!scene) return
-  const world = [...composed.terrainMeshes, ...composed.bspMeshes].filter(
-    (mesh) => mesh.isEnabled()
-  )
-  const fallback = [...composed.actorMeshes.values()].flat()
-  const meshes = world.length ? world : fallback
+  const terrain = composed.terrainMeshes.filter((mesh) => mesh.isEnabled())
+  const actors = [...composed.actorMeshes.values()]
+    .flat()
+    .filter((mesh) => mesh.isEnabled())
+  const bsp = composed.bspMeshes.filter((mesh) => mesh.isEnabled())
+  const water = composed.waterSurfaceMeshes.filter((mesh) => mesh.isEnabled())
+  const meshes = terrain.length
+    ? terrain
+    : actors.length
+      ? actors
+      : bsp.length
+        ? bsp
+        : water
   if (!meshes.length)
     throw new Error('The level contains no renderable geometry.')
 
@@ -98,6 +106,8 @@ onMounted(async () => {
     const materialErrors: string[] = []
     const composed = await composeLevelManifest(scene, manifest, {
       batchSize: 24,
+      includeSkyZoneBsp: false,
+      includeWorldBaseBsp: false,
       onMaterialError: (message) => materialErrors.push(message)
     })
     if (materialErrors.length) throw new Error(materialErrors.join(' '))

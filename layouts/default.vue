@@ -26,6 +26,20 @@ const navigation: NavigationMenuItem[] = [
     type: 'label'
   },
   {
+    label: 'Players',
+    icon: 'i-lucide-user-round',
+    defaultOpen: true,
+    children: [
+      {
+        label: 'Classes',
+        icon: 'i-lucide-git-branch',
+        to: '/content/player-classes'
+      },
+      { label: 'Races', icon: 'i-lucide-orbit', to: '/content/player-races' },
+      { label: 'Sexes', icon: 'i-lucide-tags', to: '/content/player-sexes' }
+    ]
+  },
+  {
     label: 'NPCs',
     icon: 'i-lucide-users-round',
     defaultOpen: true,
@@ -119,6 +133,9 @@ const routeTitle = computed(() => {
   if (route.path === '/content/races') return 'NPC races'
   if (route.path === '/content/sexes') return 'NPC sexes'
   if (route.path === '/content/types') return 'NPC types'
+  if (route.path === '/content/player-classes') return 'Player classes'
+  if (route.path === '/content/player-races') return 'Player races'
+  if (route.path === '/content/player-sexes') return 'Player sexes'
   if (route.path === '/content/skills') return 'Skill definitions'
   if (route.path === '/content/skill-operate-types')
     return 'Skill operate types'
