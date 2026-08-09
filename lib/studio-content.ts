@@ -106,6 +106,40 @@ export function assetImportsUrl(
   return `${base}/api/assets/${kind}/imports${suffix}`
 }
 
+export function assetCatalogsUrl(apiBase: string): string {
+  return `${apiBase.replace(/\/$/, '')}/api/assets/catalogs`
+}
+
+export function assetCatalogUrl(
+  apiBase: string,
+  kind: AssetImportKind,
+  options: {
+    query?: string
+    packageName?: string
+    page?: number
+    pageSize?: number
+  } = {}
+): string {
+  const base = apiBase.replace(/\/$/, '')
+  const url = new URL(`${base}/api/assets/${kind}/catalog`)
+  const query = options.query?.trim()
+  if (query) url.searchParams.set('query', query)
+  if (options.packageName)
+    url.searchParams.set('packageName', options.packageName)
+  url.searchParams.set('page', String(options.page ?? 1))
+  url.searchParams.set('pageSize', String(options.pageSize ?? 50))
+  return url.toString()
+}
+
+export function assetCatalogEntryUrl(
+  apiBase: string,
+  kind: 'levels' | 'scenes',
+  name: string
+): string {
+  const base = apiBase.replace(/\/$/, '')
+  return `${base}/api/assets/${kind}/catalog/${encodeURIComponent(name)}`
+}
+
 export function positiveInteger(value: unknown, fallback: number): number {
   if (typeof value !== 'string') return fallback
   const parsed = Number.parseInt(value, 10)

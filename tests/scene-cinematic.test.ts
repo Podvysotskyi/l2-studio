@@ -29,6 +29,11 @@ const manifest: SceneManifest = {
   fileName: 'Lobby.unr',
   sourceHash: 'hash',
   protocol: 111,
+  environment: {
+    ambientColor: { r: 0, g: 0, b: 0 },
+    ambientBrightness: 0,
+    distanceFog: null
+  },
   terrains: [],
   actors: [],
   lights: [],

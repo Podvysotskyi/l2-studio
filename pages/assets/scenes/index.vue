@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { SceneCatalogManifest } from '@l2/ui'
-import { sceneCatalogManifestUrl } from '@l2/ui'
+import type { AssetCatalogPage, SceneCatalogEntry } from '@l2/ui'
 import { computed, onBeforeUnmount } from 'vue'
 import {
+  assetCatalogUrl,
   assetImportsUrl,
   type AssetImportJob
 } from '../../../lib/studio-content'
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const catalog = ref<SceneCatalogManifest>()
+const catalog = ref<AssetCatalogPage<SceneCatalogEntry>>()
 const queueing = ref(false)
 const error = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
@@ -20,9 +20,8 @@ const activeJob = computed(() =>
 
 async function loadCatalog() {
   try {
-    catalog.value = await $fetch<SceneCatalogManifest>(
-      sceneCatalogManifestUrl(),
-      { query: { refresh: Date.now() } }
+    catalog.value = await $fetch(
+      assetCatalogUrl(config.public.apiBase, 'scenes', { pageSize: 500 })
     )
   } catch {
     catalog.value = undefined
@@ -99,8 +98,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </p>
     </UCard>
 
-    <div v-if="catalog?.scenes.length" class="grid gap-4 lg:grid-cols-2">
-      <UCard v-for="scene in catalog.scenes" :key="scene.name">
+    <div v-if="catalog?.items.length" class="grid gap-4 lg:grid-cols-2">
+      <UCard v-for="scene in catalog.items" :key="scene.name">
         <div class="flex items-start gap-4">
           <span
             class="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"

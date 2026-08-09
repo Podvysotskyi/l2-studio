@@ -14,7 +14,8 @@ const actors: LevelActorManifestEntry[] = [
     drawScale3D: { x: 1, y: 1, z: 1 },
     meshPackage: 'village_architecture',
     meshObject: 'StoneTower',
-    meshUrl: '/staticmeshes/village_architecture/StoneTower.glb'
+    meshUrl: '/staticmeshes/village_architecture/StoneTower.glb',
+    vertexLighting: null
   },
   {
     name: 'DecorationActor4',
@@ -26,7 +27,8 @@ const actors: LevelActorManifestEntry[] = [
     drawScale3D: { x: 1, y: 1, z: 1 },
     meshPackage: null,
     meshObject: null,
-    meshUrl: null
+    meshUrl: null,
+    vertexLighting: null
   }
 ]
 

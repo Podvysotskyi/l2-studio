@@ -15,8 +15,10 @@ const kindOptions = [
   { label: 'System textures', value: 'systextures' },
   { label: 'World textures', value: 'textures' },
   { label: 'Music', value: 'music' },
+  { label: 'Sounds', value: 'sounds' },
   { label: 'Static meshes', value: 'staticmeshes' },
   { label: 'Levels', value: 'levels' },
+  { label: 'Level previews', value: 'levelpreviews' },
   { label: 'Scenes', value: 'scenes' }
 ]
 const visibleJobs = computed(() =>
@@ -39,8 +41,10 @@ function kindLabel(kind: AssetImportKind) {
   if (kind === 'systextures') return 'System textures'
   if (kind === 'textures') return 'World textures'
   if (kind === 'music') return 'Music'
+  if (kind === 'sounds') return 'Sounds'
   if (kind === 'staticmeshes') return 'Static meshes'
-  return kind === 'levels' ? 'Levels' : 'Scenes'
+  if (kind === 'levels') return 'Levels'
+  return kind === 'levelpreviews' ? 'Level previews' : 'Scenes'
 }
 
 function formatDate(value: string | null) {
@@ -57,8 +61,10 @@ async function loadJobs(schedule = true) {
           'systextures',
           'textures',
           'music',
+          'sounds',
           'staticmeshes',
           'levels',
+          'levelpreviews',
           'scenes'
         ] as const
       ).map((kind) =>
@@ -95,7 +101,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     <StudioPageHeader
       eyebrow="Asset pipeline"
       title="Import jobs"
-      description="Review import history for textures, music, meshes, world levels, and client scenes."
+      description="Review import history for textures, music, sounds, meshes, world levels, previews, and client scenes."
       icon="i-lucide-history"
     >
       <template #actions>

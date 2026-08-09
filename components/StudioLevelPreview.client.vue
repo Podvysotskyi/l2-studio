@@ -378,6 +378,19 @@ async function loadLevel() {
       const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
       const terrainMaterial = createTerrainMaterial(terrain, scene)
       if (terrainMaterial.material) {
+        try {
+          await terrainMaterial.ready
+        } catch (error) {
+          terrainMaterial.material.dispose(true, true)
+          emit(
+            'materialError',
+            error instanceof Error
+              ? error.message
+              : 'Terrain texture arrays failed to load.'
+          )
+          terrainMeshes.push(...meshes)
+          continue
+        }
         terrainMaterials.push(terrainMaterial.material)
         if (terrainMaterial.controller)
           terrainControllers.set(terrain.name, terrainMaterial.controller)

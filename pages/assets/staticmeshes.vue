@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import type { StaticMeshManifest, StaticMeshManifestEntry } from '@l2/ui'
-import { staticMeshManifestUrl } from '@l2/ui'
+import type {
+  AssetCatalogPage,
+  StaticMeshManifestEntry,
+  StaticMeshPackage
+} from '@l2/ui'
 import { computed, onBeforeUnmount, watch } from 'vue'
-import { assetImportsUrl, type AssetImportJob } from '../../lib/studio-content'
+import {
+  assetCatalogUrl,
+  assetImportsUrl,
+  type AssetImportJob
+} from '../../lib/studio-content'
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const manifest = ref<StaticMeshManifest>()
+const catalog =
+  ref<AssetCatalogPage<StaticMeshManifestEntry, StaticMeshPackage>>()
 const selectedPackage = ref<string>('all')
 const selectedMesh = ref<StaticMeshManifestEntry>()
 const previewOpen = ref(false)
@@ -21,29 +29,12 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 const activeJob = computed(() =>
   jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
 )
-const packages = computed(() => manifest.value?.packages ?? [])
-const filteredMeshes = computed(() => {
-  const term = query.value.trim().toLocaleLowerCase()
-  return (manifest.value?.meshes ?? []).filter(
-    (mesh) =>
-      (selectedPackage.value === 'all' ||
-        mesh.packageName === selectedPackage.value) &&
-      (!term ||
-        mesh.objectName.toLocaleLowerCase().includes(term) ||
-        mesh.packageName.toLocaleLowerCase().includes(term))
-  )
-})
-const visibleMeshes = computed(() => {
-  const offset = (page.value - 1) * pageSize.value
-  return filteredMeshes.value.slice(offset, offset + pageSize.value)
-})
-const resolvedCount = computed(
-  () =>
-    manifest.value?.meshes.filter((mesh) => mesh.status === 'resolved')
-      .length ?? 0
-)
+const packages = computed(() => catalog.value?.groups ?? [])
+const filteredMeshes = computed(() => catalog.value?.items ?? [])
+const visibleMeshes = computed(() => filteredMeshes.value)
+const resolvedCount = computed(() => catalog.value?.summary.resolved ?? 0)
 const materialCounts = computed(() =>
-  (manifest.value?.meshes ?? []).reduce(
+  (catalog.value?.items ?? []).reduce(
     (total, mesh) => ({
       resolved: total.resolved + (mesh.resolvedMaterialCount ?? 0),
       available: total.available + (mesh.materialCount ?? 0)
@@ -52,7 +43,11 @@ const materialCounts = computed(() =>
   )
 )
 
-watch([query, selectedPackage, pageSize], () => (page.value = 1))
+watch([query, selectedPackage, pageSize], () => {
+  page.value = 1
+  void loadCatalog()
+})
+watch(page, () => void loadCatalog())
 
 function showPreview(mesh: StaticMeshManifestEntry) {
   if (!mesh.url) return
@@ -61,13 +56,19 @@ function showPreview(mesh: StaticMeshManifestEntry) {
   previewOpen.value = true
 }
 
-async function loadManifest() {
+async function loadCatalog() {
   try {
-    manifest.value = await $fetch<StaticMeshManifest>(staticMeshManifestUrl(), {
-      query: { refresh: Date.now() }
-    })
+    catalog.value = await $fetch(
+      assetCatalogUrl(config.public.apiBase, 'staticmeshes', {
+        query: query.value,
+        packageName:
+          selectedPackage.value === 'all' ? undefined : selectedPackage.value,
+        page: page.value,
+        pageSize: pageSize.value
+      })
+    )
   } catch {
-    manifest.value = undefined
+    catalog.value = undefined
   }
 }
 
@@ -79,7 +80,7 @@ async function loadJobs(schedule = true) {
       { query: { limit: 20 } }
     )
     error.value = undefined
-    if (!activeJob.value) await loadManifest()
+    if (!activeJob.value) await loadCatalog()
   } catch {
     error.value =
       'Static-mesh import jobs could not be loaded from the Studio API.'
@@ -173,9 +174,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             <h2 class="text-sm font-semibold text-highlighted">Mesh library</h2>
             <p class="text-xs text-muted">
               {{ resolvedCount }} resolved ·
-              {{ (manifest?.meshes.length ?? 0) - resolvedCount }} skipped ·
+              {{ catalog?.summary.skipped ?? 0 }} skipped ·
               {{ materialCounts.resolved.toLocaleString() }} /
-              {{ materialCounts.available.toLocaleString() }} materials
+              {{ materialCounts.available.toLocaleString() }} page materials
             </p>
           </div>
           <UInput
@@ -188,7 +189,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </template>
       <div
-        v-if="manifest"
+        v-if="catalog"
         class="grid min-h-[32rem] md:grid-cols-[16rem_minmax(0,1fr)]"
       >
         <aside class="border-b border-default p-2 md:border-r md:border-b-0">
@@ -202,7 +203,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             "
             @click="selectedPackage = 'all'"
           >
-            <span>All packages</span><span>{{ manifest.meshes.length }}</span>
+            <span>All packages</span><span>{{ catalog.summary.total }}</span>
           </button>
           <div class="max-h-[42rem] overflow-y-auto">
             <button
@@ -284,7 +285,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <StudioTableFooter
             v-model:page="page"
             v-model:page-size="pageSize"
-            :total="filteredMeshes.length"
+            :total="catalog.total"
             :page-size-options="[50, 100, 200]"
           />
         </section>
@@ -293,7 +294,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         v-else
         class="grid min-h-64 place-items-center p-8 text-sm text-muted"
       >
-        No generated static-mesh manifest is available. Queue the first import.
+        No imported static-mesh catalog is available. Queue the first import.
       </div>
     </UCard>
 

@@ -2,12 +2,12 @@
 import type {
   LevelRotation,
   LevelVector,
-  SceneCatalogManifest,
+  SceneCatalogEntry,
   SceneManifest
 } from '@l2/ui'
-import { sceneCatalogManifestUrl } from '@l2/ui'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { assetCatalogEntryUrl } from '../../../lib/studio-content'
 import {
   interpolateScenePose,
   sceneManagerLabel,
@@ -20,6 +20,7 @@ interface ScenePreviewApi {
 }
 
 const route = useRoute()
+const config = useRuntimeConfig()
 const manifest = ref<SceneManifest>()
 const preview = ref<ScenePreviewApi>()
 const loading = ref(true)
@@ -115,11 +116,9 @@ async function loadScene() {
   error.value = undefined
   manifest.value = undefined
   try {
-    const catalog = await $fetch<SceneCatalogManifest>(
-      sceneCatalogManifestUrl(),
-      { query: { refresh: Date.now() } }
+    const entry = await $fetch<SceneCatalogEntry>(
+      assetCatalogEntryUrl(config.public.apiBase, 'scenes', routeName.value)
     )
-    const entry = catalog.scenes.find((scene) => scene.name === routeName.value)
     if (!entry?.manifestUrl) {
       error.value = entry?.error ?? `Scene “${routeName.value}” is unavailable.`
       return

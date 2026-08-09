@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import type { MusicManifest, MusicManifestEntry } from '@l2/ui'
-import { musicManifestUrl } from '@l2/ui'
+import type { AssetCatalogPage, MusicManifestEntry } from '@l2/ui'
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
-import { assetImportsUrl, type AssetImportJob } from '../../lib/studio-content'
+import {
+  assetCatalogUrl,
+  assetImportsUrl,
+  type AssetImportJob
+} from '../../lib/studio-content'
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const manifest = ref<MusicManifest>()
+const catalog = ref<AssetCatalogPage<MusicManifestEntry>>()
 const query = ref('')
 const page = ref(1)
 const pageSize = ref(50)
@@ -19,26 +22,15 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 const activeJob = computed(() =>
   jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
 )
-const filteredTracks = computed(() => {
-  const term = query.value.trim().toLocaleLowerCase()
-  return (manifest.value?.tracks ?? []).filter(
-    (track) =>
-      !term ||
-      track.name.toLocaleLowerCase().includes(term) ||
-      track.fileName.toLocaleLowerCase().includes(term)
-  )
-})
-const visibleTracks = computed(() => {
-  const offset = (page.value - 1) * pageSize.value
-  return filteredTracks.value.slice(offset, offset + pageSize.value)
-})
-const resolvedCount = computed(
-  () =>
-    manifest.value?.tracks.filter((track) => track.status === 'resolved')
-      .length ?? 0
-)
+const filteredTracks = computed(() => catalog.value?.items ?? [])
+const visibleTracks = computed(() => filteredTracks.value)
+const resolvedCount = computed(() => catalog.value?.summary.resolved ?? 0)
 
-watch([query, pageSize], () => (page.value = 1))
+watch([query, pageSize], () => {
+  page.value = 1
+  void loadCatalog()
+})
+watch(page, () => void loadCatalog())
 
 function formatDuration(value: number | null) {
   if (value === null) return '—'
@@ -58,21 +50,26 @@ async function playTrack(track: MusicManifestEntry) {
   await audioPlayer.value?.play()
 }
 
-async function loadManifest() {
+async function loadCatalog() {
   try {
-    manifest.value = await $fetch<MusicManifest>(musicManifestUrl(), {
-      query: { refresh: Date.now() }
-    })
+    const nextCatalog = await $fetch<AssetCatalogPage<MusicManifestEntry>>(
+      assetCatalogUrl(config.public.apiBase, 'music', {
+        query: query.value,
+        page: page.value,
+        pageSize: pageSize.value
+      })
+    )
+    catalog.value = nextCatalog
     if (
       !selectedTrack.value ||
-      !manifest.value.tracks.some(
+      !nextCatalog.items.some(
         (track) => track.fileName === selectedTrack.value?.fileName
       )
     ) {
-      selectedTrack.value = manifest.value.tracks.find((track) => track.url)
+      selectedTrack.value = nextCatalog.items.find((track) => track.url)
     }
   } catch {
-    manifest.value = undefined
+    catalog.value = undefined
     selectedTrack.value = undefined
   }
 }
@@ -85,7 +82,7 @@ async function loadJobs(schedule = true) {
       { query: { limit: 20 } }
     )
     error.value = undefined
-    if (!activeJob.value) await loadManifest()
+    if (!activeJob.value) await loadCatalog()
   } catch {
     error.value = 'Music import jobs could not be loaded from the Studio API.'
   }
@@ -211,7 +208,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             </h2>
             <p class="text-xs text-muted">
               {{ resolvedCount }} resolved ·
-              {{ (manifest?.tracks.length ?? 0) - resolvedCount }} skipped
+              {{ catalog?.summary.skipped ?? 0 }} skipped
             </p>
           </div>
           <UInput
@@ -225,7 +222,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </template>
 
       <div
-        v-if="manifest"
+        v-if="catalog"
         class="max-h-[42rem] divide-y divide-default overflow-y-auto"
       >
         <div
@@ -277,17 +274,17 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </div>
       <StudioTableFooter
-        v-if="manifest"
+        v-if="catalog"
         v-model:page="page"
         v-model:page-size="pageSize"
-        :total="filteredTracks.length"
+        :total="catalog.total"
         :page-size-options="[25, 50, 100]"
       />
       <div
         v-else
         class="grid min-h-64 place-items-center p-8 text-center text-sm text-muted"
       >
-        No generated music manifest is available. Queue the first import.
+        No imported music catalog is available. Queue the first import.
       </div>
     </UCard>
   </div>

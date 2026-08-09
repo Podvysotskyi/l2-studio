@@ -1,21 +1,8 @@
 <script setup lang="ts">
-import type {
-  AssetImportKind,
-  LevelCatalogManifest,
-  MusicManifest,
-  SceneCatalogManifest,
-  StaticMeshManifest,
-  TextureManifest
-} from '@l2/ui'
-import {
-  musicManifestUrl,
-  levelCatalogManifestUrl,
-  sceneCatalogManifestUrl,
-  staticMeshManifestUrl,
-  textureManifestUrl
-} from '@l2/ui'
+import type { AssetImportKind, AssetCatalogSummary } from '@l2/ui'
 import { computed } from 'vue'
 import {
+  assetCatalogsUrl,
   assetImportsUrl,
   lookupUrl,
   npcDirectoryUrl,
@@ -280,114 +267,28 @@ async function loadContentSummary() {
 }
 
 async function loadAssetSummary() {
-  const requests = [
-    $fetch<TextureManifest>(textureManifestUrl('systextures'), {
-      query: { refresh: Date.now() }
-    }),
-    $fetch<TextureManifest>(textureManifestUrl('textures'), {
-      query: { refresh: Date.now() }
-    }),
-    $fetch<MusicManifest>(musicManifestUrl(), {
-      query: { refresh: Date.now() }
-    }),
-    $fetch<StaticMeshManifest>(staticMeshManifestUrl(), {
-      query: { refresh: Date.now() }
-    }),
-    $fetch<LevelCatalogManifest>(levelCatalogManifestUrl(), {
-      query: { refresh: Date.now() }
-    }),
-    $fetch<SceneCatalogManifest>(sceneCatalogManifestUrl(), {
-      query: { refresh: Date.now() }
-    })
-  ] as const
-  const results = await Promise.allSettled(requests)
   const summaries = createEmptyAssetSummaries()
-
-  const systemTextures = results[0]
-  if (systemTextures.status === 'fulfilled') {
-    summaries[0] = textureSummary(summaries[0]!, systemTextures.value)
-  }
-  const worldTextures = results[1]
-  if (worldTextures.status === 'fulfilled') {
-    summaries[1] = textureSummary(summaries[1]!, worldTextures.value)
-  }
-  const music = results[2]
-  if (music.status === 'fulfilled') {
-    summaries[2] = {
-      ...summaries[2]!,
-      total: music.value.tracks.length,
-      resolved: music.value.tracks.filter(
-        (track) => track.status === 'resolved'
-      ).length,
-      skipped: music.value.tracks.filter((track) => track.status === 'skipped')
-        .length,
-      groups: music.value.tracks.length,
-      available: true
+  try {
+    const records = await $fetch<AssetCatalogSummary[]>(
+      assetCatalogsUrl(config.public.apiBase)
+    )
+    for (const record of records) {
+      const index = summaries.findIndex((item) => item.kind === record.kind)
+      if (index < 0) continue
+      summaries[index] = {
+        ...summaries[index]!,
+        total: record.total,
+        resolved: record.resolved,
+        skipped: record.skipped,
+        groups: record.groupCount || record.total,
+        available: true
+      }
     }
+    assetError.value = false
+  } catch {
+    assetError.value = true
   }
-  const staticMeshes = results[3]
-  if (staticMeshes.status === 'fulfilled') {
-    summaries[3] = {
-      ...summaries[3]!,
-      total: staticMeshes.value.meshes.length,
-      resolved: staticMeshes.value.meshes.filter(
-        (mesh) => mesh.status === 'resolved'
-      ).length,
-      skipped: staticMeshes.value.meshes.filter(
-        (mesh) => mesh.status === 'skipped'
-      ).length,
-      groups: staticMeshes.value.packages.length,
-      available: true
-    }
-  }
-  const levels = results[4]
-  if (levels.status === 'fulfilled') {
-    summaries[4] = {
-      ...summaries[4]!,
-      total: levels.value.levels.length,
-      resolved: levels.value.levels.filter(
-        (level) => level.status === 'resolved'
-      ).length,
-      skipped: levels.value.levels.filter((level) => level.status === 'skipped')
-        .length,
-      groups: levels.value.levels.length,
-      available: true
-    }
-  }
-  const scenes = results[5]
-  if (scenes.status === 'fulfilled') {
-    summaries[5] = {
-      ...summaries[5]!,
-      total: scenes.value.scenes.length,
-      resolved: scenes.value.scenes.filter(
-        (scene) => scene.status === 'resolved'
-      ).length,
-      skipped: scenes.value.scenes.filter((scene) => scene.status === 'skipped')
-        .length,
-      groups: scenes.value.scenes.length,
-      available: true
-    }
-  }
-
   assets.value = summaries
-  assetError.value = results.some((result) => result.status === 'rejected')
-}
-
-function textureSummary(
-  base: AssetSummary,
-  manifest: TextureManifest
-): AssetSummary {
-  return {
-    ...base,
-    total: manifest.textures.length,
-    resolved: manifest.textures.filter(
-      (texture) => texture.status === 'resolved'
-    ).length,
-    skipped: manifest.textures.filter((texture) => texture.status === 'skipped')
-      .length,
-    groups: manifest.packages.length,
-    available: true
-  }
 }
 
 async function loadJobs() {
@@ -487,7 +388,7 @@ onMounted(loadSummary)
         variant="subtle"
         icon="i-lucide-package-x"
         title="Some asset collections are unavailable"
-        description="Missing manifests are shown as not imported; available collections still report their current inventory."
+        description="Collections without an active database catalog are shown as not imported; available collections still report their current inventory."
       />
       <UAlert
         v-if="jobsError"

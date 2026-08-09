@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import type { LevelCatalogManifest } from '@l2/ui'
-import { levelCatalogManifestUrl } from '@l2/ui'
+import type {
+  AssetCatalogPage,
+  LevelCatalogEntry,
+  LevelPreviewCatalogEntry
+} from '@l2/ui'
 import { computed, onBeforeUnmount } from 'vue'
 import {
+  assetCatalogUrl,
   assetImportsUrl,
   type AssetImportJob
 } from '../../../lib/studio-content'
@@ -10,8 +14,12 @@ import { buildLevelWorldGrid } from '../../../lib/level-world-grid'
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const catalog = ref<LevelCatalogManifest>()
+const previewJobs = ref<AssetImportJob[]>([])
+const catalog = ref<AssetCatalogPage<LevelCatalogEntry>>()
+const previewCatalog = ref<AssetCatalogPage<LevelPreviewCatalogEntry>>()
 const queueing = ref(false)
+const queueingPreviews = ref(false)
+const queueingPreviewName = ref<string>()
 const jobsError = ref<string>()
 const catalogError = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
@@ -19,24 +27,34 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 const activeJob = computed(() =>
   jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
 )
-const worldGrid = computed(() =>
-  buildLevelWorldGrid(catalog.value?.levels ?? [])
+const activePreviewJob = computed(() =>
+  previewJobs.value.find(
+    (job) => job.status === 'queued' || job.status === 'running'
+  )
 )
-const worldGridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${worldGrid.value.width}, minmax(4.75rem, 1fr))`,
-  minWidth: `${worldGrid.value.width * 4.75}rem`
-}))
+const previews = computed(
+  () => new Map(previewCatalog.value?.items.map((item) => [item.name, item]))
+)
+const worldGrid = computed(() =>
+  buildLevelWorldGrid(catalog.value?.items ?? [])
+)
 
 async function loadCatalog() {
   try {
-    catalog.value = await $fetch<LevelCatalogManifest>(
-      levelCatalogManifestUrl(),
-      { query: { refresh: Date.now() } }
+    catalog.value = await $fetch(
+      assetCatalogUrl(config.public.apiBase, 'levels', { pageSize: 500 })
     )
     catalogError.value = undefined
   } catch {
     catalog.value = undefined
     catalogError.value = 'The generated level catalog could not be loaded.'
+  }
+  try {
+    previewCatalog.value = await $fetch(
+      assetCatalogUrl(config.public.apiBase, 'levelpreviews', { pageSize: 500 })
+    )
+  } catch {
+    previewCatalog.value = undefined
   }
 }
 
@@ -47,14 +65,38 @@ async function loadJobs(schedule = true) {
       assetImportsUrl(config.public.apiBase, 'levels'),
       { query: { limit: 20 } }
     )
+    previewJobs.value = await $fetch<AssetImportJob[]>(
+      assetImportsUrl(config.public.apiBase, 'levelpreviews'),
+      { query: { limit: 20 } }
+    )
     jobsError.value = undefined
-    if (!activeJob.value) await loadCatalog()
+    if (!activeJob.value && !activePreviewJob.value) await loadCatalog()
   } catch {
     jobsError.value =
       'Level import jobs could not be loaded from the Studio API.'
   }
-  if (schedule && activeJob.value)
+  if (schedule && (activeJob.value || activePreviewJob.value))
     pollTimer = setTimeout(() => void loadJobs(), 1000)
+}
+
+async function queuePreviews(levelName?: string) {
+  queueingPreviews.value = true
+  queueingPreviewName.value = levelName
+  jobsError.value = undefined
+  try {
+    await $fetch(assetImportsUrl(config.public.apiBase, 'levelpreviews'), {
+      method: 'POST',
+      query: levelName ? { levelName } : undefined
+    })
+    await loadJobs()
+  } catch {
+    jobsError.value = levelName
+      ? `The preview for ${levelName} could not be queued.`
+      : 'The level previews could not be queued.'
+  } finally {
+    queueingPreviews.value = false
+    queueingPreviewName.value = undefined
+  }
 }
 
 async function queueImport() {
@@ -89,6 +131,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     >
       <template #actions>
         <UButton
+          label="Generate previews"
+          icon="i-lucide-image"
+          color="neutral"
+          variant="outline"
+          :loading="queueingPreviews"
+          :disabled="Boolean(activePreviewJob || activeJob)"
+          @click="queuePreviews()"
+        />
+        <UButton
           label="Import jobs"
           icon="i-lucide-history"
           color="neutral"
@@ -99,7 +150,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           label="Import levels"
           icon="i-lucide-play"
           :loading="queueing"
-          :disabled="Boolean(activeJob)"
+          :disabled="Boolean(activeJob || activePreviewJob)"
           @click="queueImport"
         />
       </template>
@@ -128,6 +179,23 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </div>
     </UCard>
+    <UCard v-if="activePreviewJob" variant="subtle">
+      <div class="flex items-center gap-4">
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="size-5 animate-spin text-primary"
+        />
+        <div class="flex-1">
+          <p class="font-medium text-highlighted">
+            Preview generation {{ activePreviewJob.status }}
+          </p>
+          <p class="text-xs text-muted">
+            {{ activePreviewJob.processedCount }} /
+            {{ activePreviewJob.totalCount || '…' }}
+          </p>
+        </div>
+      </div>
+    </UCard>
 
     <UAlert
       v-if="catalogError"
@@ -143,7 +211,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </template>
     </UAlert>
 
-    <UCard v-if="worldGrid.cells.length">
+    <UCard v-if="worldGrid.cells.length" :ui="{ body: 'p-0 sm:p-0' }">
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -164,53 +232,13 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </template>
 
-      <div class="overflow-x-auto pb-2">
-        <div class="grid gap-1.5" :style="worldGridStyle">
-          <template v-for="cell in worldGrid.cells" :key="cell.key">
-            <UButton
-              v-if="cell.level"
-              color="neutral"
-              :variant="cell.level.status === 'resolved' ? 'soft' : 'outline'"
-              :disabled="!cell.level.manifestUrl"
-              :to="
-                cell.level.manifestUrl
-                  ? {
-                      name: 'assets-levels-name',
-                      params: { name: cell.level.name }
-                    }
-                  : undefined
-              "
-              :title="cell.level.error || `Open ${cell.level.fileName}`"
-              class="group min-h-20 flex-col items-stretch justify-between gap-2 rounded-lg p-2 text-left"
-            >
-              <span class="flex w-full items-start justify-between gap-1">
-                <span class="font-mono text-sm font-semibold">
-                  {{ cell.level.name }}
-                </span>
-                <span
-                  class="mt-1 size-2 shrink-0 rounded-full"
-                  :class="
-                    cell.level.status === 'resolved'
-                      ? 'bg-success'
-                      : 'bg-warning'
-                  "
-                />
-              </span>
-              <span class="w-full text-[0.6875rem] text-muted">
-                {{ cell.level.terrainCount }} terrain ·
-                {{ cell.level.actorCount.toLocaleString() }} meshes ·
-                {{ cell.level.waterVolumeCount }} water
-              </span>
-            </UButton>
-            <div
-              v-else
-              class="min-h-20 rounded-lg border border-dashed border-default/60 bg-muted/20"
-              :title="`No imported level at ${cell.key}`"
-              aria-hidden="true"
-            />
-          </template>
-        </div>
-      </div>
+      <StudioLevelWorldMap
+        :grid="worldGrid"
+        :previews="previews"
+        :preview-job-active="Boolean(activePreviewJob || queueingPreviews)"
+        :queueing-preview-name="queueingPreviewName"
+        @generate-preview="queuePreviews"
+      />
     </UCard>
 
     <UCard v-if="worldGrid.unpositioned.length" variant="subtle">

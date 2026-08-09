@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   lookupUrl,
+  assetCatalogEntryUrl,
+  assetCatalogsUrl,
+  assetCatalogUrl,
   assetImportsUrl,
   npcDirectoryUrl,
   paginate,
@@ -78,6 +81,25 @@ describe('Studio content client', () => {
     expect(assetImportsUrl('http://localhost:5101/', 'scenes')).toBe(
       'http://localhost:5101/api/assets/scenes/imports'
     )
+  })
+
+  it('builds paginated asset catalog URLs', () => {
+    expect(
+      assetCatalogUrl('http://localhost:5101/', 'textures', {
+        query: ' icon sword ',
+        packageName: 'Interface',
+        page: 2,
+        pageSize: 100
+      })
+    ).toBe(
+      'http://localhost:5101/api/assets/textures/catalog?query=icon+sword&packageName=Interface&page=2&pageSize=100'
+    )
+    expect(assetCatalogsUrl('http://localhost:5101/')).toBe(
+      'http://localhost:5101/api/assets/catalogs'
+    )
+    expect(
+      assetCatalogEntryUrl('http://localhost:5101/', 'levels', '17 25')
+    ).toBe('http://localhost:5101/api/assets/levels/catalog/17%2025')
   })
 
   it('paginates local catalogs without mutating their records', () => {

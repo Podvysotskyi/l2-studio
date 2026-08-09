@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type {
+  AssetCatalogPage,
   TextureImportKind,
-  TextureManifest,
+  TexturePackage,
   TextureManifestEntry
 } from '@l2/ui'
-import { textureManifestUrl } from '@l2/ui'
 import { computed, onBeforeUnmount, watch } from 'vue'
-import { assetImportsUrl, type AssetImportJob } from '../lib/studio-content'
+import {
+  assetCatalogUrl,
+  assetImportsUrl,
+  type AssetImportJob
+} from '../lib/studio-content'
 
 const props = defineProps<{
   kind: TextureImportKind
@@ -17,7 +21,7 @@ const props = defineProps<{
 
 const config = useRuntimeConfig()
 const jobs = ref<AssetImportJob[]>([])
-const manifest = ref<TextureManifest>()
+const catalog = ref<AssetCatalogPage<TextureManifestEntry, TexturePackage>>()
 const query = ref('')
 const packageQuery = ref('')
 const packageFilter = ref('all')
@@ -39,32 +43,19 @@ const activeJob = computed(() =>
 )
 const visiblePackages = computed(() => {
   const term = packageQuery.value.trim().toLocaleLowerCase()
-  return (manifest.value?.packages ?? []).filter(
+  return (catalog.value?.groups ?? []).filter(
     (item) => !term || item.name.toLocaleLowerCase().includes(term)
   )
 })
-const filteredTextures = computed(() => {
-  const term = query.value.trim().toLocaleLowerCase()
-  return (manifest.value?.textures ?? []).filter(
-    (texture) =>
-      (packageFilter.value === 'all' ||
-        texture.packageName === packageFilter.value) &&
-      (!term ||
-        texture.objectName.toLocaleLowerCase().includes(term) ||
-        texture.packageName.toLocaleLowerCase().includes(term))
-  )
-})
-const visibleTextures = computed(() => {
-  const offset = (page.value - 1) * pageSize.value
-  return filteredTextures.value.slice(offset, offset + pageSize.value)
-})
-const resolvedCount = computed(
-  () =>
-    manifest.value?.textures.filter((texture) => texture.status === 'resolved')
-      .length ?? 0
-)
+const filteredTextures = computed(() => catalog.value?.items ?? [])
+const visibleTextures = computed(() => filteredTextures.value)
+const resolvedCount = computed(() => catalog.value?.summary.resolved ?? 0)
 
-watch([query, packageFilter, pageSize], () => (page.value = 1))
+watch([query, packageFilter, pageSize], () => {
+  page.value = 1
+  void loadCatalog()
+})
+watch(page, () => void loadCatalog())
 
 function showPreview(texture: TextureManifestEntry) {
   if (texture.url) selectedTexture.value = texture
@@ -88,16 +79,19 @@ function previewWidth(texture: TextureManifestEntry | undefined) {
     : undefined
 }
 
-async function loadManifest() {
+async function loadCatalog() {
   try {
-    manifest.value = await $fetch<TextureManifest>(
-      textureManifestUrl(props.kind),
-      {
-        query: { refresh: Date.now() }
-      }
+    catalog.value = await $fetch(
+      assetCatalogUrl(config.public.apiBase, props.kind, {
+        query: query.value,
+        packageName:
+          packageFilter.value === 'all' ? undefined : packageFilter.value,
+        page: page.value,
+        pageSize: pageSize.value
+      })
     )
   } catch {
-    manifest.value = undefined
+    catalog.value = undefined
   }
 }
 
@@ -109,7 +103,7 @@ async function loadJobs(schedule = true) {
       { query: { limit: 20 } }
     )
     error.value = undefined
-    if (!activeJob.value) await loadManifest()
+    if (!activeJob.value) await loadCatalog()
   } catch {
     error.value = 'Asset import jobs could not be loaded from the Studio API.'
   }
@@ -208,15 +202,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             </h2>
             <p class="text-xs text-muted">
               {{ resolvedCount }} resolved ·
-              {{ (manifest?.textures.length ?? 0) - resolvedCount }} skipped ·
-              {{ manifest?.packages.length ?? 0 }} packages
+              {{ catalog?.summary.skipped ?? 0 }} skipped ·
+              {{ catalog?.summary.groupCount ?? 0 }} packages
             </p>
           </div>
         </div>
       </template>
 
       <div
-        v-if="manifest"
+        v-if="catalog"
         class="grid min-h-[42rem] md:grid-cols-[16rem_minmax(0,1fr)]"
       >
         <aside
@@ -253,7 +247,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               <UIcon name="i-lucide-folders" class="size-4 shrink-0" />
               <span class="min-w-0 flex-1 truncate">All packages</span>
               <span class="text-xs tabular-nums">{{
-                manifest.textures.length
+                catalog.summary.total
               }}</span>
             </button>
             <button
@@ -364,7 +358,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <StudioTableFooter
             v-model:page="page"
             v-model:page-size="pageSize"
-            :total="filteredTextures.length"
+            :total="catalog.total"
             :page-size-options="[50, 100, 200]"
           />
         </section>
@@ -373,7 +367,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         v-else
         class="grid min-h-64 place-items-center p-8 text-center text-sm text-muted"
       >
-        No generated texture manifest is available. Queue the first import.
+        No imported texture catalog is available. Queue the first import.
       </div>
     </UCard>
 

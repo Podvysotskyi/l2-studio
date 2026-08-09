@@ -2,12 +2,10 @@
 import type {
   LevelActorManifestEntry,
   LevelCatalogEntry,
-  LevelCatalogManifest,
   LevelLightManifestEntry,
   LevelManifest,
   LevelWaterVolumeManifestEntry
 } from '@l2/ui'
-import { levelCatalogManifestUrl } from '@l2/ui'
 import { computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
@@ -21,7 +19,7 @@ import {
   type TerrainLayerStates
 } from '../../../lib/level-inspector'
 import { filterLevelActors } from '../../../lib/level-map'
-import { paginate } from '../../../lib/studio-content'
+import { assetCatalogEntryUrl, paginate } from '../../../lib/studio-content'
 
 interface LevelPreviewApi {
   focusActor(name: string): void
@@ -32,6 +30,7 @@ interface LevelPreviewApi {
 type InspectorTab = 'actors' | 'terrain' | 'lights' | 'water'
 
 const route = useRoute()
+const config = useRuntimeConfig()
 const catalogEntry = ref<LevelCatalogEntry>()
 const manifest = ref<LevelManifest>()
 const preview = ref<LevelPreviewApi>()
@@ -177,18 +176,9 @@ async function loadLevel() {
   waterQuery.value = ''
 
   try {
-    const catalog = await $fetch<LevelCatalogManifest>(
-      levelCatalogManifestUrl(),
-      { query: { refresh: Date.now() } }
+    const entry = await $fetch<LevelCatalogEntry>(
+      assetCatalogEntryUrl(config.public.apiBase, 'levels', routeName.value)
     )
-    const entry = catalog.levels.find((level) => level.name === routeName.value)
-    if (!entry) {
-      error.value =
-        'Map “' +
-        routeName.value +
-        '” is not present in the generated level catalog.'
-      return
-    }
     catalogEntry.value = entry
     if (!entry.manifestUrl) {
       error.value = entry.error ?? 'Map “' + entry.name + '” was not imported.'

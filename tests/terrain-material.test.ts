@@ -1,6 +1,10 @@
 import type { LevelTerrainManifestEntry } from '@l2/ui'
 import { describe, expect, it } from 'vitest'
-import { blendShader, terrainSamplerCount } from '../lib/terrain-material'
+import {
+  blendShader,
+  terrainSamplerCount,
+  unpackTerrainControlPixels
+} from '../lib/terrain-material'
 
 const terrain: LevelTerrainManifestEntry = {
   name: 'TerrainInfo0',
@@ -14,12 +18,20 @@ const terrain: LevelTerrainManifestEntry = {
   materialStatus: 'resolved',
   materialError: null,
   controlMapUrls: ['/levels/17_25/control-0.webp'],
+  controlMapWidth: 512,
+  controlMapHeight: 512,
+  controlMapEncoding: 'webp-rgb-a-horizontal',
+  controlMapArrayGroup: 1,
   layers: [
     {
       index: 0,
       texturePackage: 'T_texture',
       textureObject: 'Texture.Base',
       textureUrl: '/textures/t_texture/Texture.Base.webp',
+      textureWidth: 256,
+      textureHeight: 256,
+      textureArrayGroup: 0,
+      textureArrayLayer: 0,
       alphaPackage: 'T_texture',
       alphaObject: 'Texture.layer0',
       controlMapIndex: 0,
@@ -41,6 +53,10 @@ const terrain: LevelTerrainManifestEntry = {
       texturePackage: 'T_sland',
       textureObject: 'SL_G',
       textureUrl: '/textures/t_sland/SL_G.webp',
+      textureWidth: 256,
+      textureHeight: 256,
+      textureArrayGroup: 0,
+      textureArrayLayer: 1,
       alphaPackage: 'T_17_25',
       alphaObject: 'Height.17_25_G1',
       controlMapIndex: 0,
@@ -62,7 +78,7 @@ const terrain: LevelTerrainManifestEntry = {
 
 describe('terrain material', () => {
   it('counts diffuse and packed control samplers', () => {
-    expect(terrainSamplerCount(terrain)).toBe(3)
+    expect(terrainSamplerCount(terrain)).toBe(2)
   })
 
   it('projects every layer from terrain-local position while keeping control maps on normalized UVs', () => {
@@ -70,13 +86,37 @@ describe('terrain material', () => {
 
     expect(shader).toContain('dot(vTerrainPosition, vec3(1.0, 0.0, 0.0)) + 0.0')
     expect(shader).toContain('dot(vTerrainPosition, vec3(0.0, 0.5, 0.0)) + 3.0')
-    expect(shader).toContain('terrainControl0, vTerrainUV).r')
-    expect(shader).toContain('terrainControl0, vTerrainUV).g')
+    expect(shader).toContain('terrainControlArray, vec3(vTerrainUV, 0.0)).r')
+    expect(shader).toContain('terrainControlArray, vec3(vTerrainUV, 0.0)).g')
+    expect(shader).toContain('terrainDiffuseArray0')
     expect(shader).toContain('* terrainLayerEnabled0')
     expect(shader).toContain('* terrainLayerEnabled1')
     expect(shader.indexOf('terrainLayerColor0')).toBeLessThan(
       shader.indexOf('terrainLayerColor1')
     )
     expect(shader).toContain('terrainAnyLayerEnabled > 0.5')
+  })
+
+  it('reconstructs four independent weights from opaque transport pixels', () => {
+    const encoded = new Uint8ClampedArray([
+      10, 20, 30, 255, 40, 50, 60, 255, 0, 0, 0, 255, 128, 0, 0, 255
+    ])
+
+    expect([...unpackTerrainControlPixels(encoded, 2, 1)]).toEqual([
+      10, 20, 30, 0, 40, 50, 60, 128
+    ])
+  })
+
+  it('rejects transparent or incorrectly sized transport pixels', () => {
+    expect(() => unpackTerrainControlPixels(new Uint8Array(15), 1, 2)).toThrow(
+      /dimensions/
+    )
+    expect(() =>
+      unpackTerrainControlPixels(
+        new Uint8Array([10, 20, 30, 0, 40, 0, 0, 255]),
+        1,
+        1
+      )
+    ).toThrow(/opaque/)
   })
 })
