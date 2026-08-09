@@ -27,7 +27,7 @@ interface LevelPreviewApi {
   focusWater(name: string): void
 }
 
-type InspectorTab = 'actors' | 'terrain' | 'lights' | 'water'
+type InspectorTab = 'actors' | 'bsp' | 'terrain' | 'lights' | 'water'
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -39,6 +39,7 @@ const selectedLightName = ref<string>()
 const selectedWaterName = ref<string>()
 const inspectorTab = ref<InspectorTab>('actors')
 const actorsVisible = ref(true)
+const bspVisible = ref(true)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
 const terrainLayerStates = ref<TerrainLayerStates>({})
@@ -72,6 +73,22 @@ const terrainMaterialsResolved = computed(
     manifest.value?.terrains.every(
       (terrain) => terrain.materialStatus === 'resolved'
     ) ?? false
+)
+const bspTotals = computed(() =>
+  (manifest.value?.bspMeshes ?? []).reduce(
+    (totals, mesh) => ({
+      vertices: totals.vertices + mesh.vertexCount,
+      triangles: totals.triangles + mesh.triangleCount,
+      surfaces: totals.surfaces + mesh.surfaceCount,
+      errors: totals.errors + (mesh.error && !mesh.meshUrl ? 1 : 0),
+      fallbacks:
+        totals.fallbacks +
+        (mesh.materialStatus === 'resolved' || mesh.materialStatus === 'none'
+          ? 0
+          : 1)
+    }),
+    { vertices: 0, triangles: 0, surfaces: 0, errors: 0, fallbacks: 0 }
+  )
 )
 const filteredActors = computed(() =>
   filterLevelActors(manifest.value?.actors ?? [], query.value)
@@ -168,6 +185,7 @@ async function loadLevel() {
   selectedWaterName.value = undefined
   inspectorTab.value = 'actors'
   actorsVisible.value = true
+  bspVisible.value = true
   lightHelpersVisible.value = false
   waterVolumesVisible.value = true
   terrainLayerStates.value = {}
@@ -199,7 +217,7 @@ async function loadLevel() {
     <StudioPageHeader
       eyebrow="Level map"
       :title="catalogEntry?.name ?? routeName"
-      description="Inspect terrain layers, placed static-mesh instances, and imported lights."
+      description="Inspect render-only BSP, terrain layers, placed static-mesh instances, and imported lights."
       icon="i-lucide-map-pinned"
     >
       <template #actions>
@@ -235,7 +253,17 @@ async function loadLevel() {
     </div>
 
     <template v-else-if="manifest">
-      <div class="grid gap-3 sm:grid-cols-5">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <UCard>
+          <p class="text-xs text-muted">BSP</p>
+          <p class="text-2xl font-semibold">
+            {{ manifest.bspMeshes.length.toLocaleString() }}
+          </p>
+          <p class="text-xs text-muted">
+            {{ bspTotals.surfaces.toLocaleString() }} surfaces ·
+            {{ bspTotals.triangles.toLocaleString() }} triangles
+          </p>
+        </UCard>
         <UCard>
           <p class="text-xs text-muted">Terrains</p>
           <p class="text-2xl font-semibold">{{ manifest.terrains.length }}</p>
@@ -294,6 +322,7 @@ async function loadLevel() {
             :manifest="manifest"
             :selected-actor-name="selectedActorName"
             :actors-visible="actorsVisible"
+            :bsp-visible="bspVisible"
             :terrain-layer-visibility="terrainLayerVisibility"
             :light-helpers-visible="lightHelpersVisible"
             :selected-light-name="selectedLightName"
@@ -312,10 +341,20 @@ async function loadLevel() {
         <UCard class="xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div
-              class="grid grid-cols-4 gap-1"
+              class="grid grid-cols-5 gap-1"
               role="tablist"
               aria-label="Level inspector"
             >
+              <UButton
+                label="BSP"
+                icon="i-lucide-blocks"
+                color="neutral"
+                :variant="inspectorTab === 'bsp' ? 'soft' : 'ghost'"
+                role="tab"
+                :aria-selected="inspectorTab === 'bsp'"
+                class="justify-center"
+                @click="inspectorTab = 'bsp'"
+              />
               <UButton
                 label="Meshes"
                 icon="i-lucide-box"
@@ -356,6 +395,93 @@ async function loadLevel() {
                 class="justify-center"
                 @click="inspectorTab = 'water'"
               />
+            </div>
+          </template>
+
+          <template v-if="inspectorTab === 'bsp'">
+            <div class="space-y-3 border-b border-default p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-sm font-semibold text-highlighted">
+                    World BSP chunks
+                  </h2>
+                  <p class="text-xs text-muted">
+                    {{ bspTotals.vertices.toLocaleString() }} vertices ·
+                    {{ bspTotals.triangles.toLocaleString() }} triangles
+                  </p>
+                </div>
+                <USwitch
+                  v-model="bspVisible"
+                  label="Show"
+                  aria-label="Show world BSP"
+                />
+              </div>
+              <UAlert
+                v-if="bspTotals.errors"
+                color="error"
+                variant="subtle"
+                title="BSP load errors"
+                :description="`${bspTotals.errors} chunks could not be published or loaded.`"
+              />
+              <UAlert
+                v-else-if="bspTotals.fallbacks"
+                color="warning"
+                variant="subtle"
+                title="Neutral material fallback"
+                :description="`${bspTotals.fallbacks} chunks contain unresolved BSP materials.`"
+              />
+            </div>
+            <div class="max-h-[52vh] divide-y divide-default overflow-y-auto">
+              <div
+                v-for="bsp in manifest.bspMeshes"
+                :key="bsp.name"
+                class="space-y-1 p-4 text-xs"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-medium text-highlighted">{{ bsp.name }}</p>
+                  <UBadge
+                    :color="
+                      bsp.error && !bsp.meshUrl
+                        ? 'error'
+                        : bsp.materialStatus === 'resolved' ||
+                            bsp.materialStatus === 'none'
+                          ? 'success'
+                          : 'warning'
+                    "
+                    variant="subtle"
+                  >
+                    {{
+                      bsp.error && !bsp.meshUrl ? 'error' : bsp.materialStatus
+                    }}
+                  </UBadge>
+                </div>
+                <p class="text-muted">
+                  {{ bsp.surfaceCount }} surfaces ·
+                  {{ bsp.triangleCount }} triangles ·
+                  {{ bsp.resolvedMaterialCount }}/{{ bsp.materialCount }}
+                  materials
+                </p>
+                <p
+                  v-if="bsp.error"
+                  :class="bsp.meshUrl ? 'text-warning' : 'text-error'"
+                >
+                  {{ bsp.error }}
+                </p>
+                <p
+                  v-if="
+                    bsp.invisibleSurfaceCount ||
+                    bsp.portalSurfaceCount ||
+                    bsp.fakeBackdropSurfaceCount ||
+                    bsp.malformedSurfaceCount
+                  "
+                  class="text-muted"
+                >
+                  Skipped: {{ bsp.invisibleSurfaceCount }} invisible,
+                  {{ bsp.portalSurfaceCount }} portal,
+                  {{ bsp.fakeBackdropSurfaceCount }} backdrop,
+                  {{ bsp.malformedSurfaceCount }} malformed
+                </p>
+              </div>
             </div>
           </template>
 

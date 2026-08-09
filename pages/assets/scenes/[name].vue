@@ -123,7 +123,10 @@ async function loadScene() {
       error.value = entry?.error ?? `Scene “${routeName.value}” is unavailable.`
       return
     }
-    manifest.value = await $fetch<SceneManifest>(entry.manifestUrl)
+    const loadedManifest = await $fetch<SceneManifest>(entry.manifestUrl)
+    if (loadedManifest.schemaVersion !== 8)
+      throw new Error('The scene manifest schema is unsupported.')
+    manifest.value = loadedManifest
     selectedManagerName.value = manifest.value.sceneManagers[0]?.name
   } catch {
     error.value = `Scene “${routeName.value}” could not be loaded.`
@@ -169,7 +172,7 @@ onBeforeUnmount(stop)
     </div>
 
     <template v-else-if="manifest">
-      <div class="grid gap-3 sm:grid-cols-4">
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <UCard>
           <p class="text-xs text-muted">Placed meshes</p>
           <p class="text-2xl font-semibold">
@@ -192,6 +195,12 @@ onBeforeUnmount(stop)
           <p class="text-xs text-muted">Cinematic</p>
           <p class="text-2xl font-semibold">
             {{ cinematicCount.toLocaleString() }}
+          </p>
+        </UCard>
+        <UCard>
+          <p class="text-xs text-muted">Sky zones</p>
+          <p class="text-2xl font-semibold">
+            {{ manifest.skyZones.length.toLocaleString() }}
           </p>
         </UCard>
       </div>
@@ -254,7 +263,7 @@ onBeforeUnmount(stop)
         </div>
       </UCard>
 
-      <div class="grid gap-4 lg:grid-cols-3">
+      <div class="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <UCard>
           <template #header>
             <h2 class="font-semibold">Scene orchestration</h2>
@@ -289,6 +298,31 @@ onBeforeUnmount(stop)
           <ul class="max-h-72 space-y-1 overflow-auto text-xs">
             <li v-for="effect in manifest.effects" :key="effect.name">
               {{ effect.className }} · {{ effect.name }}
+            </li>
+          </ul>
+        </UCard>
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold">Sky zones</h2>
+          </template>
+          <ul class="max-h-72 space-y-3 overflow-auto text-xs">
+            <li v-for="skyZone in manifest.skyZones" :key="skyZone.name">
+              <p class="font-medium text-highlighted">{{ skyZone.name }}</p>
+              <p class="text-muted">
+                {{ skyZone.lensFlares.length }} flares · pan
+                {{ skyZone.texUPanSpeed }}, {{ skyZone.texVPanSpeed }}
+              </p>
+              <p class="text-muted">
+                {{ skyZone.location.x.toFixed(1) }},
+                {{ skyZone.location.y.toFixed(1) }},
+                {{ skyZone.location.z.toFixed(1) }}
+              </p>
+              <p
+                v-if="skyZone.lensFlares.some((flare) => !flare.textureUrl)"
+                class="text-warning"
+              >
+                Some flare textures are unresolved.
+              </p>
             </li>
           </ul>
         </UCard>

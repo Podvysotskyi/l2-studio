@@ -26,9 +26,11 @@ function frameTopDown(
   composed: Awaited<ReturnType<typeof composeLevelManifest>>
 ) {
   if (!scene) return
-  const terrain = composed.terrainMeshes.filter((mesh) => mesh.isEnabled())
+  const world = [...composed.terrainMeshes, ...composed.bspMeshes].filter(
+    (mesh) => mesh.isEnabled()
+  )
   const fallback = [...composed.actorMeshes.values()].flat()
-  const meshes = terrain.length ? terrain : fallback
+  const meshes = world.length ? world : fallback
   if (!meshes.length)
     throw new Error('The level contains no renderable geometry.')
 

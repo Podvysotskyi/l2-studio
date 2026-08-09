@@ -4,7 +4,8 @@ import type {
   LevelLightManifestEntry,
   LevelManifest,
   LevelRotation,
-  LevelVector
+  LevelVector,
+  SceneManifest
 } from '@l2/ui'
 import {
   AbstractMesh,
@@ -26,7 +27,11 @@ import {
   UtilityLayerRenderer,
   Vector3
 } from '@babylonjs/core'
-import { applyL2MaterialMetadata } from '@l2/babylon-runtime'
+import {
+  applyL2MaterialMetadata,
+  composeAuthoredEffects,
+  type ComposedAuthoredEffects
+} from '@l2/babylon-runtime'
 import type { Light } from '@babylonjs/core'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import {
@@ -42,9 +47,10 @@ import {
 
 const props = withDefaults(
   defineProps<{
-    manifest: LevelManifest
+    manifest: LevelManifest | SceneManifest
     selectedActorName?: string
     actorsVisible?: boolean
+    bspVisible?: boolean
     terrainLayerVisibility?: Record<string, boolean[]>
     lightHelpersVisible?: boolean
     selectedLightName?: string
@@ -54,6 +60,7 @@ const props = withDefaults(
   {
     selectedActorName: undefined,
     actorsVisible: true,
+    bspVisible: true,
     terrainLayerVisibility: () => ({}),
     lightHelpersVisible: false,
     selectedLightName: undefined,
@@ -74,6 +81,7 @@ let resizeObserver: ResizeObserver | undefined
 let loadVersion = 0
 const containers = new Map<string, Promise<AssetContainer>>()
 let terrainMeshes: AbstractMesh[] = []
+let bspMeshes: AbstractMesh[] = []
 let terrainMaterials: PBRMaterial[] = []
 const terrainControllers = new Map<string, TerrainMaterialController>()
 const actorMeshes = new Map<string, AbstractMesh[]>()
@@ -89,6 +97,7 @@ let pendingFocusActorName: string | undefined
 let pendingFocusLightName: string | undefined
 let pendingFocusWaterName: string | undefined
 let waterMaterial: PBRMaterial | undefined
+let authoredEffects: ComposedAuthoredEffects | undefined
 const highlightColor = new Color3(1, 0.55, 0.08)
 
 function instanceMeshes(rootNodes: TransformNode[]) {
@@ -126,6 +135,10 @@ function applyActorVisibility() {
     for (const mesh of meshes) mesh.setEnabled(props.actorsVisible)
   }
   applySelectionHighlight()
+}
+
+function applyBspVisibility() {
+  for (const mesh of bspMeshes) mesh.setEnabled(props.bspVisible)
 }
 
 function applyWaterVisibility() {
@@ -276,8 +289,9 @@ defineExpose({ focusActor, focusLight, focusWater, setCameraPose, frameMap })
 function frameMap(topDown = false) {
   if (!scene) return
   const camera = scene.activeCamera as ArcRotateCamera
-  const meshes = terrainMeshes.length
-    ? terrainMeshes
+  const worldMeshes = [...terrainMeshes, ...bspMeshes]
+  const meshes = worldMeshes.length
+    ? worldMeshes
     : scene.meshes.filter((mesh) => mesh.getTotalVertices() > 0)
   if (!meshes.length) return
 
@@ -337,7 +351,10 @@ async function loadLevel() {
   if (!scene) return
   const version = ++loadVersion
   loading.value = true
+  authoredEffects?.dispose()
+  authoredEffects = undefined
   terrainMeshes = []
+  bspMeshes = []
   terrainMaterials.forEach((material) => material.dispose(true, true))
   terrainMaterials = []
   terrainControllers.clear()
@@ -364,6 +381,27 @@ async function loadLevel() {
   containers.clear()
 
   try {
+    if ('bspMeshes' in props.manifest) {
+      for (const bsp of props.manifest.bspMeshes) {
+        if (bsp.error) emit('materialError', `${bsp.name}: ${bsp.error}`)
+        if (!bsp.meshUrl) continue
+        const container = await containerFor(bsp.meshUrl)
+        if (version !== loadVersion) return
+        const instance = container.instantiateModelsToScene(
+          (name) => `${bsp.name}:${name}`,
+          false
+        )
+        const placement = new TransformNode(`${bsp.name}:placement`, scene)
+        for (const root of instance.rootNodes) root.parent = placement
+        const meshes = instanceMeshes(instance.rootNodes as TransformNode[])
+        for (const mesh of meshes) {
+          mesh.checkCollisions = false
+          mesh.isPickable = false
+          mesh.setEnabled(props.bspVisible)
+        }
+        bspMeshes.push(...meshes)
+      }
+    }
     for (const terrain of props.manifest.terrains) {
       if (!terrain.meshUrl) continue
       const container = await containerFor(terrain.meshUrl)
@@ -506,6 +544,16 @@ async function loadLevel() {
     applySelectionHighlight()
 
     createLevelLights()
+    if ('effects' in props.manifest) {
+      authoredEffects = composeAuthoredEffects(
+        scene,
+        props.manifest.effects,
+        props.manifest.skyZones
+      )
+      if (authoredEffects.diagnostics.length)
+        console.warn(authoredEffects.diagnostics.join('\n'))
+      if (!terrainMeshes.length && !actorMeshes.size) frameMap()
+    }
     if (pendingFocusLightName) focusLight(pendingFocusLightName)
   } catch (error) {
     emit(
@@ -561,6 +609,7 @@ watch(
 )
 watch(() => props.selectedActorName, applySelectionHighlight)
 watch(() => props.actorsVisible, applyActorVisibility)
+watch(() => props.bspVisible, applyBspVisibility)
 watch(() => props.terrainLayerVisibility, applyTerrainLayerVisibility, {
   deep: true
 })
@@ -572,6 +621,7 @@ watch(() => props.selectedWaterName, applySelectionHighlight)
 onBeforeUnmount(() => {
   loadVersion++
   resizeObserver?.disconnect()
+  authoredEffects?.dispose()
   disposeLightGizmos()
   lightGizmoLayer?.dispose()
   scene?.dispose()
