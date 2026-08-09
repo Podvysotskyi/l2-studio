@@ -14,6 +14,7 @@ import {
   enableAllTerrainLayers,
   filterLevelLights,
   filterLevelWaterVolumes,
+  levelEnvironmentColor,
   levelLightColor,
   setTerrainLayerEnabled,
   toggleSoloTerrainLayer,
@@ -31,7 +32,8 @@ interface LevelPreviewApi {
   frameBsp(): void
 }
 
-type InspectorTab = 'actors' | 'bsp' | 'terrain' | 'lights' | 'water' | 'other'
+type InspectorTab =
+  'actors' | 'bsp' | 'terrain' | 'lights' | 'water' | 'environment'
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -52,6 +54,7 @@ const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
 const waterSurfacesVisible = ref(true)
+const distanceFogEnabled = ref(false)
 const terrainLayerStates = ref<TerrainLayerStates>({})
 const query = ref('')
 const lightQuery = ref('')
@@ -270,6 +273,7 @@ async function loadLevel() {
   lightHelpersVisible.value = false
   waterVolumesVisible.value = true
   waterSurfacesVisible.value = true
+  distanceFogEnabled.value = false
   terrainLayerStates.value = {}
   query.value = ''
   lightQuery.value = ''
@@ -421,6 +425,7 @@ async function loadLevel() {
             :selected-water-surface-name="selectedWaterSurfaceName"
             :water-volumes-visible="waterVolumesVisible"
             :selected-water-name="selectedWaterName"
+            :distance-fog-enabled="distanceFogEnabled"
             @error="previewError = $event"
             @material-error="terrainMaterialError = $event"
             @light-select="selectedLightName = $event"
@@ -434,7 +439,7 @@ async function loadLevel() {
         <UCard class="xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div
-              class="grid grid-cols-6 gap-1"
+              class="grid grid-cols-3 gap-1 sm:grid-cols-6 xl:grid-cols-3 2xl:grid-cols-6"
               role="tablist"
               aria-label="Level inspector"
             >
@@ -489,14 +494,14 @@ async function loadLevel() {
                 @click="inspectorTab = 'water'"
               />
               <UButton
-                label="Other"
-                icon="i-lucide-shapes"
+                label="Environment"
+                icon="i-lucide-cloud-fog"
                 color="neutral"
-                :variant="inspectorTab === 'other' ? 'soft' : 'ghost'"
+                :variant="inspectorTab === 'environment' ? 'soft' : 'ghost'"
                 role="tab"
-                :aria-selected="inspectorTab === 'other'"
+                :aria-selected="inspectorTab === 'environment'"
                 class="justify-center"
-                @click="inspectorTab = 'other'"
+                @click="inspectorTab = 'environment'"
               />
             </div>
           </template>
@@ -1082,18 +1087,128 @@ async function loadLevel() {
             </div>
           </template>
 
-          <template v-else-if="inspectorTab === 'other'">
+          <template v-else-if="inspectorTab === 'environment'">
             <div class="border-b border-default p-4">
               <div>
                 <h2 class="text-sm font-semibold text-highlighted">
-                  Special world geometry
+                  Level environment
                 </h2>
                 <p class="text-xs text-muted">
-                  Camera-relative atmosphere and diagnostic foundations
+                  Authored atmosphere and diagnostic world geometry
                 </p>
               </div>
             </div>
             <div class="max-h-[58vh] overflow-y-auto">
+              <section
+                class="border-b border-default p-4"
+                aria-label="Atmosphere"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 class="text-sm font-semibold text-highlighted">
+                      Atmosphere
+                    </h3>
+                    <p class="text-xs text-muted">
+                      Generated atlas previews suppress distance fog for map
+                      readability.
+                    </p>
+                  </div>
+                  <USwitch
+                    v-model="distanceFogEnabled"
+                    label="Apply fog"
+                    aria-label="Apply authored distance fog"
+                    :disabled="!manifest.environment.distanceFog"
+                  />
+                </div>
+
+                <dl class="mt-4 space-y-3 text-sm">
+                  <div class="flex items-center justify-between gap-4">
+                    <dt class="text-muted">Ambient color</dt>
+                    <dd class="flex items-center gap-2 text-highlighted">
+                      <span
+                        class="size-4 rounded-full border border-default"
+                        :style="{
+                          backgroundColor: levelEnvironmentColor(
+                            manifest.environment.ambientColor
+                          ).css
+                        }"
+                      />
+                      {{
+                        levelEnvironmentColor(manifest.environment.ambientColor)
+                          .label
+                      }}
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <dt class="text-muted">Ambient brightness</dt>
+                    <dd class="text-highlighted">
+                      {{
+                        Math.round(
+                          manifest.environment.ambientBrightness * 100
+                        )
+                      }}%
+                    </dd>
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <dt class="text-muted">Distance fog</dt>
+                    <dd>
+                      <UBadge
+                        :color="
+                          manifest.environment.distanceFog
+                            ? 'success'
+                            : 'neutral'
+                        "
+                        variant="subtle"
+                        size="sm"
+                      >
+                        {{
+                          manifest.environment.distanceFog
+                            ? 'Authored'
+                            : 'Not authored'
+                        }}
+                      </UBadge>
+                    </dd>
+                  </div>
+                  <template v-if="manifest.environment.distanceFog">
+                    <div class="flex items-center justify-between gap-4">
+                      <dt class="text-muted">Fog color</dt>
+                      <dd class="flex items-center gap-2 text-highlighted">
+                        <span
+                          class="size-4 rounded-full border border-default"
+                          :style="{
+                            backgroundColor: levelEnvironmentColor(
+                              manifest.environment.distanceFog.color
+                            ).css
+                          }"
+                        />
+                        {{
+                          levelEnvironmentColor(
+                            manifest.environment.distanceFog.color
+                          ).label
+                        }}
+                      </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                      <dt class="text-muted">Fog start</dt>
+                      <dd class="text-highlighted">
+                        {{
+                          manifest.environment.distanceFog.start.toLocaleString()
+                        }}
+                        units
+                      </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                      <dt class="text-muted">Fog end</dt>
+                      <dd class="text-highlighted">
+                        {{
+                          manifest.environment.distanceFog.end.toLocaleString()
+                        }}
+                        units
+                      </dd>
+                    </div>
+                  </template>
+                </dl>
+              </section>
               <section v-if="skyZoneBspMeshes.length" aria-label="Sky Zones">
                 <div
                   class="flex items-center justify-between gap-3 border-b border-default bg-elevated/50 px-4 py-3"

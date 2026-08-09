@@ -111,6 +111,10 @@ onMounted(async () => {
       onMaterialError: (message) => materialErrors.push(message)
     })
     if (materialErrors.length) throw new Error(materialErrors.join(' '))
+    // Authored distance fog is calibrated for an in-world camera. The elevated
+    // orthographic overview otherwise sits beyond the fog end and captures only
+    // the fog color for every fog-enabled coordinate map.
+    scene.fogMode = Scene.FOGMODE_NONE
     frameTopDown(composed)
     await scene.whenReadyAsync()
     scene.render()

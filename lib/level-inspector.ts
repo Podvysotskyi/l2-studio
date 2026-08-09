@@ -1,4 +1,5 @@
 import type {
+  LevelEnvironmentManifestEntry,
   LevelLightManifestEntry,
   LevelTerrainManifestEntry,
   LevelWaterVolumeManifestEntry
@@ -11,6 +12,18 @@ export interface TerrainLayerState {
 }
 
 export type TerrainLayerStates = Record<string, TerrainLayerState>
+
+type LevelEnvironmentColor = LevelEnvironmentManifestEntry['ambientColor']
+
+export function levelEnvironmentColor(color: LevelEnvironmentColor) {
+  const channels = [color.r, color.g, color.b].map((channel) =>
+    Math.round(Math.min(Math.max(channel, 0), 1) * 255)
+  )
+  return {
+    css: `rgb(${channels.join(' ')})`,
+    label: `RGB ${channels.join(', ')}`
+  }
+}
 
 export function createTerrainLayerStates(
   terrains: LevelTerrainManifestEntry[]

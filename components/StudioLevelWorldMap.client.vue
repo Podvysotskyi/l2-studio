@@ -191,7 +191,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
     <section class="relative min-w-0 bg-[#09120f]">
       <div
         ref="viewport"
-        class="level-map-viewport relative h-[clamp(32rem,68vh,52rem)] touch-none overflow-hidden outline-none select-none focus-visible:ring-2 focus-visible:ring-primary"
+        class="level-map-viewport relative h-[clamp(32rem,68vh,52rem)] touch-none overflow-hidden outline-none select-none focus-visible:ring-2 focus-visible:ring-primary lg:h-[clamp(40rem,calc(100dvh-20rem),64rem)]"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         tabindex="0"
         role="region"

@@ -66,6 +66,7 @@ const props = withDefaults(
     selectedWaterSurfaceName?: string
     waterVolumesVisible?: boolean
     selectedWaterName?: string
+    distanceFogEnabled?: boolean
   }>(),
   {
     selectedActorName: undefined,
@@ -81,7 +82,8 @@ const props = withDefaults(
     waterSurfacesVisible: true,
     selectedWaterSurfaceName: undefined,
     waterVolumesVisible: true,
-    selectedWaterName: undefined
+    selectedWaterName: undefined,
+    distanceFogEnabled: false
   }
 )
 const emit = defineEmits<{
@@ -121,6 +123,28 @@ let authoredEffects: ComposedAuthoredEffects | undefined
 let activeSkyZone: SkyZoneManifestEntry | undefined
 let skyZonePlacement: TransformNode | undefined
 const highlightColor = new Color3(1, 0.55, 0.08)
+const inspectorClearColor = new Color4(0.2, 0.28, 0.38, 1)
+
+function applyDistanceFog() {
+  if (!scene) return
+  const fog = props.manifest.environment.distanceFog
+  if (props.distanceFogEnabled && fog) {
+    const fogColor = new Color3(
+      fog.color.r,
+      fog.color.g,
+      fog.color.b
+    ).toLinearSpace()
+    scene.fogMode = Scene.FOGMODE_LINEAR
+    scene.fogColor.copyFrom(fogColor)
+    scene.fogStart = fog.start
+    scene.fogEnd = fog.end
+    scene.clearColor = new Color4(fogColor.r, fogColor.g, fogColor.b, 1)
+    return
+  }
+
+  scene.fogMode = Scene.FOGMODE_NONE
+  scene.clearColor.copyFrom(inspectorClearColor)
+}
 
 function instanceMeshes(rootNodes: TransformNode[]) {
   return [
@@ -558,6 +582,7 @@ async function loadWorldBaseMeshes() {
 
 async function loadLevel() {
   if (!scene) return
+  applyDistanceFog()
   const isCoordinateLevel = 'bspMeshes' in props.manifest
   if (isCoordinateLevel) {
     scene.setRenderingAutoClearDepthStencil(
@@ -811,7 +836,7 @@ onMounted(() => {
   })
   scene = new Scene(engine)
   configureUnrealScene(scene)
-  scene.clearColor = new Color4(0.2, 0.28, 0.38, 1)
+  scene.clearColor.copyFrom(inspectorClearColor)
   highlightLayer = new HighlightLayer('level-preview-highlight', scene)
   lightGizmoLayer = new UtilityLayerRenderer(scene)
   const camera = new ArcRotateCamera(
@@ -869,6 +894,7 @@ watch(() => props.terrainLayerVisibility, applyTerrainLayerVisibility, {
 watch(() => props.lightHelpersVisible, syncLightGizmos)
 watch(() => props.selectedLightName, applyLightGizmoSelection)
 watch(() => props.waterVolumesVisible, applyWaterVisibility)
+watch(() => props.distanceFogEnabled, applyDistanceFog)
 watch(() => props.selectedWaterName, applySelectionHighlight)
 
 onBeforeUnmount(() => {

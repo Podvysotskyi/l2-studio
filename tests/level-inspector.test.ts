@@ -9,6 +9,7 @@ import {
   enableAllTerrainLayers,
   filterLevelLights,
   filterLevelWaterVolumes,
+  levelEnvironmentColor,
   setTerrainLayerEnabled,
   toggleSoloTerrainLayer
 } from '../lib/level-inspector'
@@ -19,6 +20,19 @@ const terrain = {
 } as LevelTerrainManifestEntry
 
 describe('level inspector', () => {
+  it('formats normalized environment colors for display', () => {
+    expect(
+      levelEnvironmentColor({ r: 0.35686275, g: 0.4, b: 0.4509804 })
+    ).toEqual({
+      css: 'rgb(91 102 115)',
+      label: 'RGB 91, 102, 115'
+    })
+    expect(levelEnvironmentColor({ r: -1, g: 0.5, b: 2 })).toEqual({
+      css: 'rgb(0 128 255)',
+      label: 'RGB 0, 128, 255'
+    })
+  })
+
   it('initializes every imported terrain layer as enabled', () => {
     expect(createTerrainLayerStates([terrain])).toEqual({
       TerrainInfo0: { enabled: [true, true, true] }
