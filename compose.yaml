@@ -1,9 +1,12 @@
+name: l2-studio
+
 services:
   studio:
+    image: l2-studio:dev
     build:
       context: ./web
       secrets: [npm_token]
-    ports: ['3001:3001']
+    ports: ['127.0.0.1:3001:3001']
     environment:
       NUXT_PUBLIC_STUDIO_API_BASE: ${NUXT_PUBLIC_STUDIO_API_BASE:-http://localhost:5101}
       NUXT_PUBLIC_ASSET_BASE_URL: ${NUXT_PUBLIC_ASSET_BASE_URL:-http://localhost:5300}
