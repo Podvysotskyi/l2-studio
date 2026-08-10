@@ -2,15 +2,16 @@
 
 ## Scope
 
-This repository owns only the Studio Nuxt frontend. Studio API, worker, source-file access, conversion logic, and database migrations remain in the backend repository.
+This repository owns the Studio Nuxt frontend plus Studio API, Worker, content authoring, and conversion tooling. Server runtime persistence remains outside this repository.
 
 ## Commands
 
 ```sh
-npm ci
-npm test
-npm run typecheck
-npm run build
+cd web && npm ci
+cd web && npm test
+cd web && npm run typecheck
+cd web && npm run build
+dotnet build server/L2.Studio.slnx
 ```
 
 Use `NODE_AUTH_TOKEN` for private package installation. Container orchestration lives in the `l2-infra` repository.

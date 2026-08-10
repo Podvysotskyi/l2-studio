@@ -1,6 +1,6 @@
 # L2 Studio Web
 
-The Nuxt web interface for L2 asset conversion, content inspection, validation, and publishing workflows.
+The L2 Studio product: a Nuxt web interface and .NET services for asset conversion, content inspection, validation, and publishing workflows.
 
 ## Prerequisites
 
@@ -13,6 +13,7 @@ The Nuxt web interface for L2 asset conversion, content inspection, validation, 
 
 ```sh
 export NODE_AUTH_TOKEN="$(gh auth token)"
+cd web
 npm ci
 npm run dev
 ```
@@ -36,9 +37,10 @@ Do not commit original source packages or generated private assets.
 ## Checks
 
 ```sh
-npm test
-npm run typecheck
-npm run build
+cd web && npm test
+cd web && npm run typecheck
+cd web && npm run build
+dotnet build server/L2.Studio.slnx
 ```
 
 ## Dependencies

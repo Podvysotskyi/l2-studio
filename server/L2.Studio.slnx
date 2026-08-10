@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="L2.Studio.Api.Tests/L2.Studio.Api.Tests.csproj" />
+  <Project Path="L2.Studio.Api/L2.Studio.Api.csproj" />
+  <Project Path="L2.Studio.Content/L2.Studio.Content.csproj" />
+  <Project Path="L2.Studio.Worker/L2.Studio.Worker.csproj" />
+</Solution>

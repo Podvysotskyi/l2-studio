@@ -20,7 +20,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: web
           push: true
           tags: ghcr.io/podvysotskyi/l2-studio:latest,ghcr.io/podvysotskyi/l2-studio:${{ github.sha }}
           secrets: npm_token=${{ secrets.PACKAGES_TOKEN }}
