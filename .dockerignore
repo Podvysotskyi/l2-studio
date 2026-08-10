@@ -1,0 +1,9 @@
+.git
+.env
+**/bin
+**/obj
+**/node_modules
+**/.nuxt
+**/.output
+assets
+sources

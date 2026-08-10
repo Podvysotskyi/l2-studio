@@ -7,7 +7,6 @@ The L2 Studio product: a Nuxt web interface and .NET services for asset conversi
 - Node.js 22.13 or newer
 - npm
 - A GitHub Packages token with `read:packages` access, set as `NODE_AUTH_TOKEN`
-- Studio API running at the configured endpoint
 
 ## Local development
 
@@ -26,7 +25,7 @@ NUXT_PUBLIC_STUDIO_API_BASE=http://localhost:5101 npm run dev
 
 ## Docker Compose
 
-Run the repository-local Studio and nginx asset-server stack:
+Run PostgreSQL, the Studio API and worker, the Studio web application, nginx asset serving, and the preview browser:
 
 ```sh
 docker compose up --build
