@@ -25,10 +25,10 @@ NUXT_PUBLIC_STUDIO_API_BASE=http://localhost:5101 npm run dev
 
 ## Docker Compose
 
-Run PostgreSQL, the Studio API and worker, the Studio web application, nginx asset serving, and the preview browser:
+The combined development model lives in the `l2-infra` repository. From its root, run PostgreSQL, the Studio API and worker, the Studio web application, nginx asset serving, and the preview browser:
 
 ```sh
-docker compose up --build
+docker compose up --build studio-api studio-worker puppeteer studio asset-server
 ```
 
 Generated client manifests and resources live in ignored `assets/` and are served at http://localhost:5300.
