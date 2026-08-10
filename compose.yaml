@@ -1,6 +1,12 @@
 services:
   studio:
-    image: ghcr.io/podvysotskyi/l2-studio:${L2_STUDIO_IMAGE_TAG:-latest}
+    build:
+      context: .
+      secrets: [npm_token]
     ports: ['3001:3001']
     environment:
       NUXT_PUBLIC_STUDIO_API_BASE: ${NUXT_PUBLIC_STUDIO_API_BASE:-http://localhost:5101}
+
+secrets:
+  npm_token:
+    environment: NODE_AUTH_TOKEN
