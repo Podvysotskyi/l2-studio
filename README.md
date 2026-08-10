@@ -26,11 +26,13 @@ NUXT_PUBLIC_STUDIO_API_BASE=http://localhost:5101 npm run dev
 
 ## Docker Compose
 
-Container orchestration is owned by [`l2-infra`](https://github.com/Podvysotskyi/l2-infra). From that repository, run:
+Run the repository-local Studio and nginx asset-server stack:
 
 ```sh
-docker compose -f compose/studio.yaml up --build
+docker compose up --build
 ```
+
+Generated client manifests and resources live in ignored `assets/` and are served at http://localhost:5300.
 
 Do not commit original source packages or generated private assets.
 

@@ -1,0 +1,29 @@
+services:
+  studio:
+    build:
+      context: ./web
+      secrets: [npm_token]
+    ports: ['3001:3001']
+    environment:
+      NUXT_PUBLIC_STUDIO_API_BASE: ${NUXT_PUBLIC_STUDIO_API_BASE:-http://localhost:5101}
+      NUXT_PUBLIC_ASSET_BASE_URL: ${NUXT_PUBLIC_ASSET_BASE_URL:-http://localhost:5300}
+    depends_on:
+      asset-server:
+        condition: service_healthy
+
+  asset-server:
+    image: nginx:1.29-alpine
+    ports: ['127.0.0.1:5300:80']
+    volumes:
+      - ./assets:/srv/assets:ro
+      - ./docker/nginx/assets.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost/health/live']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+secrets:
+  npm_token:
+    environment: NODE_AUTH_TOKEN
