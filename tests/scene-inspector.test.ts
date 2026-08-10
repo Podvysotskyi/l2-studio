@@ -1,4 +1,4 @@
-import type { SceneObjectManifestEntry } from '@l2/ui'
+import type { SceneObjectManifestEntry } from '@podvysotskyi/l2-ui'
 import { describe, expect, it } from 'vitest'
 import { filterSceneObjects, sceneObjectStatus } from '../lib/scene-inspector'
 

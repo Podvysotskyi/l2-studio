@@ -3,7 +3,7 @@ import type {
   AssetCatalogPage,
   StaticMeshManifestEntry,
   StaticMeshPackage
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import {
   assetCatalogUrl,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetImportKind } from '@l2/ui'
+import type { AssetImportKind } from '@podvysotskyi/l2-ui'
 import { computed, onBeforeUnmount } from 'vue'
 import { assetImportsUrl, type AssetImportJob } from '../../lib/studio-content'
 

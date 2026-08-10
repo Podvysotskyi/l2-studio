@@ -2,7 +2,7 @@ import type {
   LevelLightManifestEntry,
   LevelTerrainManifestEntry,
   LevelWaterVolumeManifestEntry
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 import { describe, expect, it } from 'vitest'
 import {
   createTerrainLayerStates,

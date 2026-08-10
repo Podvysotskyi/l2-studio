@@ -1,4 +1,4 @@
-import type { AssetImportKind } from '@l2/ui'
+import type { AssetImportKind } from '@podvysotskyi/l2-ui'
 
 export interface NpcRecord {
   id: number

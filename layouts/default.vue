@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import type { ServiceState } from '@l2/ui'
+import type { ServiceState } from '@podvysotskyi/l2-ui'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { systemInfoUrl, type SystemInfo } from '../lib/system-info'

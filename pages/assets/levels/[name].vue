@@ -6,7 +6,7 @@ import type {
   LevelLightManifestEntry,
   LevelManifest,
   LevelWaterVolumeManifestEntry
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 import { computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {

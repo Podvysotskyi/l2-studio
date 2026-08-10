@@ -1,0 +1,17 @@
+services:
+  studio:
+    build: .
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:?Set NODE_AUTH_TOKEN to a GitHub Packages token}
+      NUXT_PUBLIC_STUDIO_API_BASE: ${NUXT_PUBLIC_STUDIO_API_BASE:-http://localhost:5101}
+      L2_PUBLIC_ASSETS_DIR: /workspace/assets
+    volumes:
+      - .:/workspace
+      - studio-node-modules:/workspace/node_modules
+      - ./assets:/workspace/assets:ro
+    command: sh -c 'npm ci && npm run dev'
+
+volumes:
+  studio-node-modules:

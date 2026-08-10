@@ -3,7 +3,7 @@ import type {
   AssetCatalogPage,
   LevelCatalogEntry,
   LevelPreviewCatalogEntry
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 import { computed, onBeforeUnmount } from 'vue'
 import {
   assetCatalogUrl,

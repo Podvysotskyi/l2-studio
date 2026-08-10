@@ -1,4 +1,4 @@
-import type { SceneObjectManifestEntry } from '@l2/ui'
+import type { SceneObjectManifestEntry } from '@podvysotskyi/l2-ui'
 
 export function filterSceneObjects(
   objects: SceneObjectManifestEntry[],

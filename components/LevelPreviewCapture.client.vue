@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import '@babylonjs/loaders/glTF/index.js'
-import type { LevelManifest } from '@l2/ui'
+import type { LevelManifest } from '@podvysotskyi/l2-ui'
 import { Camera, Engine, FreeCamera, Scene, Vector3 } from '@babylonjs/core'
-import { composeLevelManifest, configureUnrealScene } from '@l2/babylon-runtime'
+import { composeLevelManifest, configureUnrealScene } from '@podvysotskyi/l2-runtime'
 import { nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { calculateLevelPreviewFrame } from '../lib/level-preview-frame'
 

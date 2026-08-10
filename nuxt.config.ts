@@ -13,7 +13,7 @@ export default defineNuxtConfig({
   dir: {
     public:
       process.env.L2_PUBLIC_ASSETS_DIR ??
-      fileURLToPath(new URL('../../assets', import.meta.url))
+      fileURLToPath(new URL('./assets', import.meta.url))
   },
   runtimeConfig: {
     public: {

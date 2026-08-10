@@ -1,4 +1,4 @@
-import type { LevelActorManifestEntry } from '@l2/ui'
+import type { LevelActorManifestEntry } from '@podvysotskyi/l2-ui'
 import { describe, expect, it } from 'vitest'
 import { filterLevelActors } from '../lib/level-map'
 import { paginate } from '../lib/studio-content'

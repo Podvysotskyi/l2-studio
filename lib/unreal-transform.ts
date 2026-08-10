@@ -5,4 +5,4 @@ export {
   unrealRotationQuaternion,
   unrealVector,
   type UnrealNodeTransform
-} from '@l2/babylon-runtime'
+} from '@podvysotskyi/l2-runtime'

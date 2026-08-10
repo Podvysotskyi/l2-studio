@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetImportKind, AssetCatalogSummary } from '@l2/ui'
+import type { AssetImportKind, AssetCatalogSummary } from '@podvysotskyi/l2-ui'
 import { computed } from 'vue'
 import {
   assetCatalogsUrl,

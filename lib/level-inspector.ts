@@ -3,7 +3,7 @@ import type {
   LevelLightManifestEntry,
   LevelTerrainManifestEntry,
   LevelWaterVolumeManifestEntry
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 
 export interface TerrainLayerState {
   enabled: boolean[]

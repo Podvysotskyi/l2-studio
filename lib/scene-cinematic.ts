@@ -3,7 +3,7 @@ import type {
   LevelVector,
   SceneManifest,
   SceneObjectManifestEntry
-} from '@l2/ui'
+} from '@podvysotskyi/l2-ui'
 
 export interface ScenePose {
   location: LevelVector

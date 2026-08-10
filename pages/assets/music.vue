@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetCatalogPage, MusicManifestEntry } from '@l2/ui'
+import type { AssetCatalogPage, MusicManifestEntry } from '@podvysotskyi/l2-ui'
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import {
   assetCatalogUrl,

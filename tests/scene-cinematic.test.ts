@@ -1,4 +1,4 @@
-import type { SceneManifest, SceneObjectManifestEntry } from '@l2/ui'
+import type { SceneManifest, SceneObjectManifestEntry } from '@podvysotskyi/l2-ui'
 import { describe, expect, it } from 'vitest'
 import {
   interpolateScenePose,

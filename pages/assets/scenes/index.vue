@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetCatalogPage, SceneCatalogEntry } from '@l2/ui'
+import type { AssetCatalogPage, SceneCatalogEntry } from '@podvysotskyi/l2-ui'
 import { computed, onBeforeUnmount } from 'vue'
 import {
   assetCatalogUrl,
