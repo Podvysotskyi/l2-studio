@@ -1,0 +1,13 @@
+using L2.Studio.Content.Identifiers;
+
+namespace L2.Studio.Content.Entities;
+
+public sealed class PlayerHairStyle
+{
+    public int Id { get; set; }
+    public PlayerSexId PlayerSexId { get; set; }
+    public PlayerRaceId PlayerRaceId { get; set; }
+    public required string Name { get; set; }
+    public PlayerSex PlayerSex { get; set; } = null!;
+    public PlayerRace PlayerRace { get; set; } = null!;
+}
