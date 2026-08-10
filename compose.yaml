@@ -33,7 +33,7 @@ services:
   studio-api:
     image: ${L2_STUDIO_API_IMAGE:-l2-studio-api:dev}
     build:
-      context: .
+      context: ${L2_STUDIO_ROOT:-.}
       dockerfile: docker/dotnet.Dockerfile
       args:
         PROJECT: server/L2.Studio.Api/L2.Studio.Api.csproj
@@ -42,7 +42,7 @@ services:
       <<: [*dotnet-environment, *asset-environment]
     ports: ['127.0.0.1:5101:8080']
     volumes:
-      - ./assets:/workspace/assets:ro
+      - ${L2_STUDIO_ROOT:-.}/assets:/workspace/assets:ro
       - ${L2_SOURCE_PATH:-../sources}:/workspace/sources:ro
     depends_on:
       postgres:
@@ -59,7 +59,7 @@ services:
   studio-worker:
     image: ${L2_STUDIO_WORKER_IMAGE:-l2-studio-worker:dev}
     build:
-      context: .
+      context: ${L2_STUDIO_ROOT:-.}
       dockerfile: docker/studio-worker.Dockerfile
     command: ['L2.Studio.Worker.dll']
     environment:
@@ -67,7 +67,7 @@ services:
       AssetImport__StudioBaseUrl: http://studio:3001
       AssetImport__LevelPreviewBrowserUrl: http://puppeteer:9222
     volumes:
-      - ./assets:/workspace/assets
+      - ${L2_STUDIO_ROOT:-.}/assets:/workspace/assets
       - ${L2_SOURCE_PATH:-../sources}:/workspace/sources:ro
     depends_on:
       puppeteer:
@@ -81,7 +81,7 @@ services:
   puppeteer:
     image: ${L2_PUPPETEER_IMAGE:-l2-studio-puppeteer:dev}
     build:
-      context: .
+      context: ${L2_STUDIO_ROOT:-.}
       dockerfile: docker/puppeteer.Dockerfile
     init: true
     cap_add: [SYS_ADMIN]
@@ -103,7 +103,7 @@ services:
   studio:
     image: ${L2_STUDIO_IMAGE:-l2-studio:dev}
     build:
-      context: ./web
+      context: ${L2_STUDIO_ROOT:-.}/web
       secrets: [npm_token]
     ports: ['127.0.0.1:3001:3001']
     environment:
@@ -120,8 +120,8 @@ services:
     image: nginx:1.29-alpine
     ports: ['127.0.0.1:5300:80']
     volumes:
-      - ./assets:/srv/assets:ro
-      - ./docker/nginx/assets.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${L2_STUDIO_ROOT:-.}/assets:/srv/assets:ro
+      - ${L2_STUDIO_ROOT:-.}/docker/nginx/assets.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost/health/live']
       interval: 5s
