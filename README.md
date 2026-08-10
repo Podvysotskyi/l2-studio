@@ -45,6 +45,8 @@ cd web && npm run build
 dotnet build server/L2.Studio.slnx
 ```
 
+The .NET solution is self-contained: Studio owns its content-authoring persistence, API contracts, worker, hosting foundation, and conversion libraries under `server/` and `tools/`. It does not reference Server implementation projects.
+
 ## Dependencies
 
 Studio consumes explicitly pinned GitHub Packages releases of `@l2/ui` and `@l2/babylon-runtime`. Update package versions intentionally and commit the generated lockfile.

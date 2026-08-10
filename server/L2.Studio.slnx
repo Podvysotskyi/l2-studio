@@ -2,5 +2,11 @@
   <Project Path="L2.Studio.Api.Tests/L2.Studio.Api.Tests.csproj" />
   <Project Path="L2.Studio.Api/L2.Studio.Api.csproj" />
   <Project Path="L2.Studio.Content/L2.Studio.Content.csproj" />
+  <Project Path="L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
+  <Project Path="L2.Studio.Foundation/L2.Studio.Foundation.csproj" />
   <Project Path="L2.Studio.Worker/L2.Studio.Worker.csproj" />
+  <Project Path="../tools/L2.Tools.AudioConverter/L2.Tools.AudioConverter.csproj" />
+  <Project Path="../tools/L2.Tools.PackageReader/L2.Tools.PackageReader.csproj" />
+  <Project Path="../tools/L2.Tools.StaticMeshConverter/L2.Tools.StaticMeshConverter.csproj" />
+  <Project Path="../tools/L2.Tools.TextureConverter/L2.Tools.TextureConverter.csproj" />
 </Solution>
