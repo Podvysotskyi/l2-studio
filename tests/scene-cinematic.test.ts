@@ -24,7 +24,7 @@ function object(
 }
 
 const manifest: SceneManifest = {
-  schemaVersion: 8,
+  schemaVersion: 11,
   name: 'Lobby',
   fileName: 'Lobby.unr',
   sourceHash: 'hash',
@@ -38,6 +38,7 @@ const manifest: SceneManifest = {
   actors: [],
   lights: [],
   skyZones: [],
+  bspMeshes: [],
   skyBackdrops: [],
   cameras: [object(20, 'Camera', 20)],
   interpolationPoints: [object(10, 'InterpolationPoint', 10)],

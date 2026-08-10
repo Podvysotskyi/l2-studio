@@ -223,7 +223,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 
       <div
         v-if="catalog"
-        class="max-h-[42rem] divide-y divide-default overflow-y-auto"
+        class="h-[clamp(32rem,68vh,52rem)] divide-y divide-default overflow-y-auto lg:h-[clamp(40rem,calc(100dvh-20rem),64rem)]"
       >
         <div
           v-for="track in visibleTracks"

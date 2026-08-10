@@ -211,10 +211,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 
       <div
         v-if="catalog"
-        class="grid min-h-[42rem] md:grid-cols-[16rem_minmax(0,1fr)]"
+        class="grid min-h-[42rem] md:h-[clamp(40rem,calc(100dvh-20rem),64rem)] md:min-h-0 md:grid-cols-[16rem_minmax(0,1fr)]"
       >
         <aside
-          class="border-b border-default bg-elevated/40 md:border-r md:border-b-0"
+          class="border-b border-default bg-elevated/40 md:flex md:min-h-0 md:flex-col md:border-r md:border-b-0"
         >
           <div class="border-b border-default p-3">
             <p
@@ -232,7 +232,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           </div>
           <nav
             aria-label="Texture packages"
-            class="max-h-72 overflow-y-auto p-2 md:max-h-[38rem]"
+            class="max-h-72 overflow-y-auto p-2 md:min-h-0 md:flex-1 md:max-h-none"
           >
             <button
               type="button"
@@ -278,7 +278,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           </nav>
         </aside>
 
-        <section class="min-w-0">
+        <section class="min-w-0 md:flex md:min-h-0 md:flex-col">
           <div class="border-b border-default p-3">
             <UInput
               v-model="query"
@@ -288,7 +288,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               class="w-full"
             />
           </div>
-          <div class="max-h-[34rem] divide-y divide-default overflow-y-auto">
+          <div
+            class="max-h-[34rem] divide-y divide-default overflow-y-auto md:min-h-0 md:flex-1 md:max-h-none"
+          >
             <div
               v-for="texture in visibleTextures"
               :key="`${texture.packageName}/${texture.objectName}`"

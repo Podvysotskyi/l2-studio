@@ -48,7 +48,7 @@ const selectedWaterSurfaceName = ref<string>()
 const inspectorTab = ref<InspectorTab>('actors')
 const actorsVisible = ref(true)
 const bspVisible = ref(true)
-const skyZoneVisible = ref(true)
+const skyZoneVisible = ref(false)
 const skyZoneChunkVisibility = ref<Record<string, boolean>>({})
 const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
@@ -62,6 +62,7 @@ const waterQuery = ref('')
 const page = ref(1)
 const pageSize = ref(50)
 const loading = ref(true)
+const sceneReady = ref(false)
 const error = ref<string>()
 const previewError = ref<string>()
 const terrainMaterialError = ref<string>()
@@ -254,6 +255,7 @@ function setSkyZoneChunkVisible(name: string, visible: boolean) {
 
 async function loadLevel() {
   loading.value = true
+  sceneReady.value = false
   error.value = undefined
   previewError.value = undefined
   terrainMaterialError.value = undefined
@@ -267,7 +269,7 @@ async function loadLevel() {
   inspectorTab.value = 'actors'
   actorsVisible.value = true
   bspVisible.value = true
-  skyZoneVisible.value = true
+  skyZoneVisible.value = false
   skyZoneChunkVisibility.value = {}
   worldBaseVisible.value = false
   lightHelpersVisible.value = false
@@ -429,6 +431,7 @@ async function loadLevel() {
             @error="previewError = $event"
             @material-error="terrainMaterialError = $event"
             @light-select="selectedLightName = $event"
+            @ready-change="sceneReady = $event"
           />
           <p class="mt-2 text-center text-xs text-muted">
             Drag to orbit · scroll to zoom toward the pointer · right-drag to
@@ -436,7 +439,11 @@ async function loadLevel() {
           </p>
         </UCard>
 
-        <UCard class="xl:sticky xl:top-4" :ui="{ body: 'p-0 sm:p-0' }">
+        <UCard
+          v-if="sceneReady"
+          class="xl:sticky xl:top-4"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
           <template #header>
             <div
               class="grid grid-cols-3 gap-1 sm:grid-cols-6 xl:grid-cols-3 2xl:grid-cols-6"
@@ -1328,6 +1335,45 @@ async function loadLevel() {
               </div>
             </div>
           </template>
+        </UCard>
+        <UCard
+          v-else-if="previewError"
+          class="xl:sticky xl:top-4"
+          aria-live="polite"
+        >
+          <div
+            class="flex min-h-64 flex-col items-center justify-center px-6 text-center"
+          >
+            <span
+              class="flex size-11 items-center justify-center rounded-full bg-error/10 text-error"
+            >
+              <UIcon name="i-lucide-circle-alert" class="size-5" />
+            </span>
+            <h2 class="mt-3 text-sm font-semibold text-highlighted">
+              Scene controls unavailable
+            </h2>
+            <p class="mt-1 max-w-sm text-xs leading-5 text-muted">
+              The inspector remains locked because the scene did not finish
+              loading.
+            </p>
+          </div>
+        </UCard>
+        <UCard v-else class="xl:sticky xl:top-4" aria-live="polite">
+          <div
+            class="flex min-h-64 flex-col items-center justify-center px-6 text-center"
+          >
+            <UIcon
+              name="i-lucide-loader-circle"
+              class="size-6 animate-spin text-primary"
+            />
+            <h2 class="mt-3 text-sm font-semibold text-highlighted">
+              Loading scene controls…
+            </h2>
+            <p class="mt-1 max-w-sm text-xs leading-5 text-muted">
+              Camera and inspector actions unlock after the complete scene is
+              ready.
+            </p>
+          </div>
         </UCard>
       </div>
     </template>

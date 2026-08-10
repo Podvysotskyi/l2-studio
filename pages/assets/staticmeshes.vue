@@ -190,9 +190,11 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </template>
       <div
         v-if="catalog"
-        class="grid min-h-[32rem] md:grid-cols-[16rem_minmax(0,1fr)]"
+        class="grid min-h-[32rem] md:h-[clamp(40rem,calc(100dvh-20rem),64rem)] md:min-h-0 md:grid-cols-[16rem_minmax(0,1fr)]"
       >
-        <aside class="border-b border-default p-2 md:border-r md:border-b-0">
+        <aside
+          class="border-b border-default p-2 md:flex md:min-h-0 md:flex-col md:border-r md:border-b-0"
+        >
           <button
             type="button"
             class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm"
@@ -205,7 +207,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           >
             <span>All packages</span><span>{{ catalog.summary.total }}</span>
           </button>
-          <div class="max-h-[42rem] overflow-y-auto">
+          <div
+            class="max-h-[42rem] overflow-y-auto md:min-h-0 md:flex-1 md:max-h-none"
+          >
             <button
               v-for="item in packages"
               :key="item.name"
@@ -223,8 +227,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             </button>
           </div>
         </aside>
-        <section class="min-w-0">
-          <div class="max-h-[42rem] divide-y divide-default overflow-y-auto">
+        <section class="min-w-0 md:flex md:min-h-0 md:flex-col">
+          <div
+            class="max-h-[42rem] divide-y divide-default overflow-y-auto md:min-h-0 md:flex-1 md:max-h-none"
+          >
             <button
               v-for="mesh in visibleMeshes"
               :key="`${mesh.packageName}/${mesh.objectName}`"
