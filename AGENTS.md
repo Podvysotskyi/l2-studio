@@ -13,7 +13,7 @@ npm run typecheck
 npm run build
 ```
 
-Use `NODE_AUTH_TOKEN` for private `@l2` package installation. Run `docker compose up --build` for a containerized development server.
+Use `NODE_AUTH_TOKEN` for private package installation. Container orchestration lives in the `l2-infra` repository.
 
 ## Conventions
 
