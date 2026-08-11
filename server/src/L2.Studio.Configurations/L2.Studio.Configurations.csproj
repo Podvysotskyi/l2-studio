@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../L2.Studio.Context/L2.Studio.Context.csproj" />
+    <ProjectReference Include="../L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
+    <ProjectReference Include="../L2.Studio.Migrations/L2.Studio.Migrations.csproj" />
+    <ProjectReference Include="../L2.Studio.Repositories/L2.Studio.Repositories.csproj" />
+    <ProjectReference Include="../L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
+    <ProjectReference Include="../L2.Studio.Services/L2.Studio.Services.csproj" />
+    <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+</Project>

@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../L2.Studio.Content/L2.Studio.Content.csproj" />
-    <ProjectReference Include="../L2.Studio.Foundation/L2.Studio.Foundation.csproj" />
-    <ProjectReference Include="../L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
-  </ItemGroup>
-</Project>

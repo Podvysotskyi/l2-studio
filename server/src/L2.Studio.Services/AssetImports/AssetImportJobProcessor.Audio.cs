@@ -1,0 +1,239 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using L2.Studio.Context;
+using L2.Studio.Context.Entities;
+using L2.Studio.Contracts;
+using L2.Tools.AudioConverter;
+using L2.Tools.PackageReader;
+using L2.Tools.TextureConverter;
+using L2.Tools.StaticMeshConverter;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using PuppeteerSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.PixelFormats;
+
+namespace L2.Studio.Services;
+
+public sealed partial class AssetImportJobProcessor
+{
+    private async Task ImportSoundsAsync(
+        GameContentDbContext context,
+        AssetImportJob job,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        if (!Directory.Exists(sourcePath))
+            throw new DirectoryNotFoundException($"The configured sound directory does not exist: {sourcePath}");
+
+        var paths = Directory.EnumerateFiles(sourcePath)
+            .Where(path => string.Equals(Path.GetExtension(path), ".uax", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (paths.Length == 0)
+            throw new InvalidOperationException("The configured sound directory contains no .uax packages.");
+
+        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
+        RequireSafeSegment(sourceFolder, "source folder");
+        var sourceHashes = new List<(string FileName, string Sha256)>(paths.Length);
+        var packages = new List<(string Path, string PackageName, int SoundCount)>();
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var fileName = Path.GetFileName(path);
+            var packageName = Path.GetFileNameWithoutExtension(path);
+            RequireSafeSegment(packageName, "sound package name");
+            var encrypted = await File.ReadAllBytesAsync(path, cancellationToken);
+            sourceHashes.Add((fileName, Convert.ToHexStringLower(SHA256.HashData(encrypted))));
+            var sounds = new UnrealPackageReader(
+                LineagePackageDecoder.DecodeProtocol111(encrypted)).ReadSoundExports();
+            packages.Add((path, packageName, sounds.Count));
+            job.TotalCount += sounds.Count;
+        }
+        job.SourceHash = HashSourceSet(sourceHashes);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var finalPath = Path.Combine(assetRootPath, sourceFolder);
+        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        Directory.CreateDirectory(stagingPath);
+        try
+        {
+            var entries = new List<SoundManifestEntry>(job.TotalCount);
+            foreach (var package in packages)
+            {
+                var packagePath = Path.Combine(stagingPath, package.PackageName);
+                Directory.CreateDirectory(packagePath);
+                var encrypted = await File.ReadAllBytesAsync(package.Path, cancellationToken);
+                var sounds = new UnrealPackageReader(
+                    LineagePackageDecoder.DecodeProtocol111(encrypted)).ReadSoundExports();
+                if (sounds.Count != package.SoundCount)
+                    throw new InvalidDataException($"Sound package '{package.PackageName}' changed during import.");
+                foreach (var sound in sounds)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    RequireSafeSegment(sound.Name, "sound object name");
+                    var fileName = $"{sound.Name}.wav";
+                    var hash = Convert.ToHexStringLower(SHA256.HashData(sound.WaveData));
+                    await File.WriteAllBytesAsync(
+                        Path.Combine(packagePath, fileName),
+                        sound.WaveData,
+                        cancellationToken);
+                    entries.Add(new SoundManifestEntry(
+                        package.PackageName,
+                        sound.Name,
+                        VersionedUrl(sourceFolder, package.PackageName, fileName, hash),
+                        sound.DurationSeconds,
+                        sound.SampleRate,
+                        sound.Channels,
+                        sound.WaveData.LongLength,
+                        hash));
+                    job.ProcessedCount++;
+                    await SaveProgressAsync(context, job, cancellationToken);
+                }
+            }
+            Promote(stagingPath, finalPath, job.Id);
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, 111, Array.Empty<string>(), entries,
+                group => group, item => item.ObjectName, item => item.PackageName, _ => "resolved", new { }, cancellationToken);
+            job.Status = AssetImportJobValues.Succeeded;
+            job.FinishedAt = timeProvider.GetUtcNow();
+            job.Error = null;
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingPath)) Directory.Delete(stagingPath, recursive: true);
+        }
+    }
+
+    private async Task ImportMusicAsync(
+        GameContentDbContext context,
+        AssetImportJob job,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        if (!Directory.Exists(sourcePath))
+        {
+            throw new DirectoryNotFoundException($"The configured music directory does not exist: {sourcePath}");
+        }
+
+        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
+        RequireSafeSegment(sourceFolder, "source folder");
+        var paths = Directory.EnumerateFiles(sourcePath)
+            .Where(path => string.Equals(Path.GetExtension(path), ".ogg", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (paths.Length == 0)
+        {
+            throw new InvalidOperationException("The configured music directory contains no .ogg files.");
+        }
+
+        var sources = new List<MusicSource>(paths.Length);
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var fileName = Path.GetFileName(path);
+            RequireSafeSegment(fileName, "music file name");
+            var sourceBytes = await File.ReadAllBytesAsync(path, cancellationToken);
+            sources.Add(new MusicSource(
+                path,
+                fileName,
+                Convert.ToHexStringLower(SHA256.HashData(sourceBytes))));
+        }
+
+        var duplicateFile = sources
+            .GroupBy(source => source.FileName, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateFile is not null)
+        {
+            throw new InvalidDataException(
+                $"Music file name '{duplicateFile.Key}' is duplicated ignoring case.");
+        }
+
+        job.TotalCount = sources.Count;
+        job.SourceHash = HashSourceSet(sources.Select(source => (source.FileName, source.Sha256)));
+        await context.SaveChangesAsync(cancellationToken);
+
+        Directory.CreateDirectory(assetRootPath);
+        var finalPath = Path.Combine(assetRootPath, sourceFolder);
+        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        Directory.CreateDirectory(stagingPath);
+        try
+        {
+            var entries = new List<MusicManifestEntry>(sources.Count);
+            var warnings = new List<string>();
+            foreach (var source in sources)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var input = await File.ReadAllBytesAsync(source.Path, cancellationToken);
+                    var track = L2MusicDecoder.Decode(input);
+                    var hash = Convert.ToHexStringLower(SHA256.HashData(track.Data));
+                    await File.WriteAllBytesAsync(
+                        Path.Combine(stagingPath, source.FileName),
+                        track.Data,
+                        cancellationToken);
+                    entries.Add(new MusicManifestEntry(
+                        Path.GetFileNameWithoutExtension(source.FileName),
+                        source.FileName,
+                        VersionedFileUrl(sourceFolder, source.FileName, hash),
+                        track.DurationSeconds,
+                        track.SampleRate,
+                        track.Channels,
+                        track.Data.LongLength,
+                        hash,
+                        "resolved",
+                        null));
+                }
+                catch (InvalidDataException exception)
+                {
+                    warnings.Add($"{source.FileName}: {exception.Message}");
+                    entries.Add(new MusicManifestEntry(
+                        Path.GetFileNameWithoutExtension(source.FileName),
+                        source.FileName,
+                        null,
+                        null,
+                        null,
+                        null,
+                        new FileInfo(source.Path).Length,
+                        null,
+                        "skipped",
+                        exception.Message));
+                    job.SkippedCount++;
+                }
+
+                job.ProcessedCount++;
+                await SaveProgressAsync(context, job, cancellationToken);
+            }
+
+            Promote(stagingPath, finalPath, job.Id);
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, null, Array.Empty<string>(), entries,
+                group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            job.Status = warnings.Count == 0
+                ? AssetImportJobValues.Succeeded
+                : AssetImportJobValues.SucceededWithWarnings;
+            job.FinishedAt = timeProvider.GetUtcNow();
+            job.Error = null;
+            await context.SaveChangesAsync(cancellationToken);
+            logger.LogInformation(
+                "Imported {ProcessedCount} music tracks with {SkippedCount} skipped for job {JobId}",
+                job.ProcessedCount,
+                job.SkippedCount,
+                job.Id);
+        }
+        finally
+        {
+            if (Directory.Exists(stagingPath))
+            {
+                Directory.Delete(stagingPath, recursive: true);
+            }
+        }
+    }
+
+}

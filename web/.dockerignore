@@ -7,3 +7,5 @@ coverage/
 assets/
 .env
 .env.*
+!.env.development
+!.env.production

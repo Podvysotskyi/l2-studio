@@ -1,0 +1,206 @@
+using System.Text.Json;
+using L2.Studio.Context;
+using L2.Studio.Context.Entities;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
+
+namespace L2.Studio.Services;
+
+internal sealed record StaticMeshMaterialCatalog(
+    StaticMeshMaterialResolver Resolver,
+    IReadOnlyList<string> GpuTextureFormats,
+    int LoadedTextureCount);
+
+internal static class StaticMeshMaterialCatalogLoader
+{
+    private const int LookupBatchSize = 1_000;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static async Task<StaticMeshMaterialCatalog> LoadAsync(
+        GameContentDbContext context,
+        IReadOnlyCollection<TextureMaterialReference> rootReferences,
+        CancellationToken cancellationToken) => await LoadAsync(
+            context,
+            rootReferences,
+            [],
+            cancellationToken);
+
+    public static async Task<StaticMeshMaterialCatalog> LoadAsync(
+        GameContentDbContext context,
+        IReadOnlyCollection<TextureMaterialReference> rootReferences,
+        IReadOnlyCollection<TextureMaterialManifestEntry> embeddedMaterials,
+        CancellationToken cancellationToken)
+    {
+        var catalogs = new List<TextureCatalogHeader>(2);
+        foreach (var kind in new[] { AssetImportJobValues.SystemTextures, AssetImportJobValues.Textures })
+        {
+            var catalog = await context.AssetCatalogs
+                .AsNoTracking()
+                .Where(item => item.Kind == kind && item.IsActive)
+                .Select(item => new TextureCatalogHeader(
+                    item.Id,
+                    item.Kind,
+                    item.SchemaVersion,
+                    item.MetadataJson))
+                .SingleOrDefaultAsync(cancellationToken);
+            if (catalog is not null) catalogs.Add(catalog);
+        }
+
+        var gpuTextureFormats = catalogs.Count == 2 && catalogs.All(catalog => catalog.SchemaVersion >= 3)
+            ? new[] { "-dxt.ktx" }
+            : [];
+        if (rootReferences.Count == 0)
+        {
+            return new StaticMeshMaterialCatalog(
+                new StaticMeshMaterialResolver([], []),
+                gpuTextureFormats,
+                0);
+        }
+
+        var allMaterials = catalogs
+            .SelectMany(catalog => JsonSerializer.Deserialize<TextureCatalogMetadata>(catalog.MetadataJson, JsonOptions)?.Materials ?? [])
+            .Concat(embeddedMaterials)
+            .GroupBy(material => Key(material.PackageName, material.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var reachableMaterials = new Dictionary<string, TextureMaterialManifestEntry>(StringComparer.OrdinalIgnoreCase);
+        var requiredTextures = new Dictionary<string, TextureMaterialReference>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in rootReferences)
+        {
+            CollectDependencies(root, string.Empty, allMaterials, reachableMaterials, requiredTextures);
+        }
+
+        var textureEntries = await LoadTextureEntriesAsync(
+            context,
+            catalogs,
+            requiredTextures.Values.ToArray(),
+            cancellationToken);
+        return new StaticMeshMaterialCatalog(
+            new StaticMeshMaterialResolver(textureEntries, reachableMaterials.Values),
+            gpuTextureFormats,
+            textureEntries.Count);
+    }
+
+    internal static IReadOnlyCollection<TextureMaterialReference> RequiredTextures(
+        IReadOnlyCollection<TextureMaterialReference> rootReferences,
+        IReadOnlyCollection<TextureMaterialManifestEntry> materials)
+    {
+        var allMaterials = materials
+            .GroupBy(material => Key(material.PackageName, material.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var reachableMaterials = new Dictionary<string, TextureMaterialManifestEntry>(StringComparer.OrdinalIgnoreCase);
+        var requiredTextures = new Dictionary<string, TextureMaterialReference>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in rootReferences)
+        {
+            CollectDependencies(root, string.Empty, allMaterials, reachableMaterials, requiredTextures);
+        }
+        return requiredTextures.Values.ToArray();
+    }
+
+    private static void CollectDependencies(
+        TextureMaterialReference reference,
+        string currentPackage,
+        IReadOnlyDictionary<string, TextureMaterialManifestEntry> allMaterials,
+        IDictionary<string, TextureMaterialManifestEntry> reachableMaterials,
+        IDictionary<string, TextureMaterialReference> requiredTextures)
+    {
+        var normalized = Normalize(reference, currentPackage);
+        var key = Key(normalized.PackageName, normalized.ObjectName);
+        if (!allMaterials.TryGetValue(key, out var material))
+        {
+            requiredTextures.TryAdd(key, normalized);
+            return;
+        }
+        if (!reachableMaterials.TryAdd(key, material)) return;
+
+        var innerReference = material.ClassName switch
+        {
+            "FinalBlend" or "Panner" or "Rotator" or "TexPanner" or "TexRotator" or "Combiner" or "TexOscillator" or "TexOscillatorTriggered" or "ColorModifier" => material.Material,
+            "FadeColor" => null,
+            _ => material.Diffuse
+        };
+        if (innerReference is not null)
+        {
+            CollectDependencies(innerReference, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        }
+        CollectDependency(material.Opacity, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.Mask, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.SelfIllumination, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.SelfIlluminationMask, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.Specular, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.SpecularityMask, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        CollectDependency(material.Detail, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        if (material.ClassName == "Combiner" && material.Material2 is not null)
+        {
+            CollectDependencies(material.Material2, material.PackageName, allMaterials, reachableMaterials, requiredTextures);
+        }
+    }
+
+    private static void CollectDependency(
+        TextureMaterialReference? reference,
+        string currentPackage,
+        IReadOnlyDictionary<string, TextureMaterialManifestEntry> allMaterials,
+        IDictionary<string, TextureMaterialManifestEntry> reachableMaterials,
+        IDictionary<string, TextureMaterialReference> requiredTextures)
+    {
+        if (reference is null) return;
+        CollectDependencies(reference, currentPackage, allMaterials, reachableMaterials, requiredTextures);
+    }
+
+    private static async Task<IReadOnlyList<TextureManifestEntry>> LoadTextureEntriesAsync(
+        GameContentDbContext context,
+        IReadOnlyList<TextureCatalogHeader> catalogs,
+        IReadOnlyList<TextureMaterialReference> references,
+        CancellationToken cancellationToken)
+    {
+        if (catalogs.Count == 0 || references.Count == 0) return [];
+
+        var rows = new List<AssetCatalogItem>();
+        var catalogIds = catalogs.Select(catalog => catalog.Id).ToArray();
+        foreach (var batch in references.Chunk(LookupBatchSize))
+        {
+            var packageNames = batch.Select(reference => reference.PackageName).ToArray();
+            var objectNames = batch.Select(reference => reference.ObjectName).ToArray();
+            var catalogIdsParameter = new NpgsqlParameter("catalog_ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
+            {
+                Value = catalogIds
+            };
+            var packageNamesParameter = new NpgsqlParameter("package_names", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = packageNames
+            };
+            var objectNamesParameter = new NpgsqlParameter("object_names", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = objectNames
+            };
+            rows.AddRange(await context.AssetCatalogItems
+                .FromSqlRaw(
+                    "SELECT item.* FROM content.asset_catalog_items AS item " +
+                    "INNER JOIN unnest(@package_names::text[], @object_names::text[]) " +
+                    "AS wanted(group_name, name) " +
+                    "ON lower(item.group_name) = lower(wanted.group_name) AND lower(item.name) = lower(wanted.name) " +
+                    "WHERE item.catalog_id = ANY(@catalog_ids::uuid[])",
+                    packageNamesParameter,
+                    objectNamesParameter,
+                    catalogIdsParameter)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken));
+        }
+
+        return catalogs
+            .SelectMany(catalog => rows.Where(row => row.CatalogId == catalog.Id))
+            .Select(row => JsonSerializer.Deserialize<TextureManifestEntry>(row.MetadataJson, JsonOptions)!)
+            .GroupBy(texture => Key(texture.PackageName, texture.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
+    }
+
+    private static TextureMaterialReference Normalize(TextureMaterialReference reference, string currentPackage) =>
+        string.IsNullOrEmpty(reference.PackageName)
+            ? reference with { PackageName = currentPackage }
+            : reference;
+
+    private static string Key(string packageName, string objectName) => $"{packageName}\n{objectName}";
+
+    private sealed record TextureCatalogHeader(Guid Id, string Kind, int SchemaVersion, string MetadataJson);
+}

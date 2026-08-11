@@ -4,7 +4,8 @@ node_modules/
 coverage/
 .env
 .env.*
-!.env.example
+!web/.env.development
+!web/.env.production
 assets/*
 !assets/README.md
 !web/assets/README.md

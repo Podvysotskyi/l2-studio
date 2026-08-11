@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../L2.Studio.Configurations/L2.Studio.Configurations.csproj" />
+    <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
+  </ItemGroup>
+</Project>

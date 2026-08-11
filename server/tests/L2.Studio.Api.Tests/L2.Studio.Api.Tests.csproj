@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/L2.Studio.Api/L2.Studio.Api.csproj" />
+    <ProjectReference Include="../../src/L2.Studio.Context/L2.Studio.Context.csproj" />
+    <ProjectReference Include="../../src/L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
+    <ProjectReference Include="../../src/L2.Studio.Repositories/L2.Studio.Repositories.csproj" />
+    <Compile Include="../Common/PostgreSqlIntegrationCollection.cs" Link="PostgreSqlIntegrationCollection.cs" />
+  </ItemGroup>
+</Project>

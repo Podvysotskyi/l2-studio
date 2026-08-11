@@ -1,4 +1,8 @@
-import { fileURLToPath } from 'node:url'
+const studioApiBase = process.env.NUXT_STUDIO_API_BASE?.replace(/\/$/, '')
+
+if (!studioApiBase) {
+  throw new Error('NUXT_STUDIO_API_BASE is required')
+}
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
@@ -10,15 +14,17 @@ export default defineNuxtConfig({
     }
   },
   modules: ['@nuxt/ui', '@pinia/nuxt'],
-  dir: {
-    public:
-      process.env.L2_PUBLIC_ASSETS_DIR ??
-      fileURLToPath(new URL('./assets', import.meta.url))
+  components: [{ path: '~/components', pathPrefix: false }],
+  routeRules: {
+    '/api/**': {
+      proxy: `${studioApiBase}/api/**`
+    }
   },
   runtimeConfig: {
     public: {
-      apiBase:
-        process.env.NUXT_PUBLIC_STUDIO_API_BASE ?? 'http://localhost:5101'
+      apiBase: '',
+      assetBaseUrl:
+        process.env.NUXT_PUBLIC_ASSET_BASE_URL ?? 'http://localhost:5300'
     }
   },
   typescript: { typeCheck: true }

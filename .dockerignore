@@ -1,6 +1,7 @@
 .git
 .env
 **/bin
+**/bin*
 **/obj
 **/node_modules
 **/.nuxt

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../L2.Studio.Context/L2.Studio.Context.csproj" />
+    <ProjectReference Include="../L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
+    <ProjectReference Include="../L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
+    <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
+    <ProjectReference Include="../L2.Tools.AudioConverter/L2.Tools.AudioConverter.csproj" />
+    <ProjectReference Include="../L2.Tools.PackageReader/L2.Tools.PackageReader.csproj" />
+    <ProjectReference Include="../L2.Tools.StaticMeshConverter/L2.Tools.StaticMeshConverter.csproj" />
+    <ProjectReference Include="../L2.Tools.TextureConverter/L2.Tools.TextureConverter.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="PuppeteerSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="L2.Studio.Services.Tests" />
+  </ItemGroup>
+</Project>

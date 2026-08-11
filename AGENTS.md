@@ -7,15 +7,20 @@ This repository owns the Studio Nuxt frontend plus Studio API, Worker, content a
 ## Commands
 
 ```sh
-cd web && npm ci
-cd web && npm test
-cd web && npm run typecheck
-cd web && npm run build
-dotnet build server/L2.Studio.slnx
+docker compose up --build
+docker compose --profile test run --rm server-tests
+docker build --target validate --build-arg APP_ENV=production --secret id=npm_token,env=NODE_AUTH_TOKEN web
 ```
 
-Use `NODE_AUTH_TOKEN` for private package installation. Container orchestration is defined by the root `compose.yaml` in the `l2-infra` integration repository; nginx serves generated client resources from ignored `assets/`.
+Use `NODE_AUTH_TOKEN` for private package installation. `compose.yaml` owns the standalone Studio stack; the root integration Compose model remains supported. Browser code calls the same-origin `/api` proxy. Keep `NUXT_STUDIO_API_BASE` private to Nuxt and use `NUXT_PUBLIC_ASSET_BASE_URL` only for browser-readable generated assets.
+
+## Architecture
+
+- Keep .NET production projects in `server/src`, tests in `server/tests`, build configuration and Dockerfile in `server/`.
+- Keep Nuxt source in `web/app`, browser API calls in `web/app/services`, state in Pinia setup stores, and tests under `web/test`.
+- `L2.Tools.*` conversion libraries are Studio solution projects under `server/src`; preserve their public names and namespaces.
+- Keep migration and seed data in `L2.Studio.Migrations`, repositories limited to runtime persistence, and Worker/API hosts thin.
 
 ## Conventions
 
-Use UTF-8, LF endings, two-space indentation, single quotes, no semicolons, and no trailing commas. Keep the API endpoint configurable through `NUXT_PUBLIC_STUDIO_API_BASE`. Do not commit original game sources or ignored generated assets.
+Use UTF-8, LF endings, two-space indentation, single quotes, no semicolons, and no trailing commas. Do not commit original game sources or ignored generated assets.
