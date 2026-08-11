@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { paginationRange } from '../../utils/studio-content'
+import { paginationRange } from '../../utils/directory'
 
 const props = defineProps<{
   page: number

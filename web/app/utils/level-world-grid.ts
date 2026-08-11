@@ -1,4 +1,4 @@
-import type { LevelCatalogEntry } from '@podvysotskyi/l2-ui'
+import type { LevelCatalogEntry } from '~/types/studio'
 
 export interface LevelWorldCoordinate {
   x: number

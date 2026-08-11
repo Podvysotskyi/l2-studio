@@ -1,4 +1,4 @@
-import type { LevelCatalogEntry } from '@podvysotskyi/l2-ui'
+import type { LevelCatalogEntry } from '~/types/studio'
 import { describe, expect, it } from 'vitest'
 import {
   buildLevelWorldGrid,

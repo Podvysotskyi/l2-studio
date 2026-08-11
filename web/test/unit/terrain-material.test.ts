@@ -1,4 +1,4 @@
-import type { LevelTerrainManifestEntry } from '@podvysotskyi/l2-ui'
+import type { LevelTerrainManifestEntry } from '~/types/studio'
 import { describe, expect, it } from 'vitest'
 import {
   blendShader,

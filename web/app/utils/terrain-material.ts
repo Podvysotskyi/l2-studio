@@ -5,4 +5,4 @@ export {
   unpackTerrainControlPixels,
   type TerrainMaterialController,
   type TerrainMaterialResult
-} from '@podvysotskyi/l2-runtime'
+} from '~/runtime'

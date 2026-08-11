@@ -24,9 +24,9 @@ describe('Studio API service', () => {
   it('normalizes directory requests through the service boundary', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 50 })
     await getNpcDirectory({ query: ' Goblin ', page: 2, pageSize: 50 })
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/content/npcs?query=Goblin&page=2&pageSize=50'
-    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/content/npcs', {
+      query: { query: 'Goblin', page: 2, pageSize: 50 }
+    })
   })
 
   it('loads and starts import jobs through same-origin URLs', async () => {
@@ -38,7 +38,8 @@ describe('Studio API service', () => {
 
     await startAssetImport('textures')
     expect(fetchMock).toHaveBeenLastCalledWith('/api/assets/textures/imports', {
-      method: 'POST'
+      method: 'POST',
+      query: undefined
     })
   })
 })

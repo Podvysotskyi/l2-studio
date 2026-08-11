@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import '@babylonjs/loaders/glTF/index.js'
-import type { LevelManifest } from '@podvysotskyi/l2-ui'
+import type { LevelManifest } from '~/types/studio'
 import { Camera, Engine, FreeCamera, Scene, Vector3 } from '@babylonjs/core'
-import { composeLevelManifest, configureUnrealScene } from '@podvysotskyi/l2-runtime'
+import { composeLevelManifest, configureUnrealScene } from '~/runtime'
+import { getPublishedManifest } from '../../../services/published-assets'
 import { nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { calculateLevelPreviewFrame } from '../../../utils/level-preview-frame'
 
@@ -95,7 +96,7 @@ onMounted(async () => {
       canvas.value ??
       document.querySelector<HTMLCanvasElement>('[data-level-preview-canvas]')
     if (!target) throw new Error('The preview canvas is unavailable.')
-    const manifest = await $fetch<LevelManifest>(props.manifestUrl)
+    const manifest = await getPublishedManifest<LevelManifest>(props.manifestUrl)
     engine = new Engine(target, true, {
       preserveDrawingBuffer: true,
       stencil: true

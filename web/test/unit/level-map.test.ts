@@ -1,7 +1,7 @@
-import type { LevelActorManifestEntry } from '@podvysotskyi/l2-ui'
+import type { LevelActorManifestEntry } from '~/types/studio'
 import { describe, expect, it } from 'vitest'
 import { filterLevelActors } from '../../app/utils/level-map'
-import { paginate } from '../../app/utils/studio-content'
+import { paginate } from '../../app/utils/directory'
 
 const actors: LevelActorManifestEntry[] = [
   {

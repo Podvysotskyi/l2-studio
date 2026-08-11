@@ -1,4 +1,4 @@
-import type { LevelActorManifestEntry } from '@podvysotskyi/l2-ui'
+import type { LevelActorManifestEntry } from '~/types/studio'
 
 export function filterLevelActors(
   actors: LevelActorManifestEntry[],

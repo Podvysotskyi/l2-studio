@@ -1,4 +1,4 @@
-import type { AssetImportKind } from '@podvysotskyi/l2-ui'
+import type { AssetImportKind } from '~/types/studio'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getAssetImportJobs, startAssetImport } from '../services/studio-api'

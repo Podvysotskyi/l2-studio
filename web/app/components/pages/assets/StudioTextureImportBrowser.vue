@@ -4,13 +4,14 @@ import type {
   TextureImportKind,
   TexturePackage,
   TextureManifestEntry
-} from '@podvysotskyi/l2-ui'
+} from '~/types/studio'
+import type { AssetImportJob } from '../../../types/models/asset-import-job'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import {
-  assetCatalogUrl,
-  assetImportsUrl,
-  type AssetImportJob
-} from '../../../utils/studio-content'
+  getAssetCatalog,
+  getAssetImportJobs,
+  startAssetImport
+} from '../../../services/studio-api'
 
 const props = defineProps<{
   kind: TextureImportKind
@@ -19,7 +20,6 @@ const props = defineProps<{
   importLabel: string
 }>()
 
-const apiBase = ''
 const jobs = ref<AssetImportJob[]>([])
 const catalog = ref<AssetCatalogPage<TextureManifestEntry, TexturePackage>>()
 const query = ref('')
@@ -81,14 +81,15 @@ function previewWidth(texture: TextureManifestEntry | undefined) {
 
 async function loadCatalog() {
   try {
-    catalog.value = await $fetch(
-      assetCatalogUrl(apiBase, props.kind, {
+    catalog.value = await getAssetCatalog<TextureManifestEntry, TexturePackage>(
+      props.kind,
+      {
         query: query.value,
         packageName:
           packageFilter.value === 'all' ? undefined : packageFilter.value,
         page: page.value,
         pageSize: pageSize.value
-      })
+      }
     )
   } catch {
     catalog.value = undefined
@@ -98,10 +99,7 @@ async function loadCatalog() {
 async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
-    jobs.value = await $fetch<AssetImportJob[]>(
-      assetImportsUrl(apiBase, props.kind),
-      { query: { limit: 20 } }
-    )
+    jobs.value = await getAssetImportJobs(props.kind)
     error.value = undefined
     if (!activeJob.value) await loadCatalog()
   } catch {
@@ -117,9 +115,7 @@ async function queueImport() {
   queueing.value = true
   error.value = undefined
   try {
-    await $fetch(assetImportsUrl(apiBase, props.kind), {
-      method: 'POST'
-    })
+    await startAssetImport(props.kind)
     await loadJobs()
   } catch {
     error.value =

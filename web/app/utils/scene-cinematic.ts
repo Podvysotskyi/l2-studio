@@ -3,7 +3,7 @@ import type {
   LevelVector,
   SceneManifest,
   SceneObjectManifestEntry
-} from '@podvysotskyi/l2-ui'
+} from '~/types/studio'
 
 export interface ScenePose {
   location: LevelVector

@@ -7,9 +7,6 @@ COPY server/ server/
 RUN dotnet restore server/L2.Studio.slnx
 RUN dotnet build server/L2.Studio.slnx --configuration Release --no-restore -m:1
 
-FROM build AS test
-ENTRYPOINT ["dotnet", "test", "server/L2.Studio.slnx", "--configuration", "Release", "--no-build", "-m:1"]
-
 FROM build AS publish-api
 RUN dotnet publish server/src/L2.Studio.Api/L2.Studio.Api.csproj \
     --configuration Release \

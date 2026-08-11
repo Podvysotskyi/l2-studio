@@ -8,7 +8,7 @@ import type {
   LevelVector,
   SceneManifest,
   SkyZoneManifestEntry
-} from '@podvysotskyi/l2-ui'
+} from '~/types/studio'
 import {
   AbstractMesh,
   ArcRotateCamera,
@@ -38,7 +38,7 @@ import {
   configureWorldMesh,
   createSkyPortalMaterial,
   type ComposedAuthoredEffects
-} from '@podvysotskyi/l2-runtime'
+} from '~/runtime'
 import type { Light, Material } from '@babylonjs/core'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import {

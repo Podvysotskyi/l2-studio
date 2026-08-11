@@ -1,11 +1,10 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  test: {
-    server: {
-      deps: {
-        inline: ['@podvysotskyi/l2-runtime']
-      }
+  resolve: {
+    alias: {
+      '~': fileURLToPath(new URL('./app', import.meta.url))
     }
   }
 })

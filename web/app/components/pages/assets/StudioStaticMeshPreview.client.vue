@@ -10,7 +10,7 @@ import {
   Vector3
 } from '@babylonjs/core'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { applyL2MaterialMetadata } from '@podvysotskyi/l2-runtime'
+import { applyL2MaterialMetadata } from '~/runtime'
 
 const props = defineProps<{ url: string }>()
 const emit = defineEmits<{ error: [message: string] }>()

@@ -5,4 +5,4 @@ export {
   unrealRotationQuaternion,
   unrealVector,
   type UnrealNodeTransform
-} from '@podvysotskyi/l2-runtime'
+} from '~/runtime'

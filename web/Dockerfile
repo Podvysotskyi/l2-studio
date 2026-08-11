@@ -3,11 +3,9 @@ FROM node:24-bookworm-slim AS dependencies
 
 WORKDIR /workspace
 RUN chown node:node /workspace
-COPY --chown=node:node package.json package-lock.json .npmrc ./
+COPY --chown=node:node package.json package-lock.json ./
 USER node
 RUN --mount=type=cache,target=/home/node/.npm,uid=1000,gid=1000 \
-    --mount=type=secret,id=npm_token,uid=1000 \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/npm_token)" \
     npm ci --include=dev --cache /home/node/.npm
 
 FROM dependencies AS source

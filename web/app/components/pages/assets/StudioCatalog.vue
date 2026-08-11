@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { computed, watch } from 'vue'
-import {
-  lookupUrl,
-  paginate,
-  type LookupKind,
-  type LookupRecord
-} from '../../../utils/studio-content'
+import { useLookupDirectoryStore } from '../../../stores/lookup-directory'
+import type {
+  LookupKind,
+  LookupRecord
+} from '../../../types/models/content-directory'
+import { paginate } from '../../../utils/directory'
 
 const props = defineProps<{
   kind: LookupKind
@@ -16,13 +16,13 @@ const props = defineProps<{
   itemLabel: string
 }>()
 
-const apiBase = ''
-const records = ref<LookupRecord[]>([])
+const store = useLookupDirectoryStore()
+const records = computed<LookupRecord[]>(() => store.records[props.kind] ?? [])
 const query = ref('')
 const page = ref(1)
 const pageSize = ref(10)
-const loading = ref(true)
-const error = ref<string>()
+const loading = computed(() => store.isLoading(props.kind))
+const error = computed(() => store.errors[props.kind])
 
 const columns: TableColumn<LookupRecord>[] = [
   { accessorKey: 'id', header: 'ID' },
@@ -46,17 +46,7 @@ watch([query, pageSize], () => {
 })
 
 async function loadRecords() {
-  loading.value = true
-  error.value = undefined
-  try {
-    records.value = await $fetch<LookupRecord[]>(
-      lookupUrl(apiBase, props.kind)
-    )
-  } catch {
-    error.value = `The ${props.itemLabel.toLowerCase()} catalog could not be loaded.`
-  } finally {
-    loading.value = false
-  }
+  await store.load(props.kind, props.itemLabel)
 }
 
 onMounted(loadRecords)

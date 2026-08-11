@@ -1,1 +1,5 @@
-export type { SystemInfo as StudioServiceInfo } from '../../utils/system-info'
+export interface StudioServiceInfo {
+  service: string
+  buildVersion: string
+  environment: string
+}

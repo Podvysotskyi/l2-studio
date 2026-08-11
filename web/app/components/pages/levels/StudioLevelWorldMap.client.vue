@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LevelCatalogEntry, LevelPreviewCatalogEntry } from '@podvysotskyi/l2-ui'
+import type { LevelCatalogEntry, LevelPreviewCatalogEntry } from '~/types/studio'
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import type { LevelWorldCell, LevelWorldGrid } from '../../../utils/level-world-grid'
 import {

@@ -6,12 +6,10 @@ The L2 Studio product: a Nuxt web interface and .NET services for asset conversi
 
 - Node.js 22.13 or newer
 - npm
-- A GitHub Packages token with `read:packages` access, set as `NODE_AUTH_TOKEN`
 
 ## Local development
 
 ```sh
-export NODE_AUTH_TOKEN="$(gh auth token)"
 docker compose up --build
 ```
 
@@ -25,22 +23,28 @@ Studio has a standalone development stack containing PostgreSQL, the Studio API 
 docker compose up --build
 ```
 
-Set `L2_SOURCE_PATH` when the game source directory is not adjacent to this repository. The root `l2-infra` Compose model remains available for integration testing.
+Set `L2_SOURCE_PATH` when the game source directory is not adjacent to this repository. Generated assets persist in the shared `l2-studio_assets-data` Docker volume; the worker writes to it while the API and asset server read from it.
 
 Do not commit original source packages or generated private assets.
 
 ## Checks
 
 ```sh
-docker compose --profile test run --rm server-tests
-docker build --target validate --build-arg APP_ENV=production --secret id=npm_token,env=NODE_AUTH_TOKEN web
+docker build --target validate --build-arg APP_ENV=production web
 docker compose config
 ```
 
-The .NET solution is self-contained. Production projects are organized by responsibility under `server/src` (API and Worker hosts, configuration, contracts, context and migrations, repositories, import services, and conversion libraries); matching test projects live under `server/tests`. Studio does not reference Server implementation projects.
+The .NET solution is self-contained. Production projects are organized by responsibility under `server/src` (API and Worker hosts, configuration, contracts, context and migrations, repositories, import services, and conversion libraries). Studio does not reference Server implementation projects.
 
-Resetting a development database is required after the August 2026 server reorganization because Studio now uses a consolidated `InitialStudioContent` migration baseline.
+Resetting a development database is required after the August 2026 server reorganization and the `l2-studio` database rename because Studio now uses a consolidated `InitialStudioContent` migration baseline.
 
 ## Dependencies
 
-Studio consumes explicitly pinned GitHub Packages releases of `@l2/ui` and `@l2/babylon-runtime`. Update package versions intentionally and commit the generated lockfile.
+Studio owns its browser contracts and Babylon.js rendering helpers under `web/app/types` and `web/app/runtime`, so its web build does not require the shared L2 UI or runtime packages.
+
+The Nuxt application keeps route files thin. Feature UI lives under
+`web/app/components/pages`, browser requests are centralized in
+`web/app/services`, server-backed state lives in Pinia stores, and Babylon.js
+runtime code is grouped into `core`, `effects`, `materials`, and `scene`
+domains. `web/app/types/studio.ts` remains a compatibility barrel over the
+domain contracts in `web/app/types/models`.

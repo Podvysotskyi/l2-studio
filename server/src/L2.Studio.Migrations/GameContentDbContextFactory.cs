@@ -10,7 +10,7 @@ public sealed class GameContentDbContextFactory : IDesignTimeDbContextFactory<Ga
     public GameContentDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__PostgreSql")
-            ?? "Host=localhost;Port=5432;Database=l2web;Username=l2web;Password=l2web_dev";
+            ?? "Host=localhost;Port=5432;Database=l2-studio;Username=l2;Password=secret";
         var options = new DbContextOptionsBuilder<GameContentDbContext>()
             .UseNpgsql(connectionString, postgres =>
             {
