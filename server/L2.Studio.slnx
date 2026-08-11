@@ -5,6 +5,7 @@
   <Project Path="src/L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
   <Project Path="src/L2.Studio.Exceptions/L2.Studio.Exceptions.csproj" />
   <Project Path="src/L2.Studio.Migrations/L2.Studio.Migrations.csproj" />
+  <Project Path="src/L2.Studio.Messages/L2.Studio.Messages.csproj" />
   <Project Path="src/L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
   <Project Path="src/L2.Studio.Repositories/L2.Studio.Repositories.csproj" />
   <Project Path="src/L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
@@ -14,4 +15,5 @@
   <Project Path="src/L2.Tools.PackageReader/L2.Tools.PackageReader.csproj" />
   <Project Path="src/L2.Tools.StaticMeshConverter/L2.Tools.StaticMeshConverter.csproj" />
   <Project Path="src/L2.Tools.TextureConverter/L2.Tools.TextureConverter.csproj" />
+  <Project Path="tests/L2.Studio.Tests/L2.Studio.Tests.csproj" />
 </Solution>

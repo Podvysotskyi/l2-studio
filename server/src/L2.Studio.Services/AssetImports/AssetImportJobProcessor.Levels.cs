@@ -45,22 +45,24 @@ public sealed partial class AssetImportJobProcessor
             levelCatalogRecord.SchemaVersion, levelCatalogRecord.Kind, levelCatalogRecord.SourceFolder,
             levelCatalogRecord.SourceHash, levelCatalogRecord.Protocol ?? 0,
             levelCatalogRecord.Items.Select(item => JsonSerializer.Deserialize<LevelCatalogEntry>(item.MetadataJson, ManifestJsonOptions)!).ToArray());
-        var levels = levelCatalog.Levels.OrderBy(level => level.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+        var allLevels = levelCatalog.Levels.OrderBy(level => level.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         var requestedLevelName = LevelPreviewGeneration.RequestedLevelName(
             options.Value.LevelsSourcePath,
             job.SourcePath);
-        if (requestedLevelName is not null && !levels.Any(level =>
+        if (requestedLevelName is not null && !allLevels.Any(level =>
                 string.Equals(level.Name, requestedLevelName, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
                 $"The requested level '{requestedLevelName}' does not exist in the active level catalog.");
         }
-        job.TotalCount = requestedLevelName is null ? levels.Length : 1;
-        job.SourceHash = LevelPreviewGeneration.ComputeSourceHash(levelCatalog.SourceHash);
+        var levels = requestedLevelName is null
+            ? allLevels
+            : allLevels.Where(level => string.Equals(level.Name, requestedLevelName, StringComparison.OrdinalIgnoreCase)).ToArray();
+        job.TotalCount = levels.Length;
         await context.SaveChangesAsync(cancellationToken);
 
-        var finalPath = Path.Combine(assetRootPath, AssetImportJobValues.LevelPreviews);
-        var stagingPath = Path.Combine(assetRootPath, $".{AssetImportJobValues.LevelPreviews}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, outputUrlRoot) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         var warnings = new List<string>();
         var entries = new Dictionary<string, LevelPreviewCatalogEntry>(StringComparer.OrdinalIgnoreCase);
@@ -153,7 +155,7 @@ public sealed partial class AssetImportJobProcessor
                         entries[level.Name] = new LevelPreviewCatalogEntry(
                             level.Name,
                             level.LevelSourceHash,
-                            $"/levelpreviews/{Uri.EscapeDataString(level.Name)}.webp?v={result.Sha256[..12]}",
+                            $"/{EscapedUrlRoot(outputUrlRoot)}/{Uri.EscapeDataString(level.Name)}.webp",
                             LevelPreviewGeneration.Size,
                             LevelPreviewGeneration.Size,
                             "resolved",
@@ -171,17 +173,14 @@ public sealed partial class AssetImportJobProcessor
                 }
             }
 
-            Promote(stagingPath, finalPath, job.Id);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             var previewEntries = levels.Select(level => entries[level.Name]).ToArray();
-            var publishedRendererVersion = requestedLevelName is not null &&
-                previous is not null && previous.RendererVersion != LevelPreviewGeneration.RendererVersion
-                    ? previous.RendererVersion
-                    : LevelPreviewGeneration.RendererVersion;
             await PublishCatalogAsync(context, job, finalPath, AssetImportJobValues.LevelPreviews, 1, null,
                 Array.Empty<string>(), previewEntries, group => group, item => item.Name, _ => null,
-                item => item.Status, new LevelPreviewCatalogMetadata(publishedRendererVersion), cancellationToken);
+                item => item.Status, new LevelPreviewCatalogMetadata(LevelPreviewGeneration.RendererVersion), cancellationToken);
             job.ProcessedCount = job.TotalCount;
-            job.WarningsJson = JsonSerializer.Serialize(warnings);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded
                 : AssetImportJobValues.SucceededWithWarnings;
@@ -362,15 +361,14 @@ public sealed partial class AssetImportJobProcessor
         bool scenes,
         CancellationToken cancellationToken)
     {
-        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(sourcePath))
+        if (!File.Exists(sourcePath) && !Directory.Exists(sourcePath))
         {
             throw new DirectoryNotFoundException($"The configured level directory does not exist: {sourcePath}");
         }
 
-        var levelPaths = Directory.EnumerateFiles(sourcePath)
-            .Where(path => string.Equals(Path.GetExtension(path), ".unr", StringComparison.OrdinalIgnoreCase))
+        var levelPaths = SourceFiles(sourcePath, ".unr", scenes ? "scene" : "level")
             .Where(path => scenes
                 ? UnrealPackageKindClassifier.IsScene(path)
                 : UnrealPackageKindClassifier.IsWorldLevel(path))
@@ -409,7 +407,7 @@ public sealed partial class AssetImportJobProcessor
         }
 
         job.TotalCount = sources.Count;
-        job.SourceHash = HashSourceSet(sources.Select(source => (source.FileName, source.Sha256)));
+        job.SourceHash = sources.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
         var staticMeshes = await LoadStaticMeshLookupAsync(context, cancellationToken);
@@ -417,8 +415,8 @@ public sealed partial class AssetImportJobProcessor
         var sounds = await LoadSoundLookupAsync(context, cancellationToken);
         var sourceTexturePackages = new Dictionary<string, IReadOnlyDictionary<string, UnrealTexture>>(
             StringComparer.OrdinalIgnoreCase);
-        var finalPath = Path.Combine(assetRootPath, job.Kind);
-        var stagingPath = Path.Combine(assetRootPath, $".{job.Kind}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, outputUrlRoot) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         var warnings = new List<string>();
         var catalogEntries = new List<LevelCatalogEntry>();
@@ -426,11 +424,18 @@ public sealed partial class AssetImportJobProcessor
         IReadOnlyList<UnrealSkyZoneInfo> sharedSkyZones = [];
         if (scenes)
         {
-            var skySource = sources.FirstOrDefault(source =>
-                string.Equals(source.Name, "skylevel", StringComparison.OrdinalIgnoreCase));
-            if (skySource is not null)
+            var skyPath = sources.FirstOrDefault(source =>
+                string.Equals(source.Name, "skylevel", StringComparison.OrdinalIgnoreCase))?.Path;
+            if (skyPath is null)
             {
-                var skyBytes = await File.ReadAllBytesAsync(skySource.Path, cancellationToken);
+                var sourceDirectory = Path.GetDirectoryName(Path.GetFullPath(job.SourcePath))!;
+                skyPath = Directory.EnumerateFiles(sourceDirectory)
+                    .FirstOrDefault(path => string.Equals(
+                        Path.GetFileName(path), "skylevel.unr", StringComparison.OrdinalIgnoreCase));
+            }
+            if (skyPath is not null)
+            {
+                var skyBytes = await File.ReadAllBytesAsync(skyPath, cancellationToken);
                 sharedSkyZones = new UnrealPackageReader(
                     LineagePackageDecoder.DecodeProtocol111(skyBytes)).ReadScene().SkyZones;
             }
@@ -463,7 +468,7 @@ public sealed partial class AssetImportJobProcessor
                             scene.SkyBackdrops,
                             effectiveSkyZones,
                             levelPath,
-                            job.Kind,
+                            outputUrlRoot,
                             source,
                             warnings,
                             cancellationToken);
@@ -472,7 +477,7 @@ public sealed partial class AssetImportJobProcessor
                         level.Actors,
                         staticMeshes,
                         levelPath,
-                        job.Kind,
+                        outputUrlRoot,
                         source,
                         warnings,
                         cancellationToken);
@@ -481,7 +486,7 @@ public sealed partial class AssetImportJobProcessor
                         context,
                         level.BspModels,
                         levelPath,
-                        job.Kind,
+                        outputUrlRoot,
                         source,
                         warnings,
                         cancellationToken);
@@ -516,7 +521,7 @@ public sealed partial class AssetImportJobProcessor
                                 var hash = Convert.ToHexStringLower(SHA256.HashData(glb));
                                 var fileName = $"{terrain.Name}.glb";
                                 await File.WriteAllBytesAsync(Path.Combine(levelPath, fileName), glb, cancellationToken);
-                                terrainUrl = VersionedUrl(job.Kind, source.Name, fileName, hash);
+                                terrainUrl = VersionedUrl(outputUrlRoot, source.Name, fileName, hash);
                             }
                             else
                             {
@@ -527,7 +532,7 @@ public sealed partial class AssetImportJobProcessor
                         var material = await BuildTerrainMaterialAsync(
                             terrain,
                             levelPath,
-                            job.Kind,
+                            outputUrlRoot,
                             source.Name,
                             textures,
                             sourceTexturePackages,
@@ -579,7 +584,7 @@ public sealed partial class AssetImportJobProcessor
                                 var hash = Convert.ToHexStringLower(SHA256.HashData(glb));
                                 var fileName = $"{water.Name}.glb";
                                 await File.WriteAllBytesAsync(Path.Combine(levelPath, fileName), glb, cancellationToken);
-                                meshUrl = VersionedUrl(job.Kind, source.Name, fileName, hash);
+                                meshUrl = VersionedUrl(outputUrlRoot, source.Name, fileName, hash);
                             }
                             catch (Exception exception) when (exception is InvalidDataException or OverflowException)
                             {
@@ -727,7 +732,9 @@ public sealed partial class AssetImportJobProcessor
                 await context.SaveChangesAsync(cancellationToken);
             }
 
-            Promote(stagingPath, finalPath, job.Id);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             if (scenes)
             {
                 await PublishCatalogAsync(context, job, finalPath, "maps", SceneSchemaVersion, 111, Array.Empty<string>(), sceneCatalogEntries,
@@ -738,7 +745,6 @@ public sealed partial class AssetImportJobProcessor
                 await PublishCatalogAsync(context, job, finalPath, "maps", LevelSchemaVersion, 111, Array.Empty<string>(), catalogEntries,
                     group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
             }
-            job.WarningsJson = JsonSerializer.Serialize(warnings);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded
                 : AssetImportJobValues.SucceededWithWarnings;

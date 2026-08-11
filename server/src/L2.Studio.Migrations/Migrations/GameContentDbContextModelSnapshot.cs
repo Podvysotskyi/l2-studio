@@ -102,7 +102,13 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("name");
 
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("SourceId");
 
                     b.HasIndex("CatalogId", "Name")
                         .IsUnique()
@@ -140,6 +146,10 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("name");
 
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -147,6 +157,8 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnName("status");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SourceId");
 
                     b.HasIndex("CatalogId", "Name")
                         .HasDatabaseName("ix_asset_catalog_items_catalog_name");
@@ -160,16 +172,161 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("asset_catalog_items", "content");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportJob", b =>
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSource", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("CatalogId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("catalog_id");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<string>("NormalizedSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_source_key");
+
+                    b.Property<string>("OutputRoot")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("output_root");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("PublishingWorkItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publishing_work_item_id");
+
+                    b.Property<string>("ReferencedOutputRootsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("referenced_output_roots_json");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogId", "NormalizedSourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_catalog_sources_catalog_source");
+
+                    b.ToTable("asset_catalog_sources", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportDiagnostic", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("ObjectName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("object_name");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("severity");
+
+                    b.Property<string>("SourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_key");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stage");
+
+                    b.Property<Guid?>("WorkItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_item_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceKey")
+                        .HasDatabaseName("ix_asset_import_diagnostics_source_key");
+
+                    b.HasIndex("WorkItemId");
+
+                    b.HasIndex("RunId", "Severity", "Code", "Stage")
+                        .HasDatabaseName("ix_asset_import_diagnostics_filters");
+
+                    b.ToTable("asset_import_diagnostics", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CompletedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_file_count");
+
+                    b.Property<int>("DiscoveredFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("discovered_file_count");
+
+                    b.Property<DateTimeOffset?>("DiscoveryFinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("discovery_finished_at");
+
                     b.Property<string>("Error")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("error");
+
+                    b.Property<int>("FailedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_file_count");
 
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
@@ -181,22 +338,119 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("kind");
 
-                    b.Property<int>("ProcessedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("processed_count");
+                    b.Property<string>("NormalizedRequestedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_requested_source_key");
 
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
 
-                    b.Property<int>("SkippedCount")
+                    b.Property<string>("RequestedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("requested_source_key");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("SucceededFileCount")
                         .HasColumnType("integer")
-                        .HasColumnName("skipped_count");
+                        .HasColumnName("succeeded_file_count");
+
+                    b.Property<string>("TriggerType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("trigger_type");
+
+                    b.Property<int>("WarningFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("warning_file_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_import_runs_active_full_scan_kind")
+                        .HasFilter("trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')");
+
+                    b.HasIndex("Kind", "NormalizedRequestedSourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_import_runs_active_single_source")
+                        .HasFilter("trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')");
+
+                    b.HasIndex("Kind", "RequestedAt")
+                        .HasDatabaseName("ix_asset_import_runs_kind_requested");
+
+                    b.ToTable("asset_import_runs", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("ImportKind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("import_kind");
+
+                    b.Property<string>("NormalizedSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_source_key");
+
+                    b.Property<int>("ProcessedResourceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("processed_resource_count");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<int>("SkippedResourceCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_resource_count");
 
                     b.Property<string>("SourceHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_key");
 
                     b.Property<string>("SourcePath")
                         .IsRequired()
@@ -214,26 +468,28 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("status");
 
-                    b.Property<int>("TotalCount")
+                    b.Property<int>("TotalResourceCount")
                         .HasColumnType("integer")
-                        .HasColumnName("total_count");
+                        .HasColumnName("total_resource_count");
 
-                    b.Property<string>("WarningsJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("warnings_json");
+                    b.Property<DateTimeOffset?>("UnpublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unpublished_at");
+
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("warning_count");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Kind")
+                    b.HasIndex("RunId", "NormalizedSourceKey")
                         .IsUnique()
-                        .HasDatabaseName("ix_asset_import_jobs_active_kind")
-                        .HasFilter("\"status\" IN ('queued', 'running')");
+                        .HasDatabaseName("ix_asset_import_work_items_run_source");
 
-                    b.HasIndex("Kind", "Status", "RequestedAt")
-                        .HasDatabaseName("ix_asset_import_jobs_claim");
+                    b.HasIndex("RunId", "Status")
+                        .HasDatabaseName("ix_asset_import_work_items_run_status");
 
-                    b.ToTable("asset_import_jobs", "content");
+                    b.ToTable("asset_import_work_items", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
@@ -630,7 +886,15 @@ namespace L2.Studio.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("L2.Studio.Context.Entities.AssetCatalogSource", "Source")
+                        .WithMany("Groups")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Catalog");
+
+                    b.Navigation("Source");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogItem", b =>
@@ -641,7 +905,55 @@ namespace L2.Studio.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("L2.Studio.Context.Entities.AssetCatalogSource", "Source")
+                        .WithMany("Items")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Catalog");
+
+                    b.Navigation("Source");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSource", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetCatalog", "Catalog")
+                        .WithMany("Sources")
+                        .HasForeignKey("CatalogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Catalog");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportDiagnostic", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetImportRun", "Run")
+                        .WithMany("Diagnostics")
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetImportWorkItem", "WorkItem")
+                        .WithMany("Diagnostics")
+                        .HasForeignKey("WorkItemId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Run");
+
+                    b.Navigation("WorkItem");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetImportRun", "Run")
+                        .WithMany("WorkItems")
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Run");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
@@ -786,6 +1098,27 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("Groups");
 
                     b.Navigation("Items");
+
+                    b.Navigation("Sources");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSource", b =>
+                {
+                    b.Navigation("Groups");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
+                {
+                    b.Navigation("Diagnostics");
+
+                    b.Navigation("WorkItems");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
+                {
+                    b.Navigation("Diagnostics");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcRace", b =>

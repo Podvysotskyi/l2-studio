@@ -11,12 +11,16 @@ public static class AssetImportJobValues
     public const string LevelPreviews = "levelpreviews";
     public const string Scenes = "scenes";
     public const string Queued = "queued";
+    public const string Discovering = "discovering";
     public const string Running = "running";
     public const string Succeeded = "succeeded";
     public const string SucceededWithWarnings = "succeeded_with_warnings";
     public const string Failed = "failed";
 
-    public static readonly string[] ActiveStatuses = [Queued, Running];
+    public const string FullScan = "full_scan";
+    public const string SingleFile = "single_file";
+    public static readonly string[] ActiveStatuses = [Queued, Discovering, Running];
+    public static readonly string[] TerminalStatuses = [Succeeded, SucceededWithWarnings, Failed];
     public static readonly HashSet<string> SupportedKinds =
     [
         SystemTextures, Textures, Music, Sounds, StaticMeshes, Levels, LevelPreviews, Scenes

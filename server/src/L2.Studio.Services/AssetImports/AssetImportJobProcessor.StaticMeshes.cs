@@ -25,18 +25,9 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job,
         CancellationToken cancellationToken)
     {
-        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(sourcePath))
-        {
-            throw new DirectoryNotFoundException($"The configured static-mesh directory does not exist: {sourcePath}");
-        }
-        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
-        RequireSafeSegment(sourceFolder, "source folder");
-        var packagePaths = Directory.EnumerateFiles(sourcePath)
-            .Where(path => string.Equals(Path.GetExtension(path), ".usx", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var packagePaths = SourceFiles(sourcePath, ".usx", "static-mesh");
         if (packagePaths.Length == 0)
         {
             throw new InvalidOperationException("The configured static-mesh directory contains no .usx packages.");
@@ -69,7 +60,7 @@ public sealed partial class AssetImportJobProcessor
             job.TotalCount += meshes.Count;
         }
 
-        job.SourceHash = HashSourceSet(packages.Select(package => (package.FileName, package.Sha256)));
+        job.SourceHash = packages.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
         var materialCatalog = await StaticMeshMaterialCatalogLoader.LoadAsync(
             context,
@@ -79,8 +70,8 @@ public sealed partial class AssetImportJobProcessor
         var materialResolver = materialCatalog.Resolver;
 
         Directory.CreateDirectory(assetRootPath);
-        var finalPath = Path.Combine(assetRootPath, sourceFolder);
-        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, sourceFolder) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         try
         {
@@ -152,11 +143,12 @@ public sealed partial class AssetImportJobProcessor
                     package.Sha256,
                     package.MeshCount)).ToArray();
 
-            Promote(stagingPath, finalPath, job.Id);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             await PublishCatalogAsync(context, job, finalPath, sourceFolder, 8, 111, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new StaticMeshCatalogMetadata(materialCatalog.GpuTextureFormats), cancellationToken);
-            job.WarningsJson = JsonSerializer.Serialize(warnings);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded
                 : AssetImportJobValues.SucceededWithWarnings;

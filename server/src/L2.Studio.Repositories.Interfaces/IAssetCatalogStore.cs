@@ -5,4 +5,5 @@ namespace L2.Studio.Repositories.Interfaces;
 public interface IAssetCatalogStore
 {
     Task PublishAsync(AssetCatalogPublication publication, CancellationToken cancellationToken);
+    Task FailAsync(Guid workItemId, string error, CancellationToken cancellationToken);
 }

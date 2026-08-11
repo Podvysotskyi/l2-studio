@@ -16,6 +16,21 @@ services:
       retries: 30
     restart: unless-stopped
 
+  postgres-test:
+    profiles: [test]
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: l2-studio-test
+      POSTGRES_USER: l2_test
+      POSTGRES_PASSWORD: test-secret
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U l2_test -d l2-studio-test']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
   studio-api:
     image: ${L2_STUDIO_API_IMAGE:-l2-studio-api:dev}
     build:
@@ -85,6 +100,18 @@ services:
       studio:
         condition: service_started
     restart: unless-stopped
+
+  server-tests:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: server-tests
+    environment:
+      L2_STUDIO_TEST_POSTGRES: Host=postgres-test;Port=5432;Database=l2-studio-test;Username=l2_test;Password=test-secret
+    depends_on:
+      postgres-test:
+        condition: service_healthy
 
   asset-server:
     image: nginx:1.29-alpine

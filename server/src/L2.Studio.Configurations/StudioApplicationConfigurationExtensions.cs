@@ -16,8 +16,8 @@ public static class StudioApplicationConfigurationExtensions
         services.AddHealthChecks().AddGameContentMigrationHealthCheck();
         services.AddSingleton<IContentDirectoryRepository, ContentDirectoryRepository>();
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();
-        services.AddSingleton<IAssetImportRepository, AssetImportRepository>();
-        services.AddSingleton<IAssetCatalogStore, AssetCatalogStore>();
+        services.AddScoped<IAssetImportRepository, AssetImportRepository>();
+        services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
         services.TryAddTimeProvider();
         services.AddHostedService<GameContentInitializer>();
         return services;
@@ -28,8 +28,8 @@ public static class StudioApplicationConfigurationExtensions
         services.AddStudioPersistence(configuration);
         services.AddAssetImportOptions(configuration);
         services.TryAddTimeProvider();
-        services.AddSingleton<IAssetCatalogStore, AssetCatalogStore>();
-        services.AddSingleton<IAssetImportJobProcessor, AssetImportJobProcessor>();
+        services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
+        services.AddScoped<IAssetImportWorkItemProcessor, AssetImportJobProcessor>();
         return services;
     }
 

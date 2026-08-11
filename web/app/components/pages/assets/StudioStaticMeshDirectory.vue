@@ -27,7 +27,9 @@ const error = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
-  jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
+  jobs.value.find((job) =>
+    ['queued', 'discovering', 'running'].includes(job.status)
+  )
 )
 const packages = computed(() => catalog.value?.groups ?? [])
 const filteredMeshes = computed(() => catalog.value?.items ?? [])
@@ -149,17 +151,17 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <p class="font-medium text-highlighted">
             Import {{ activeJob.status }}
           </p>
-          <p class="truncate text-xs text-muted">{{ activeJob.sourcePath }}</p>
+          <p class="truncate text-xs text-muted">{{ activeJob.requestedSourceKey ?? 'Full scan' }}</p>
         </div>
         <UBadge color="info" variant="subtle">
-          {{ activeJob.processedCount }} /
-          {{ activeJob.totalCount || '…' }}
+          {{ activeJob.completedFileCount }} /
+          {{ activeJob.discoveredFileCount || '…' }}
         </UBadge>
       </div>
       <UProgress
         class="mt-4"
-        :model-value="activeJob.processedCount"
-        :max="activeJob.totalCount || 1"
+        :model-value="activeJob.completedFileCount"
+        :max="activeJob.discoveredFileCount || 1"
       />
     </UCard>
 

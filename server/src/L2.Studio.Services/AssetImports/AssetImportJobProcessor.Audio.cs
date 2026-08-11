@@ -25,20 +25,12 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job,
         CancellationToken cancellationToken)
     {
-        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(sourcePath))
-            throw new DirectoryNotFoundException($"The configured sound directory does not exist: {sourcePath}");
-
-        var paths = Directory.EnumerateFiles(sourcePath)
-            .Where(path => string.Equals(Path.GetExtension(path), ".uax", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var paths = SourceFiles(sourcePath, ".uax", "sound");
         if (paths.Length == 0)
             throw new InvalidOperationException("The configured sound directory contains no .uax packages.");
 
-        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
-        RequireSafeSegment(sourceFolder, "source folder");
         var sourceHashes = new List<(string FileName, string Sha256)>(paths.Length);
         var packages = new List<(string Path, string PackageName, int SoundCount)>();
         foreach (var path in paths)
@@ -54,11 +46,11 @@ public sealed partial class AssetImportJobProcessor
             packages.Add((path, packageName, sounds.Count));
             job.TotalCount += sounds.Count;
         }
-        job.SourceHash = HashSourceSet(sourceHashes);
+        job.SourceHash = sourceHashes.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
-        var finalPath = Path.Combine(assetRootPath, sourceFolder);
-        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, sourceFolder) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         try
         {
@@ -95,7 +87,8 @@ public sealed partial class AssetImportJobProcessor
                     await SaveProgressAsync(context, job, cancellationToken);
                 }
             }
-            Promote(stagingPath, finalPath, job.Id);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, 111, Array.Empty<string>(), entries,
                 group => group, item => item.ObjectName, item => item.PackageName, _ => "resolved", new { }, cancellationToken);
             job.Status = AssetImportJobValues.Succeeded;
@@ -114,19 +107,9 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job,
         CancellationToken cancellationToken)
     {
-        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(sourcePath))
-        {
-            throw new DirectoryNotFoundException($"The configured music directory does not exist: {sourcePath}");
-        }
-
-        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
-        RequireSafeSegment(sourceFolder, "source folder");
-        var paths = Directory.EnumerateFiles(sourcePath)
-            .Where(path => string.Equals(Path.GetExtension(path), ".ogg", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var paths = SourceFiles(sourcePath, ".ogg", "music");
         if (paths.Length == 0)
         {
             throw new InvalidOperationException("The configured music directory contains no .ogg files.");
@@ -155,12 +138,12 @@ public sealed partial class AssetImportJobProcessor
         }
 
         job.TotalCount = sources.Count;
-        job.SourceHash = HashSourceSet(sources.Select(source => (source.FileName, source.Sha256)));
+        job.SourceHash = sources.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
         Directory.CreateDirectory(assetRootPath);
-        var finalPath = Path.Combine(assetRootPath, sourceFolder);
-        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, sourceFolder) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         try
         {
@@ -211,10 +194,11 @@ public sealed partial class AssetImportJobProcessor
                 await SaveProgressAsync(context, job, cancellationToken);
             }
 
-            Promote(stagingPath, finalPath, job.Id);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, null, Array.Empty<string>(), entries,
                 group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
-            job.WarningsJson = JsonSerializer.Serialize(warnings);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded
                 : AssetImportJobValues.SucceededWithWarnings;

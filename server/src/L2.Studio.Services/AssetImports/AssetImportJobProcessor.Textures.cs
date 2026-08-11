@@ -25,19 +25,9 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job,
         CancellationToken cancellationToken)
     {
-        var sourcePath = Path.GetFullPath(job.SourcePath);
+        var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(sourcePath))
-        {
-            throw new DirectoryNotFoundException($"The configured system-texture directory does not exist: {sourcePath}");
-        }
-
-        var sourceFolder = Path.GetFileName(Path.TrimEndingDirectorySeparator(sourcePath));
-        RequireSafeSegment(sourceFolder, "source folder");
-        var packagePaths = Directory.EnumerateFiles(sourcePath)
-            .Where(path => string.Equals(Path.GetExtension(path), ".utx", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var packagePaths = SourceFiles(sourcePath, ".utx", "texture");
         if (packagePaths.Length == 0)
         {
             throw new InvalidOperationException("The configured system-texture directory contains no .utx packages.");
@@ -78,12 +68,12 @@ public sealed partial class AssetImportJobProcessor
             throw new InvalidDataException($"Package name '{duplicatePackage.Key}' is duplicated ignoring case.");
         }
 
-        job.SourceHash = HashSourceSet(packages);
+        job.SourceHash = packages.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
         Directory.CreateDirectory(assetRootPath);
-        var finalPath = Path.Combine(assetRootPath, sourceFolder);
-        var stagingPath = Path.Combine(assetRootPath, $".{sourceFolder}-staging-{job.Id:N}");
+        var (finalPath, stagingPath, sourceFolder) = OutputPaths(assetRootPath, job);
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
         try
         {
@@ -196,11 +186,12 @@ public sealed partial class AssetImportJobProcessor
                     package.TextureCount,
                     package.MaterialCount)).ToArray();
 
-            Promote(stagingPath, finalPath, job.Id);
+            job.WarningsJson = JsonSerializer.Serialize(warnings);
+            await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
+            Promote(stagingPath, finalPath);
             await PublishCatalogAsync(context, job, finalPath, sourceFolder, 7, 121, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new TextureCatalogMetadata(materialEntries), cancellationToken);
-            job.WarningsJson = JsonSerializer.Serialize(warnings);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded
                 : AssetImportJobValues.SucceededWithWarnings;

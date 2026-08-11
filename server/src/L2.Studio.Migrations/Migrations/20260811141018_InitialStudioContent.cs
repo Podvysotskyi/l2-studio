@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -36,27 +36,30 @@ namespace L2.Studio.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "asset_import_jobs",
+                name: "asset_import_runs",
                 schema: "content",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     kind = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    trigger_type = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    source_path = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    source_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    requested_source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    normalized_requested_source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     requested_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     started_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    discovery_finished_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     finished_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    total_count = table.Column<int>(type: "integer", nullable: false),
-                    processed_count = table.Column<int>(type: "integer", nullable: false),
-                    skipped_count = table.Column<int>(type: "integer", nullable: false),
-                    warnings_json = table.Column<string>(type: "jsonb", nullable: false),
+                    discovered_file_count = table.Column<int>(type: "integer", nullable: false),
+                    completed_file_count = table.Column<int>(type: "integer", nullable: false),
+                    succeeded_file_count = table.Column<int>(type: "integer", nullable: false),
+                    warning_file_count = table.Column<int>(type: "integer", nullable: false),
+                    failed_file_count = table.Column<int>(type: "integer", nullable: false),
                     error = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_asset_import_jobs", x => x.id);
+                    table.PrimaryKey("PK_asset_import_runs", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -151,21 +154,26 @@ namespace L2.Studio.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "asset_catalog_groups",
+                name: "asset_catalog_sources",
                 schema: "content",
                 columns: table => new
                 {
-                    id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
                     catalog_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    metadata_json = table.Column<string>(type: "jsonb", nullable: false)
+                    publishing_work_item_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    normalized_source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    source_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    output_root = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                    metadata_json = table.Column<string>(type: "jsonb", nullable: false),
+                    referenced_output_roots_json = table.Column<string>(type: "jsonb", nullable: false),
+                    published_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_asset_catalog_groups", x => x.id);
+                    table.PrimaryKey("PK_asset_catalog_sources", x => x.id);
                     table.ForeignKey(
-                        name: "FK_asset_catalog_groups_asset_catalogs_catalog_id",
+                        name: "FK_asset_catalog_sources_asset_catalogs_catalog_id",
                         column: x => x.catalog_id,
                         principalSchema: "content",
                         principalTable: "asset_catalogs",
@@ -174,26 +182,37 @@ namespace L2.Studio.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "asset_catalog_items",
+                name: "asset_import_work_items",
                 schema: "content",
                 columns: table => new
                 {
-                    id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    catalog_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    group_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    run_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    import_kind = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    normalized_source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    source_path = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
+                    source_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    metadata_json = table.Column<string>(type: "jsonb", nullable: false)
+                    attempt_count = table.Column<int>(type: "integer", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    started_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    finished_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    total_resource_count = table.Column<int>(type: "integer", nullable: false),
+                    processed_resource_count = table.Column<int>(type: "integer", nullable: false),
+                    skipped_resource_count = table.Column<int>(type: "integer", nullable: false),
+                    warning_count = table.Column<int>(type: "integer", nullable: false),
+                    error = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    unpublished_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_asset_catalog_items", x => x.id);
+                    table.PrimaryKey("PK_asset_import_work_items", x => x.id);
                     table.ForeignKey(
-                        name: "FK_asset_catalog_items_asset_catalogs_catalog_id",
-                        column: x => x.catalog_id,
+                        name: "FK_asset_import_work_items_asset_import_runs_run_id",
+                        column: x => x.run_id,
                         principalSchema: "content",
-                        principalTable: "asset_catalogs",
+                        principalTable: "asset_import_runs",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -394,6 +413,106 @@ namespace L2.Studio.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "asset_catalog_groups",
+                schema: "content",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    catalog_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    source_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    metadata_json = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_asset_catalog_groups", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_asset_catalog_groups_asset_catalog_sources_source_id",
+                        column: x => x.source_id,
+                        principalSchema: "content",
+                        principalTable: "asset_catalog_sources",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_asset_catalog_groups_asset_catalogs_catalog_id",
+                        column: x => x.catalog_id,
+                        principalSchema: "content",
+                        principalTable: "asset_catalogs",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "asset_catalog_items",
+                schema: "content",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    catalog_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    source_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    group_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    metadata_json = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_asset_catalog_items", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_asset_catalog_items_asset_catalog_sources_source_id",
+                        column: x => x.source_id,
+                        principalSchema: "content",
+                        principalTable: "asset_catalog_sources",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_asset_catalog_items_asset_catalogs_catalog_id",
+                        column: x => x.catalog_id,
+                        principalSchema: "content",
+                        principalTable: "asset_catalogs",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "asset_import_diagnostics",
+                schema: "content",
+                columns: table => new
+                {
+                    id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    run_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    work_item_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    severity = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    code = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    stage = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    source_key = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    object_name = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    message = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_asset_import_diagnostics", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_asset_import_diagnostics_asset_import_runs_run_id",
+                        column: x => x.run_id,
+                        principalSchema: "content",
+                        principalTable: "asset_import_runs",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_asset_import_diagnostics_asset_import_work_items_work_item_~",
+                        column: x => x.work_item_id,
+                        principalSchema: "content",
+                        principalTable: "asset_import_work_items",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "skill_icons",
                 schema: "content",
                 columns: table => new
@@ -423,6 +542,12 @@ namespace L2.Studio.Migrations.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_asset_catalog_groups_source_id",
+                schema: "content",
+                table: "asset_catalog_groups",
+                column: "source_id");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_asset_catalog_items_catalog_group_name",
                 schema: "content",
                 table: "asset_catalog_items",
@@ -441,6 +566,19 @@ namespace L2.Studio.Migrations.Migrations
                 columns: new[] { "catalog_id", "status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_asset_catalog_items_source_id",
+                schema: "content",
+                table: "asset_catalog_items",
+                column: "source_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_catalog_sources_catalog_source",
+                schema: "content",
+                table: "asset_catalog_sources",
+                columns: new[] { "catalog_id", "normalized_source_key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "ix_asset_catalogs_active_kind",
                 schema: "content",
                 table: "asset_catalogs",
@@ -449,18 +587,64 @@ namespace L2.Studio.Migrations.Migrations
                 filter: "is_active");
 
             migrationBuilder.CreateIndex(
-                name: "ix_asset_import_jobs_active_kind",
+                name: "ix_asset_import_diagnostics_filters",
                 schema: "content",
-                table: "asset_import_jobs",
-                column: "kind",
-                unique: true,
-                filter: "\"status\" IN ('queued', 'running')");
+                table: "asset_import_diagnostics",
+                columns: new[] { "run_id", "severity", "code", "stage" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_asset_import_jobs_claim",
+                name: "ix_asset_import_diagnostics_source_key",
                 schema: "content",
-                table: "asset_import_jobs",
-                columns: new[] { "kind", "status", "requested_at" });
+                table: "asset_import_diagnostics",
+                column: "source_key");
+
+            migrationBuilder.Sql("""
+                CREATE INDEX ix_asset_import_diagnostics_search
+                ON content.asset_import_diagnostics
+                USING GIN (to_tsvector('simple',
+                    coalesce(source_key, '') || ' ' || coalesce(object_name, '') || ' ' || message));
+                """);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_asset_import_diagnostics_work_item_id",
+                schema: "content",
+                table: "asset_import_diagnostics",
+                column: "work_item_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_import_runs_active_full_scan_kind",
+                schema: "content",
+                table: "asset_import_runs",
+                column: "kind",
+                unique: true,
+                filter: "trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_import_runs_active_single_source",
+                schema: "content",
+                table: "asset_import_runs",
+                columns: new[] { "kind", "normalized_requested_source_key" },
+                unique: true,
+                filter: "trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_import_runs_kind_requested",
+                schema: "content",
+                table: "asset_import_runs",
+                columns: new[] { "kind", "requested_at" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_import_work_items_run_source",
+                schema: "content",
+                table: "asset_import_work_items",
+                columns: new[] { "run_id", "normalized_source_key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_asset_import_work_items_run_status",
+                schema: "content",
+                table: "asset_import_work_items",
+                columns: new[] { "run_id", "status" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_npc_races_name",
@@ -615,7 +799,7 @@ namespace L2.Studio.Migrations.Migrations
                 schema: "content");
 
             migrationBuilder.DropTable(
-                name: "asset_import_jobs",
+                name: "asset_import_diagnostics",
                 schema: "content");
 
             migrationBuilder.DropTable(
@@ -643,7 +827,11 @@ namespace L2.Studio.Migrations.Migrations
                 schema: "content");
 
             migrationBuilder.DropTable(
-                name: "asset_catalogs",
+                name: "asset_catalog_sources",
+                schema: "content");
+
+            migrationBuilder.DropTable(
+                name: "asset_import_work_items",
                 schema: "content");
 
             migrationBuilder.DropTable(
@@ -668,6 +856,14 @@ namespace L2.Studio.Migrations.Migrations
 
             migrationBuilder.DropTable(
                 name: "skills",
+                schema: "content");
+
+            migrationBuilder.DropTable(
+                name: "asset_catalogs",
+                schema: "content");
+
+            migrationBuilder.DropTable(
+                name: "asset_import_runs",
                 schema: "content");
 
             migrationBuilder.DropTable(

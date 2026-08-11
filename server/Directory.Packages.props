@@ -17,6 +17,10 @@
     <PackageVersion Include="PuppeteerSharp" Version="25.0.4" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="WolverineFx" Version="6.25.2" />
+    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.25.2" />
+    <PackageVersion Include="WolverineFx.Postgresql" Version="6.25.2" />
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.25.2" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0" />
   </ItemGroup>

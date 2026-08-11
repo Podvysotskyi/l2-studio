@@ -25,18 +25,34 @@ docker compose up --build
 
 Set `L2_SOURCE_PATH` when the game source directory is not adjacent to this repository. Generated assets persist in the shared `l2-studio_assets-data` Docker volume; the worker writes to it while the API and asset server read from it.
 
+Asset imports use Wolverine 6.25.2 with PostgreSQL only. API envelopes live in
+`l2_messaging_api`, Worker envelopes in `l2_messaging_worker`, and the durable
+control and sequential file queues share the `l2_messaging` transport schema.
+Development and the isolated test profile create these resources
+automatically.
+
+Run exactly one Studio Worker replica for this milestone. Each durable endpoint
+is sequential within a Worker process; scaling the Worker horizontally would
+allow different heavy files to convert concurrently.
+
 Do not commit original source packages or generated private assets.
 
 ## Checks
 
 ```sh
 docker build --target validate --build-arg APP_ENV=production web
+docker compose --profile test run --build --rm server-tests
+(cd web && npx playwright install chromium && npm run test:e2e)
 docker compose config
 ```
 
 The .NET solution is self-contained. Production projects are organized by responsibility under `server/src` (API and Worker hosts, configuration, contracts, context and migrations, repositories, import services, and conversion libraries). Studio does not reference Server implementation projects.
 
 Resetting a development database is required after the August 2026 server reorganization and the `l2-studio` database rename because Studio now uses a consolidated `InitialStudioContent` migration baseline.
+
+The per-file import migration is also a clean baseline: reset existing Studio
+development databases instead of attempting to retain the retired polling-job
+rows. Generated URLs now use immutable `{kind}/{source}/{sha256}` locations.
 
 ## Dependencies
 

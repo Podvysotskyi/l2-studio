@@ -5,5 +5,6 @@
     <ProjectReference Include="../L2.Studio.Contracts/L2.Studio.Contracts.csproj" />
     <ProjectReference Include="../L2.Studio.Exceptions/L2.Studio.Exceptions.csproj" />
     <ProjectReference Include="../L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 </Project>

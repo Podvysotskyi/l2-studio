@@ -15,7 +15,9 @@ const error = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
-  jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
+  jobs.value.find((job) =>
+    ['queued', 'discovering', 'running'].includes(job.status)
+  )
 )
 
 async function loadCatalog() {
@@ -88,8 +90,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     />
     <UCard v-if="activeJob" variant="subtle">
       <p class="text-sm font-medium text-highlighted">
-        Import {{ activeJob.status }} · {{ activeJob.processedCount }} /
-        {{ activeJob.totalCount || '…' }}
+        Import {{ activeJob.status }} · {{ activeJob.completedFileCount }} /
+        {{ activeJob.discoveredFileCount || '…' }}
       </p>
     </UCard>
 

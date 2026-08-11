@@ -39,7 +39,9 @@ const previewOpen = computed({
   }
 })
 const activeJob = computed(() =>
-  jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
+  jobs.value.find((job) =>
+    ['queued', 'discovering', 'running'].includes(job.status)
+  )
 )
 const visiblePackages = computed(() => {
   const term = packageQuery.value.trim().toLocaleLowerCase()
@@ -175,17 +177,17 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             Import {{ activeJob.status }}
           </p>
           <p class="truncate text-xs text-muted">
-            {{ activeJob.sourcePath }}
+            {{ activeJob.requestedSourceKey ?? 'Full scan' }}
           </p>
         </div>
         <UBadge color="info" variant="subtle">
-          {{ activeJob.processedCount }} / {{ activeJob.totalCount || '…' }}
+          {{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}
         </UBadge>
       </div>
       <UProgress
         class="mt-4"
-        :model-value="activeJob.processedCount"
-        :max="activeJob.totalCount || 1"
+        :model-value="activeJob.completedFileCount"
+        :max="activeJob.discoveredFileCount || 1"
       />
     </UCard>
 

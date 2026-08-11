@@ -1,16 +1,14 @@
-using System.Security.Cryptography;
-using System.Text;
+using L2.Studio.Repositories.Interfaces.Models;
 
 namespace L2.Studio.Services;
 
 internal static class LevelPreviewGeneration
 {
-    public const int RendererVersion = 3;
+    public const int RendererVersion = AssetImportSourceHash.LevelPreviewRendererVersion;
     public const int Size = 512;
 
     public static string ComputeSourceHash(string levelCatalogSourceHash) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
-            $"{levelCatalogSourceHash}\n{RendererVersion}")));
+        AssetImportSourceHash.LevelPreview(levelCatalogSourceHash);
 
     public static string? RequestedLevelName(string levelsSourcePath, string jobSourcePath)
     {

@@ -27,11 +27,14 @@ public sealed partial class AssetImportJobProcessor
         string fileName,
         string hash,
         bool gpuTextureAvailable = true) =>
-        $"/{Uri.EscapeDataString(sourceFolder)}/{Uri.EscapeDataString(packageName)}/{Uri.EscapeDataString(fileName)}" +
-        $"?v={hash[..12]}{(gpuTextureAvailable ? string.Empty : "&gpu=none")}";
+        $"/{EscapedUrlRoot(sourceFolder)}/{Uri.EscapeDataString(packageName)}/{Uri.EscapeDataString(fileName)}" +
+        (gpuTextureAvailable ? string.Empty : "?gpu=none");
 
     private static string VersionedFileUrl(string sourceFolder, string fileName, string hash) =>
-        $"/{Uri.EscapeDataString(sourceFolder)}/{Uri.EscapeDataString(fileName)}?v={hash[..12]}";
+        $"/{EscapedUrlRoot(sourceFolder)}/{Uri.EscapeDataString(fileName)}";
+
+    private static string EscapedUrlRoot(string sourceFolder) => string.Join('/',
+        sourceFolder.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString));
 
     private static Task SaveProgressAsync(
         GameContentDbContext context,
@@ -57,33 +60,53 @@ public sealed partial class AssetImportJobProcessor
         TMetadata metadata,
         CancellationToken cancellationToken)
     {
-        var backupPath = $"{finalPath}.backup-{job.Id:N}";
-        try
+        await catalogStore.PublishAsync(new AssetCatalogPublication(
+            job.Id,
+            job.Kind,
+            job.SourceKey,
+            job.NormalizedSourceKey,
+            job.Kind,
+            job.SourceHash!,
+            Path.GetRelativePath(Path.GetFullPath(options.Value.AssetRootPath), finalPath).Replace('\\', '/'),
+            schemaVersion,
+            protocol,
+            groups.Select(group => new AssetCatalogPublicationEntry(
+                groupName(group), null, null, JsonSerializer.Serialize(group, ManifestJsonOptions))).ToArray(),
+            items.Select(item => new AssetCatalogPublicationEntry(
+                itemName(item), itemGroup(item), itemStatus(item), JsonSerializer.Serialize(item, ManifestJsonOptions))).ToArray(),
+            JsonSerializer.Serialize(metadata, ManifestJsonOptions),
+            JsonSerializer.Deserialize<string[]>(job.WarningsJson) ?? [],
+            timeProvider.GetUtcNow()), cancellationToken);
+    }
+
+    private static string[] SourceFiles(string sourcePath, string extension, string description)
+    {
+        if (File.Exists(sourcePath))
         {
-            await catalogStore.PublishAsync(new AssetCatalogPublication(
-                job.Id,
-                job.Kind,
-                sourceFolder,
-                job.SourceHash!,
-                schemaVersion,
-                protocol,
-                groups.Select(group => new AssetCatalogPublicationEntry(
-                    groupName(group), null, null, JsonSerializer.Serialize(group, ManifestJsonOptions))).ToArray(),
-                items.Select(item => new AssetCatalogPublicationEntry(
-                    itemName(item), itemGroup(item), itemStatus(item), JsonSerializer.Serialize(item, ManifestJsonOptions))).ToArray(),
-                JsonSerializer.Serialize(metadata, ManifestJsonOptions),
-                timeProvider.GetUtcNow()), cancellationToken);
-            if (Directory.Exists(backupPath)) Directory.Delete(backupPath, recursive: true);
+            if (!string.Equals(Path.GetExtension(sourcePath), extension, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"The {description} source must be a {extension} file.");
+            return [sourcePath];
         }
-        catch
-        {
-            if (Directory.Exists(finalPath)) Directory.Delete(finalPath, recursive: true);
-            if (File.Exists(Path.Combine(backupPath, ".empty")))
-                Directory.Delete(backupPath, recursive: true);
-            else if (Directory.Exists(backupPath))
-                Directory.Move(backupPath, finalPath);
-            throw;
-        }
+        if (!Directory.Exists(sourcePath))
+            throw new DirectoryNotFoundException($"The configured {description} source does not exist: {sourcePath}");
+        return Directory.EnumerateFiles(sourcePath)
+            .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static (string FinalPath, string StagingPath, string UrlRoot) OutputPaths(
+        string assetRootPath,
+        AssetImportJob job)
+    {
+        var sourceStem = Path.GetFileNameWithoutExtension(job.SourceKey);
+        RequireSafeSegment(sourceStem, "source filename");
+        if (string.IsNullOrWhiteSpace(job.SourceHash)) throw new InvalidOperationException("The source hash is unavailable.");
+        var relative = Path.Combine(job.Kind, sourceStem, job.SourceHash);
+        return (
+            Path.Combine(assetRootPath, relative),
+            Path.Combine(assetRootPath, ".staging", job.Id.ToString("N")),
+            relative.Replace('\\', '/'));
     }
 
     private static async Task<string[]> ActiveCatalogItemJsonAsync(
@@ -95,64 +118,18 @@ public sealed partial class AssetImportJobProcessor
             .Select(item => item.MetadataJson)
             .ToArrayAsync(cancellationToken);
 
-    private static void Promote(string stagingPath, string finalPath, Guid jobId)
+    private static void Promote(string stagingPath, string finalPath)
     {
-        var backupPath = $"{finalPath}.backup-{jobId:N}";
         if (Directory.Exists(finalPath))
         {
-            Directory.Move(finalPath, backupPath);
-        }
-        else
-        {
-            Directory.CreateDirectory(backupPath);
-            File.WriteAllText(Path.Combine(backupPath, ".empty"), string.Empty);
-        }
-
-        try
-        {
-            Directory.Move(stagingPath, finalPath);
-        }
-        catch
-        {
-            if (!Directory.Exists(finalPath) && Directory.Exists(backupPath))
+            if (File.Exists(Path.Combine(finalPath, ".l2-asset-version")))
             {
-                if (File.Exists(Path.Combine(backupPath, ".empty")))
-                    Directory.Delete(backupPath, recursive: true);
-                else
-                    Directory.Move(backupPath, finalPath);
+                Directory.Delete(stagingPath, recursive: true);
+                return;
             }
-
-            throw;
+            Directory.Delete(finalPath, recursive: true);
         }
-    }
-
-    private async Task ReconcilePromotionsAsync(
-        GameContentDbContext context,
-        CancellationToken cancellationToken)
-    {
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
-        if (!Directory.Exists(assetRootPath)) return;
-        foreach (var backupPath in Directory.EnumerateDirectories(assetRootPath, "*.backup-*", SearchOption.TopDirectoryOnly))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var separator = backupPath.LastIndexOf(".backup-", StringComparison.Ordinal);
-            if (separator < 0 || !Guid.TryParseExact(backupPath[(separator + 8)..], "N", out var jobId)) continue;
-            var finalPath = backupPath[..separator];
-            var published = await context.AssetCatalogs.AsNoTracking()
-                .AnyAsync(catalog => catalog.Id == jobId && catalog.IsActive, cancellationToken);
-            if (published)
-            {
-                Directory.Delete(backupPath, recursive: true);
-                continue;
-            }
-
-            if (Directory.Exists(finalPath)) Directory.Delete(finalPath, recursive: true);
-            if (File.Exists(Path.Combine(backupPath, ".empty")))
-                Directory.Delete(backupPath, recursive: true);
-            else
-                Directory.Move(backupPath, finalPath);
-            logger.LogWarning("Recovered interrupted asset promotion for job {JobId}", jobId);
-        }
+        Directory.Move(stagingPath, finalPath);
     }
 
     private sealed record PackageSource(

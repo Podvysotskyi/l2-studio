@@ -20,7 +20,9 @@ const audioPlayer = ref<HTMLAudioElement>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
-  jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
+  jobs.value.find((job) =>
+    ['queued', 'discovering', 'running'].includes(job.status)
+  )
 )
 const filteredTracks = computed(() => catalog.value?.items ?? [])
 const visibleTracks = computed(() => filteredTracks.value)
@@ -150,16 +152,16 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <p class="font-medium text-highlighted">
             Import {{ activeJob.status }}
           </p>
-          <p class="truncate text-xs text-muted">{{ activeJob.sourcePath }}</p>
+          <p class="truncate text-xs text-muted">{{ activeJob.requestedSourceKey ?? 'Full scan' }}</p>
         </div>
         <UBadge color="info" variant="subtle">
-          {{ activeJob.processedCount }} / {{ activeJob.totalCount || '…' }}
+          {{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}
         </UBadge>
       </div>
       <UProgress
         class="mt-4"
-        :model-value="activeJob.processedCount"
-        :max="activeJob.totalCount || 1"
+        :model-value="activeJob.completedFileCount"
+        :max="activeJob.discoveredFileCount || 1"
       />
     </UCard>
 

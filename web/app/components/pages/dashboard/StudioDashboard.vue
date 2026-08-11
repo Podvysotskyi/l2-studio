@@ -30,7 +30,7 @@ const skippedAssets = computed(() =>
 )
 const activeJobs = computed(() =>
   jobs.value.filter(
-    (job) => job.status === 'queued' || job.status === 'running'
+    (job) => ['queued', 'discovering', 'running'].includes(job.status)
   )
 )
 const recentJobs = computed(() => jobs.value.slice(0, 6))
@@ -437,8 +437,8 @@ onMounted(() => void dashboard.load())
               {{ job.status.replaceAll('_', ' ') }}
             </UBadge>
             <span class="min-w-32 flex-1 text-xs text-muted"
-              >{{ job.processedCount.toLocaleString() }} /
-              {{ job.totalCount.toLocaleString() }} processed</span
+              >{{ job.completedFileCount.toLocaleString() }} /
+              {{ job.discoveredFileCount.toLocaleString() }} completed</span
             >
             <time
               class="text-xs text-dimmed"

@@ -21,8 +21,11 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<PlayerFace> PlayerFaces => Set<PlayerFace>();
     public DbSet<PlayerHairStyle> PlayerHairStyles => Set<PlayerHairStyle>();
     public DbSet<PlayerHairColor> PlayerHairColors => Set<PlayerHairColor>();
-    public DbSet<AssetImportJob> AssetImportJobs => Set<AssetImportJob>();
+    public DbSet<AssetImportRun> AssetImportRuns => Set<AssetImportRun>();
+    public DbSet<AssetImportWorkItem> AssetImportWorkItems => Set<AssetImportWorkItem>();
+    public DbSet<AssetImportDiagnostic> AssetImportDiagnostics => Set<AssetImportDiagnostic>();
     public DbSet<AssetCatalog> AssetCatalogs => Set<AssetCatalog>();
+    public DbSet<AssetCatalogSource> AssetCatalogSources => Set<AssetCatalogSource>();
     public DbSet<AssetCatalogGroup> AssetCatalogGroups => Set<AssetCatalogGroup>();
     public DbSet<AssetCatalogItem> AssetCatalogItems => Set<AssetCatalogItem>();
 
@@ -109,28 +112,88 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         playerHairColor.HasOne(entity => entity.PlayerSex).WithMany(entity => entity.PlayerHairColors)
             .HasForeignKey(entity => entity.PlayerSexId).OnDelete(DeleteBehavior.Restrict);
 
-        var assetImportJob = modelBuilder.Entity<AssetImportJob>();
-        assetImportJob.ToTable("asset_import_jobs");
-        assetImportJob.HasKey(entity => entity.Id);
-        assetImportJob.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
-        assetImportJob.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
-        assetImportJob.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
-        assetImportJob.Property(entity => entity.SourcePath).HasColumnName("source_path").HasMaxLength(1024);
-        assetImportJob.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
-        assetImportJob.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
-        assetImportJob.Property(entity => entity.StartedAt).HasColumnName("started_at");
-        assetImportJob.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
-        assetImportJob.Property(entity => entity.TotalCount).HasColumnName("total_count");
-        assetImportJob.Property(entity => entity.ProcessedCount).HasColumnName("processed_count");
-        assetImportJob.Property(entity => entity.SkippedCount).HasColumnName("skipped_count");
-        assetImportJob.Property(entity => entity.WarningsJson).HasColumnName("warnings_json").HasColumnType("jsonb");
-        assetImportJob.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
-        assetImportJob.HasIndex(entity => new { entity.Kind, entity.Status, entity.RequestedAt })
-            .HasDatabaseName("ix_asset_import_jobs_claim");
-        assetImportJob.HasIndex(entity => entity.Kind)
-            .IsUnique()
-            .HasFilter("\"status\" IN ('queued', 'running')")
-            .HasDatabaseName("ix_asset_import_jobs_active_kind");
+        var assetImportRun = modelBuilder.Entity<AssetImportRun>();
+        assetImportRun.ToTable("asset_import_runs");
+        assetImportRun.HasKey(entity => entity.Id);
+        assetImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        assetImportRun.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
+        assetImportRun.Property(entity => entity.TriggerType).HasColumnName("trigger_type").HasMaxLength(32);
+        assetImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        assetImportRun.Property(entity => entity.RequestedSourceKey).HasColumnName("requested_source_key").HasMaxLength(256);
+        assetImportRun.Property(entity => entity.NormalizedRequestedSourceKey).HasColumnName("normalized_requested_source_key").HasMaxLength(256);
+        assetImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        assetImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        assetImportRun.Property(entity => entity.DiscoveryFinishedAt).HasColumnName("discovery_finished_at");
+        assetImportRun.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        assetImportRun.Property(entity => entity.DiscoveredFileCount).HasColumnName("discovered_file_count");
+        assetImportRun.Property(entity => entity.CompletedFileCount).HasColumnName("completed_file_count");
+        assetImportRun.Property(entity => entity.SucceededFileCount).HasColumnName("succeeded_file_count");
+        assetImportRun.Property(entity => entity.WarningFileCount).HasColumnName("warning_file_count");
+        assetImportRun.Property(entity => entity.FailedFileCount).HasColumnName("failed_file_count");
+        assetImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        assetImportRun.HasIndex(entity => new { entity.Kind, entity.RequestedAt })
+            .HasDatabaseName("ix_asset_import_runs_kind_requested");
+        assetImportRun.HasIndex(entity => entity.Kind).IsUnique()
+            .HasFilter("trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')")
+            .HasDatabaseName("ix_asset_import_runs_active_full_scan_kind");
+        assetImportRun.HasIndex(entity => new { entity.Kind, entity.NormalizedRequestedSourceKey }).IsUnique()
+            .HasFilter("trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')")
+            .HasDatabaseName("ix_asset_import_runs_active_single_source");
+
+        var assetImportWorkItem = modelBuilder.Entity<AssetImportWorkItem>();
+        assetImportWorkItem.ToTable("asset_import_work_items");
+        assetImportWorkItem.HasKey(entity => entity.Id);
+        assetImportWorkItem.Ignore(entity => entity.Kind);
+        assetImportWorkItem.Ignore(entity => entity.TotalCount);
+        assetImportWorkItem.Ignore(entity => entity.ProcessedCount);
+        assetImportWorkItem.Ignore(entity => entity.SkippedCount);
+        assetImportWorkItem.Ignore(entity => entity.WarningsJson);
+        assetImportWorkItem.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        assetImportWorkItem.Property(entity => entity.RunId).HasColumnName("run_id");
+        assetImportWorkItem.Property(entity => entity.ImportKind).HasColumnName("import_kind").HasMaxLength(64);
+        assetImportWorkItem.Property(entity => entity.SourceKey).HasColumnName("source_key").HasMaxLength(256);
+        assetImportWorkItem.Property(entity => entity.NormalizedSourceKey).HasColumnName("normalized_source_key").HasMaxLength(256);
+        assetImportWorkItem.Property(entity => entity.SourcePath).HasColumnName("source_path").HasMaxLength(1024);
+        assetImportWorkItem.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
+        assetImportWorkItem.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        assetImportWorkItem.Property(entity => entity.AttemptCount).HasColumnName("attempt_count");
+        assetImportWorkItem.Property(entity => entity.CreatedAt).HasColumnName("created_at");
+        assetImportWorkItem.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        assetImportWorkItem.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        assetImportWorkItem.Property(entity => entity.TotalResourceCount).HasColumnName("total_resource_count");
+        assetImportWorkItem.Property(entity => entity.ProcessedResourceCount).HasColumnName("processed_resource_count");
+        assetImportWorkItem.Property(entity => entity.SkippedResourceCount).HasColumnName("skipped_resource_count");
+        assetImportWorkItem.Property(entity => entity.WarningCount).HasColumnName("warning_count");
+        assetImportWorkItem.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        assetImportWorkItem.Property(entity => entity.UnpublishedAt).HasColumnName("unpublished_at");
+        assetImportWorkItem.HasIndex(entity => new { entity.RunId, entity.NormalizedSourceKey }).IsUnique()
+            .HasDatabaseName("ix_asset_import_work_items_run_source");
+        assetImportWorkItem.HasIndex(entity => new { entity.RunId, entity.Status })
+            .HasDatabaseName("ix_asset_import_work_items_run_status");
+        assetImportWorkItem.HasOne(entity => entity.Run).WithMany(entity => entity.WorkItems)
+            .HasForeignKey(entity => entity.RunId).OnDelete(DeleteBehavior.Cascade);
+
+        var assetImportDiagnostic = modelBuilder.Entity<AssetImportDiagnostic>();
+        assetImportDiagnostic.ToTable("asset_import_diagnostics");
+        assetImportDiagnostic.HasKey(entity => entity.Id);
+        assetImportDiagnostic.Property(entity => entity.Id).HasColumnName("id");
+        assetImportDiagnostic.Property(entity => entity.RunId).HasColumnName("run_id");
+        assetImportDiagnostic.Property(entity => entity.WorkItemId).HasColumnName("work_item_id");
+        assetImportDiagnostic.Property(entity => entity.Severity).HasColumnName("severity").HasMaxLength(16);
+        assetImportDiagnostic.Property(entity => entity.Code).HasColumnName("code").HasMaxLength(128);
+        assetImportDiagnostic.Property(entity => entity.Stage).HasColumnName("stage").HasMaxLength(64);
+        assetImportDiagnostic.Property(entity => entity.SourceKey).HasColumnName("source_key").HasMaxLength(256);
+        assetImportDiagnostic.Property(entity => entity.ObjectName).HasColumnName("object_name").HasMaxLength(512);
+        assetImportDiagnostic.Property(entity => entity.Message).HasColumnName("message").HasMaxLength(4000);
+        assetImportDiagnostic.Property(entity => entity.CreatedAt).HasColumnName("created_at");
+        assetImportDiagnostic.HasIndex(entity => new { entity.RunId, entity.Severity, entity.Code, entity.Stage })
+            .HasDatabaseName("ix_asset_import_diagnostics_filters");
+        assetImportDiagnostic.HasIndex(entity => entity.SourceKey)
+            .HasDatabaseName("ix_asset_import_diagnostics_source_key");
+        assetImportDiagnostic.HasOne(entity => entity.Run).WithMany(entity => entity.Diagnostics)
+            .HasForeignKey(entity => entity.RunId).OnDelete(DeleteBehavior.Cascade);
+        assetImportDiagnostic.HasOne(entity => entity.WorkItem).WithMany(entity => entity.Diagnostics)
+            .HasForeignKey(entity => entity.WorkItemId).OnDelete(DeleteBehavior.Cascade);
 
         var assetCatalog = modelBuilder.Entity<AssetCatalog>();
         assetCatalog.ToTable("asset_catalogs");
@@ -149,23 +212,45 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .HasFilter("is_active")
             .HasDatabaseName("ix_asset_catalogs_active_kind");
 
+        var assetCatalogSource = modelBuilder.Entity<AssetCatalogSource>();
+        assetCatalogSource.ToTable("asset_catalog_sources");
+        assetCatalogSource.HasKey(entity => entity.Id);
+        assetCatalogSource.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        assetCatalogSource.Property(entity => entity.CatalogId).HasColumnName("catalog_id");
+        assetCatalogSource.Property(entity => entity.PublishingWorkItemId).HasColumnName("publishing_work_item_id");
+        assetCatalogSource.Property(entity => entity.SourceKey).HasColumnName("source_key").HasMaxLength(256);
+        assetCatalogSource.Property(entity => entity.NormalizedSourceKey).HasColumnName("normalized_source_key").HasMaxLength(256);
+        assetCatalogSource.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
+        assetCatalogSource.Property(entity => entity.OutputRoot).HasColumnName("output_root").HasMaxLength(1024);
+        assetCatalogSource.Property(entity => entity.MetadataJson).HasColumnName("metadata_json").HasColumnType("jsonb");
+        assetCatalogSource.Property(entity => entity.ReferencedOutputRootsJson).HasColumnName("referenced_output_roots_json").HasColumnType("jsonb");
+        assetCatalogSource.Property(entity => entity.PublishedAt).HasColumnName("published_at");
+        assetCatalogSource.HasIndex(entity => new { entity.CatalogId, entity.NormalizedSourceKey }).IsUnique()
+            .HasDatabaseName("ix_asset_catalog_sources_catalog_source");
+        assetCatalogSource.HasOne(entity => entity.Catalog).WithMany(entity => entity.Sources)
+            .HasForeignKey(entity => entity.CatalogId).OnDelete(DeleteBehavior.Cascade);
+
         var assetCatalogGroup = modelBuilder.Entity<AssetCatalogGroup>();
         assetCatalogGroup.ToTable("asset_catalog_groups");
         assetCatalogGroup.HasKey(entity => entity.Id);
         assetCatalogGroup.Property(entity => entity.Id).HasColumnName("id");
         assetCatalogGroup.Property(entity => entity.CatalogId).HasColumnName("catalog_id");
+        assetCatalogGroup.Property(entity => entity.SourceId).HasColumnName("source_id");
         assetCatalogGroup.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(256);
         assetCatalogGroup.Property(entity => entity.MetadataJson).HasColumnName("metadata_json").HasColumnType("jsonb");
         assetCatalogGroup.HasIndex(entity => new { entity.CatalogId, entity.Name })
             .IsUnique().HasDatabaseName("ix_asset_catalog_groups_catalog_name");
         assetCatalogGroup.HasOne(entity => entity.Catalog).WithMany(entity => entity.Groups)
             .HasForeignKey(entity => entity.CatalogId).OnDelete(DeleteBehavior.Cascade);
+        assetCatalogGroup.HasOne(entity => entity.Source).WithMany(entity => entity.Groups)
+            .HasForeignKey(entity => entity.SourceId).OnDelete(DeleteBehavior.Cascade);
 
         var assetCatalogItem = modelBuilder.Entity<AssetCatalogItem>();
         assetCatalogItem.ToTable("asset_catalog_items");
         assetCatalogItem.HasKey(entity => entity.Id);
         assetCatalogItem.Property(entity => entity.Id).HasColumnName("id");
         assetCatalogItem.Property(entity => entity.CatalogId).HasColumnName("catalog_id");
+        assetCatalogItem.Property(entity => entity.SourceId).HasColumnName("source_id");
         assetCatalogItem.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(256);
         assetCatalogItem.Property(entity => entity.GroupName).HasColumnName("group_name").HasMaxLength(256);
         assetCatalogItem.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
@@ -178,6 +263,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .HasDatabaseName("ix_asset_catalog_items_catalog_status");
         assetCatalogItem.HasOne(entity => entity.Catalog).WithMany(entity => entity.Items)
             .HasForeignKey(entity => entity.CatalogId).OnDelete(DeleteBehavior.Cascade);
+        assetCatalogItem.HasOne(entity => entity.Source).WithMany(entity => entity.Items)
+            .HasForeignKey(entity => entity.SourceId).OnDelete(DeleteBehavior.Cascade);
 
         var npcType = modelBuilder.Entity<NpcType>();
         npcType.ToTable("npc_types");

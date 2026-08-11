@@ -3,7 +3,12 @@ import type {
   AssetCatalogSummary,
   AssetImportKind
 } from '../types/models/asset-catalog'
-import type { AssetImportJob } from '../types/models/asset-import-job'
+import type {
+  AssetImportDiagnostic,
+  AssetImportJob,
+  AssetImportPage,
+  AssetImportWorkItem
+} from '../types/models/asset-import-job'
 import type {
   LookupKind,
   LookupRecord,
@@ -95,6 +100,65 @@ export function startAssetImport(
     method: 'POST',
     query
   })
+}
+
+export function startAssetFileImport(
+  kind: AssetImportKind,
+  fileName: string
+): Promise<AssetImportJob> {
+  return $fetch<AssetImportJob>(
+    `/api/assets/${kind}/imports/files/${encodeURIComponent(fileName)}`,
+    { method: 'POST' }
+  )
+}
+
+export function getAssetImportWorkItems(
+  kind: AssetImportKind,
+  runId: string,
+  request: {
+    sourceKey?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  } = {}
+): Promise<AssetImportPage<AssetImportWorkItem>> {
+  return $fetch<AssetImportPage<AssetImportWorkItem>>(
+    `/api/assets/${kind}/imports/${runId}/work-items`,
+    {
+      query: {
+        ...(request.sourceKey ? { sourceKey: request.sourceKey } : {}),
+        ...(request.status ? { status: request.status } : {}),
+        page: request.page ?? 1,
+        pageSize: request.pageSize ?? 50
+      }
+    }
+  )
+}
+
+export function getAssetImportDiagnostics(
+  kind: AssetImportKind,
+  runId: string,
+  request: {
+    sourceKey?: string
+    severity?: string
+    code?: string
+    stage?: string
+    workItemStatus?: string
+    query?: string
+    page?: number
+    pageSize?: number
+  } = {}
+): Promise<AssetImportPage<AssetImportDiagnostic>> {
+  return $fetch<AssetImportPage<AssetImportDiagnostic>>(
+    `/api/assets/${kind}/imports/${runId}/diagnostics`,
+    {
+      query: {
+        ...request,
+        page: request.page ?? 1,
+        pageSize: request.pageSize ?? 50
+      }
+    }
+  )
 }
 
 function directoryQuery(request: DirectoryRequest) {

@@ -3,5 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="../L2.Studio.Configurations/L2.Studio.Configurations.csproj" />
     <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 </Project>

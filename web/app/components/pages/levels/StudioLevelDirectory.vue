@@ -25,11 +25,13 @@ const catalogError = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
-  jobs.value.find((job) => job.status === 'queued' || job.status === 'running')
+  jobs.value.find((job) =>
+    ['queued', 'discovering', 'running'].includes(job.status)
+  )
 )
 const activePreviewJob = computed(() =>
   previewJobs.value.find(
-    (job) => job.status === 'queued' || job.status === 'running'
+    (job) => ['queued', 'discovering', 'running'].includes(job.status)
   )
 )
 const previews = computed(
@@ -167,7 +169,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             Import {{ activeJob.status }}
           </p>
           <p class="text-xs text-muted">
-            {{ activeJob.processedCount }} / {{ activeJob.totalCount || '…' }}
+            {{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}
           </p>
         </div>
       </div>
@@ -183,8 +185,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             Preview generation {{ activePreviewJob.status }}
           </p>
           <p class="text-xs text-muted">
-            {{ activePreviewJob.processedCount }} /
-            {{ activePreviewJob.totalCount || '…' }}
+            {{ activePreviewJob.completedFileCount }} /
+            {{ activePreviewJob.discoveredFileCount || '…' }}
           </p>
         </div>
       </div>
