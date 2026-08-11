@@ -1,7 +1,7 @@
 name: l2-studio
 
 x-postgres-environment: &postgres-environment
-  ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=l2studio;Username=l2studio;Password=l2studio_dev
+  ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=l2studio;Username=l2;Password=secret
 
 x-asset-environment: &asset-environment
   AssetImport__SystemTexturesSourcePath: /workspace/sources/Interlude/systextures
@@ -30,12 +30,12 @@ services:
     image: postgres:18-alpine
     environment:
       POSTGRES_DB: l2studio
-      POSTGRES_USER: l2studio
-      POSTGRES_PASSWORD: l2studio_dev
+      POSTGRES_USER: l2
+      POSTGRES_PASSWORD: secret
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U l2studio -d l2studio']
+      test: ['CMD-SHELL', 'pg_isready -U l2 -d l2studio']
       interval: 3s
       timeout: 3s
       retries: 30
@@ -145,7 +145,7 @@ services:
       dockerfile: server/Dockerfile
       target: test
     environment:
-      L2_STUDIO_TEST_POSTGRES: Host=postgres;Port=5432;Database=postgres;Username=l2studio;Password=l2studio_dev
+      L2_STUDIO_TEST_POSTGRES: Host=postgres;Port=5432;Database=postgres;Username=l2;Password=secret
     depends_on:
       postgres:
         condition: service_healthy
