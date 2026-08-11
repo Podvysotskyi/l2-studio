@@ -41,7 +41,7 @@ Do not commit original source packages or generated private assets.
 
 ```sh
 docker build --target validate --build-arg APP_ENV=production web
-docker compose --profile test run --build --rm server-tests
+docker build --target unit-tests --file server/Dockerfile .
 (cd web && npx playwright install chromium && npm run test:e2e)
 docker compose config
 ```

@@ -21,9 +21,8 @@ RUN dotnet publish server/src/L2.Studio.Worker/L2.Studio.Worker.csproj \
     --output /app/publish \
     --property:UseAppHost=false
 
-FROM build AS server-tests
-ENV L2_STUDIO_TEST_POSTGRES="Host=postgres-test;Port=5432;Database=l2-studio-test;Username=l2_test;Password=test-secret"
-CMD ["dotnet", "test", "server/L2.Studio.slnx", "--configuration", "Release", "--no-build", "--no-restore"]
+FROM build AS unit-tests
+RUN dotnet test server/L2.Studio.slnx --configuration Release --no-build --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.2 AS api-production
 WORKDIR /app

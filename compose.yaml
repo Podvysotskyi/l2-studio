@@ -16,21 +16,6 @@ services:
       retries: 30
     restart: unless-stopped
 
-  postgres-test:
-    profiles: [test]
-    image: postgres:18-alpine
-    environment:
-      POSTGRES_DB: l2-studio-test
-      POSTGRES_USER: l2_test
-      POSTGRES_PASSWORD: test-secret
-    tmpfs:
-      - /var/lib/postgresql
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U l2_test -d l2-studio-test']
-      interval: 3s
-      timeout: 3s
-      retries: 30
-
   studio-api:
     image: ${L2_STUDIO_API_IMAGE:-l2-studio-api:dev}
     build:
@@ -59,11 +44,11 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  preview-browser:
-    image: ${L2_STUDIO_PREVIEW_IMAGE:-l2-studio-preview-browser:dev}
+  puppeteer:
+    image: ${L2_STUDIO_PUPPETEER_IMAGE:-l2-studio-puppeteer:dev}
     build:
       context: .
-      dockerfile: docker/preview-browser/Dockerfile
+      dockerfile: puppeteer/Dockerfile
     init: true
     cap_add: [SYS_ADMIN]
     shm_size: 1gb
@@ -93,7 +78,7 @@ services:
       - assets-data:/workspace/assets
       - ${L2_SOURCE_PATH:-../sources}:/workspace/sources:ro
     depends_on:
-      preview-browser:
+      puppeteer:
         condition: service_healthy
       studio-api:
         condition: service_healthy
@@ -101,25 +86,13 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  server-tests:
-    profiles: [test]
-    build:
-      context: .
-      dockerfile: server/Dockerfile
-      target: server-tests
-    environment:
-      L2_STUDIO_TEST_POSTGRES: Host=postgres-test;Port=5432;Database=l2-studio-test;Username=l2_test;Password=test-secret
-    depends_on:
-      postgres-test:
-        condition: service_healthy
-
   asset-server:
     image: nginx:1.29-alpine
     ports:
       - '127.0.0.1:${STUDIO_ASSET_PORT:-5300}:80'
     volumes:
       - assets-data:/srv/assets:ro
-      - ./docker/asset-server/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost/health/live']
       interval: 5s

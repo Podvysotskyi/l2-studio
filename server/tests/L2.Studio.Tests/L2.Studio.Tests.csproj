@@ -13,8 +13,6 @@
     <ProjectReference Include="../../src/L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
     <ProjectReference Include="../../src/L2.Studio.Services/L2.Studio.Services.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="Npgsql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>

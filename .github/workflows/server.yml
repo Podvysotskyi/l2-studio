@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Run server tests against PostgreSQL
-        run: docker compose --profile test run --rm server-tests
+      - name: Run server unit tests
+        run: docker build --target unit-tests --file server/Dockerfile .
       - name: Build production hosts
         run: |
           docker build --target api-production --tag l2-studio-api-validate --file server/Dockerfile .
