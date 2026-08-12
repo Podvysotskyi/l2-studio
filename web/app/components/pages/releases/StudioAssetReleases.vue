@@ -36,6 +36,7 @@ const scenes = ref<AssetReleaseResourceOption[]>([])
 const audio = ref<AssetReleaseResourceOption[]>([])
 const images = ref<AssetReleaseResourceOption[]>([])
 const form = ref(emptyForm())
+const dialogs = useStudioDialogs()
 
 const statusOptions = [
   { label: 'All releases', value: 'all' },
@@ -118,9 +119,16 @@ async function save() {
 }
 
 async function refreshSnapshot() {
-  if (!selected.value || !window.confirm('Refresh this draft from the current artifact registry?')) return
+  if (!selected.value) return
+  const releaseId = selected.value.release.id
+  const confirmed = await dialogs.confirm({
+    title: 'Refresh draft snapshot?',
+    description: 'Replace this draft snapshot with the current artifact registry.',
+    confirmLabel: 'Refresh snapshot'
+  })
+  if (!confirmed) return
   await run(async () => {
-    selected.value = await refreshAssetRelease(selected.value!.release.id)
+    selected.value = await refreshAssetRelease(releaseId)
     form.value = formFrom(selected.value)
     await loadResources(selected.value.release.id)
     await load()
@@ -140,24 +148,53 @@ async function validate() {
 }
 
 async function publish() {
-  if (!selected.value || !window.confirm('Publish this immutable release? It can no longer be edited.')) return
-  await releaseAction(() => publishAssetRelease(selected.value!.release.id))
+  if (!selected.value) return
+  const releaseId = selected.value.release.id
+  const confirmed = await dialogs.confirm({
+    title: 'Publish release?',
+    description: 'This release will become immutable and can no longer be edited.',
+    confirmLabel: 'Publish'
+  })
+  if (!confirmed) return
+  await releaseAction(() => publishAssetRelease(releaseId))
 }
 
 async function activate() {
-  if (!selected.value || !window.confirm('Make this the live release for the selected game version?')) return
-  await releaseAction(() => activateAssetRelease(selected.value!.release.id))
+  if (!selected.value) return
+  const releaseId = selected.value.release.id
+  const confirmed = await dialogs.confirm({
+    title: 'Activate release?',
+    description: 'Make this the live release for the selected game version.',
+    confirmLabel: 'Activate'
+  })
+  if (!confirmed) return
+  await releaseAction(() => activateAssetRelease(releaseId))
 }
 
 async function retire() {
-  if (!selected.value || !window.confirm('Retire this release? It will remain stored but cannot be activated.')) return
-  await releaseAction(() => retireAssetRelease(selected.value!.release.id))
+  if (!selected.value) return
+  const releaseId = selected.value.release.id
+  const confirmed = await dialogs.confirm({
+    title: 'Retire release?',
+    description: 'The release will remain stored but cannot be activated.',
+    confirmLabel: 'Retire'
+  })
+  if (!confirmed) return
+  await releaseAction(() => retireAssetRelease(releaseId))
 }
 
 async function removeDraft() {
-  if (!selected.value || !window.confirm('Delete this draft release?')) return
+  if (!selected.value) return
+  const releaseId = selected.value.release.id
+  const confirmed = await dialogs.confirm({
+    title: 'Delete draft release?',
+    description: 'Permanently delete this draft release? This cannot be undone.',
+    confirmLabel: 'Delete draft',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
   await run(async () => {
-    await deleteAssetRelease(selected.value!.release.id)
+    await deleteAssetRelease(releaseId)
     selected.value = undefined
     await load()
   })

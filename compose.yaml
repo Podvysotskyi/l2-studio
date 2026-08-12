@@ -16,27 +16,6 @@ services:
       retries: 30
     restart: unless-stopped
 
-  storage-init:
-    image: alpine:3.22
-    command:
-      - sh
-      - -c
-      - >-
-        mkdir -p
-        /workspace/resources/C1/textures /workspace/resources/C1/staticmeshes
-        /workspace/resources/C1/sounds /workspace/resources/C1/music
-        /workspace/resources/C1/maps /workspace/resources/C1/scenes
-        /workspace/resources/C4/textures /workspace/resources/C4/staticmeshes
-        /workspace/resources/C4/sounds /workspace/resources/C4/music
-        /workspace/resources/C4/maps /workspace/resources/C4/scenes
-        /workspace/resources/Interlude/textures /workspace/resources/Interlude/staticmeshes
-        /workspace/resources/Interlude/sounds /workspace/resources/Interlude/music
-        /workspace/resources/Interlude/maps /workspace/resources/Interlude/scenes;
-        chown -R 1000:1000 /workspace/resources
-    volumes:
-      - resources-data:/workspace/resources
-    restart: 'no'
-
   studio-api:
     image: ${L2_STUDIO_API_IMAGE:-l2-studio-api:dev}
     build:
@@ -138,8 +117,6 @@ services:
       - resources-data:/workspace/resources
       - assets-data:/workspace/assets:ro
     depends_on:
-      storage-init:
-        condition: service_completed_successfully
       studio-api:
         condition: service_healthy
       asset-server:

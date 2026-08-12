@@ -12,6 +12,7 @@ FROM dependencies AS source
 ARG APP_ENV=development
 COPY --chown=node:node ".env.${APP_ENV}" .env
 COPY --chown=node:node . .
+RUN mkdir /workspace/resources && npm run postinstall
 
 FROM source AS validate
 RUN npm test

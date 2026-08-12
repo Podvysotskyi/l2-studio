@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import type {
-  StorageEntry,
-  StorageKind,
-  StorageUploadProgress
-} from '../../../types/models/storage'
+import type { StorageEntry, StorageKind, StorageUploadProgress } from '../../../types/models/storage'
 import { StorageRequestError } from '../../../types/models/storage'
 import {
   createStorageFolder,
@@ -13,49 +9,58 @@ import {
   storageDownloadUrl,
   uploadStorageFile
 } from '../../../services/storage-api'
-
-interface UploadItem {
-  id: string
-  path: string
-  file: File
-  loaded: number
-  total: number
-  status: 'queued' | 'uploading' | 'complete' | 'failed'
-  error?: string
-}
+import {
+  storageSortOptions,
+  type StorageSort,
+  type StorageUploadItem,
+  visibleStorageEntries
+} from '../../../utils/storage-browser'
+import { storageUploadPath } from '../../../utils/storage-upload'
 
 const kind = ref<StorageKind>('resources')
 const currentPath = ref('')
 const entries = ref<StorageEntry[]>([])
+const query = ref('')
+const sort = ref<StorageSort>('name-asc')
 const loading = ref(false)
 const error = ref<string>()
-const uploads = ref<UploadItem[]>([])
+const uploads = ref<StorageUploadItem[]>([])
+const uploadDrawerOpen = ref(false)
+const selectedPaths = ref<string[]>([])
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const folderInput = useTemplateRef<HTMLInputElement>('folderInput')
+const dialogs = useStudioDialogs()
 
 const writable = computed(() => kind.value === 'resources')
-const breadcrumbs = computed(() => {
-  const parts = currentPath.value ? currentPath.value.split('/') : []
-  return [
-    { label: 'Version root', path: '' },
-    ...parts.map((label, index) => ({
-      label,
-      path: parts.slice(0, index + 1).join('/')
-    }))
-  ]
-})
+const visibleEntries = computed(() => visibleStorageEntries(entries.value, query.value, sort.value))
+const selectedEntries = computed(() =>
+  entries.value.filter(entry => selectedPaths.value.includes(entry.path))
+)
 const activeUploads = computed(() =>
   uploads.value.filter(item => item.status === 'queued' || item.status === 'uploading')
 )
-const uploadProgress = computed(() => {
-  const total = uploads.value.reduce((sum, item) => sum + item.total, 0)
-  const loaded = uploads.value.reduce((sum, item) => sum + item.loaded, 0)
-  return total ? Math.round((loaded / total) * 100) : 0
-})
+const resourceStorageDescription = computed(() =>
+  `Upload destination: ${currentPath.value ? `/${currentPath.value}` : 'version root'}`
+)
+const uploadMenuItems = computed(() => [[
+  {
+    label: 'Choose files',
+    description: 'Upload one or more files to this folder.',
+    icon: 'i-lucide-files',
+    onSelect: () => chooseFiles(false)
+  },
+  {
+    label: 'Choose folder',
+    description: 'Upload the contents of a folder.',
+    icon: 'i-lucide-folder-up',
+    onSelect: () => chooseFiles(true)
+  }
+]])
 
 watch(kind, () => {
   currentPath.value = ''
-  uploads.value = []
+  query.value = ''
+  selectedPaths.value = []
   void load()
 })
 
@@ -65,6 +70,9 @@ async function load() {
   try {
     const listing = await getStorageEntries(kind.value, currentPath.value)
     entries.value = listing.entries
+    selectedPaths.value = selectedPaths.value.filter(path =>
+      listing.entries.some(entry => entry.path === path)
+    )
   } catch (reason) {
     entries.value = []
     error.value = requestMessage(reason, 'Storage contents could not be loaded.')
@@ -73,17 +81,10 @@ async function load() {
   }
 }
 
-function open(entry: StorageEntry) {
-  if (entry.type === 'directory') {
-    currentPath.value = entry.path
-    void load()
-    return
-  }
-  download(entry)
-}
-
 function navigate(path: string) {
   currentPath.value = path
+  query.value = ''
+  selectedPaths.value = []
   void load()
 }
 
@@ -95,7 +96,14 @@ function download(entry: StorageEntry) {
 }
 
 async function createFolder() {
-  const name = window.prompt('Folder name')?.trim()
+  const name = await dialogs.prompt({
+    title: 'Create folder',
+    description: currentPath.value
+      ? `Add a folder inside ${currentPath.value}.`
+      : 'Add a folder at the version root.',
+    label: 'Folder name',
+    confirmLabel: 'Create folder'
+  })
   if (!name) return
   await runMutation(
     () => createStorageFolder(childPath(name)),
@@ -104,7 +112,13 @@ async function createFolder() {
 }
 
 async function rename(entry: StorageEntry) {
-  const name = window.prompt('New name', entry.name)?.trim()
+  const name = await dialogs.prompt({
+    title: `Rename ${entry.type}`,
+    description: entry.path,
+    label: 'New name',
+    initialValue: entry.name,
+    confirmLabel: 'Rename'
+  })
   if (!name || name === entry.name) return
   const parent = parentPath(entry.path)
   await moveWithConflict(entry.path, parent ? `${parent}/${name}` : name)
@@ -114,10 +128,13 @@ async function moveWithConflict(path: string, destination: string) {
   try {
     await moveStorageEntry(path, destination)
   } catch (reason) {
-    if (
-      requestStatus(reason) === 409 &&
-      window.confirm(`Replace the existing entry at ${destination}?`)
-    ) {
+    const replace = requestStatus(reason) === 409 && await dialogs.confirm({
+      title: 'Replace existing entry?',
+      description: `An entry already exists at ${destination}. Replacing it cannot be undone.`,
+      confirmLabel: 'Replace',
+      confirmColor: 'error'
+    })
+    if (replace) {
       await runMutation(
         () => moveStorageEntry(path, destination, true),
         'The entry could not be moved.'
@@ -131,11 +148,53 @@ async function moveWithConflict(path: string, destination: string) {
 }
 
 async function remove(entry: StorageEntry) {
-  if (!window.confirm(`Permanently delete ${entry.path}?`)) return
+  const confirmed = await dialogs.confirm({
+    title: `Delete ${entry.type}?`,
+    description: `Permanently delete ${entry.path}? This cannot be undone.`,
+    confirmLabel: 'Delete',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
   await runMutation(
     () => deleteStorageEntry(entry.path),
     'The entry could not be deleted.'
   )
+}
+
+function selectEntry(path: string, selected: boolean) {
+  selectedPaths.value = selected
+    ? [...new Set([...selectedPaths.value, path])]
+    : selectedPaths.value.filter(value => value !== path)
+}
+
+function selectVisible(paths: string[], selected: boolean) {
+  if (selected) {
+    selectedPaths.value = [...new Set([...selectedPaths.value, ...paths])]
+    return
+  }
+  selectedPaths.value = selectedPaths.value.filter(path => !paths.includes(path))
+}
+
+async function removeSelected() {
+  const selected = selectedEntries.value
+  if (!selected.length) return
+  const confirmed = await dialogs.confirm({
+    title: `Delete ${selected.length} selected ${selected.length === 1 ? 'entry' : 'entries'}?`,
+    description: 'Permanently delete the selected files and folders? This cannot be undone.',
+    confirmLabel: `Delete ${selected.length} ${selected.length === 1 ? 'entry' : 'entries'}`,
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
+
+  let failure: unknown
+  try {
+    await Promise.all(selected.map(entry => deleteStorageEntry(entry.path)))
+    selectedPaths.value = []
+  } catch (reason) {
+    failure = reason
+  }
+  await load()
+  if (failure) error.value = requestMessage(failure, 'Some selected entries could not be deleted.')
 }
 
 async function runMutation(action: () => Promise<unknown>, fallback: string) {
@@ -157,50 +216,77 @@ async function selectedFiles(event: Event, preservePaths: boolean) {
   const input = event.target as HTMLInputElement
   const selected = Array.from(input.files ?? [])
   input.value = ''
-  if (!selected.length) return
+  await queueUploads(selected, preservePaths)
+}
 
-  uploads.value = selected.map((file, index) => {
-    const relativePath = preservePaths
-      ? file.webkitRelativePath || file.name
-      : file.name
-    return {
-      id: `${Date.now()}-${index}`,
-      path: childPath(relativePath),
-      file,
-      loaded: 0,
-      total: file.size,
-      status: 'queued'
-    }
-  })
+async function queueDroppedFiles(files: File[]) {
+  await queueUploads(files, false)
+}
+
+async function queueUploads(files: File[], preservePaths: boolean) {
+  if (!files.length || activeUploads.value.length) return
+  uploads.value = files.map((file, index) => ({
+    id: `${Date.now()}-${index}`,
+    path: storageUploadPath(
+      currentPath.value,
+      file.name,
+      preservePaths ? file.webkitRelativePath : undefined
+    ),
+    file,
+    loaded: 0,
+    total: file.size,
+    status: 'queued'
+  }))
+  uploadDrawerOpen.value = true
   await runUploadQueue()
   await load()
 }
 
+function rejectFolderDrop() {
+  error.value = 'Dropped folders are not supported. Use Upload → Choose folder to upload folder contents.'
+}
+
 async function runUploadQueue() {
   let next = 0
+  let replaceAll = false
+  let pendingConflictDecision: Promise<boolean | 'all'> | undefined
+
+  async function resolveConflict(item: StorageUploadItem): Promise<boolean | 'all'> {
+    if (pendingConflictDecision) {
+      const decision = await pendingConflictDecision
+      return decision === true ? resolveConflict(item) : decision
+    }
+    const decision = dialogs.confirm({
+      title: 'Replace existing file?',
+      description: `A file already exists at ${item.path}. Replacing it cannot be undone.`,
+      confirmLabel: 'Replace',
+      alternativeLabel: 'Replace all',
+      confirmColor: 'error'
+    })
+    pendingConflictDecision = decision
+    try {
+      return await decision
+    } finally {
+      if (pendingConflictDecision === decision) pendingConflictDecision = undefined
+    }
+  }
+
   async function worker() {
     while (next < uploads.value.length) {
       const item = uploads.value[next++]!
       item.status = 'uploading'
       try {
-        await uploadStorageFile(item.path, item.file, progress =>
-          updateProgress(item, progress)
-        )
+        await uploadStorageFile(item.path, item.file, progress => updateProgress(item, progress), replaceAll)
         item.loaded = item.total
         item.status = 'complete'
       } catch (reason) {
-        if (
-          reason instanceof StorageRequestError &&
-          reason.status === 409 &&
-          window.confirm(`Replace the existing file at ${item.path}?`)
-        ) {
+        const decision = reason instanceof StorageRequestError && reason.status === 409
+          ? await resolveConflict(item)
+          : false
+        if (decision) {
+          if (decision === 'all') replaceAll = true
           try {
-            await uploadStorageFile(
-              item.path,
-              item.file,
-              progress => updateProgress(item, progress),
-              true
-            )
+            await uploadStorageFile(item.path, item.file, progress => updateProgress(item, progress), true)
             item.loaded = item.total
             item.status = 'complete'
             continue
@@ -216,7 +302,7 @@ async function runUploadQueue() {
   await Promise.all(Array.from({ length: Math.min(3, uploads.value.length) }, worker))
 }
 
-function updateProgress(item: UploadItem, progress: StorageUploadProgress) {
+function updateProgress(item: StorageUploadItem, progress: StorageUploadProgress) {
   item.loaded = progress.loaded
   item.total = progress.total
 }
@@ -229,23 +315,9 @@ function parentPath(path: string) {
   return path.split('/').slice(0, -1).join('/')
 }
 
-function formatSize(size: number | null) {
-  if (size === null) return '—'
-  if (size < 1024) return `${size} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = size / 1024
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit++
-  }
-  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unit]}`
-}
-
 function requestStatus(reason: unknown) {
   if (reason instanceof StorageRequestError) return reason.status
-  if (reason && typeof reason === 'object' && 'statusCode' in reason)
-    return Number(reason.statusCode)
+  if (reason && typeof reason === 'object' && 'statusCode' in reason) return Number(reason.statusCode)
   return 0
 }
 
@@ -258,88 +330,42 @@ onMounted(() => void load())
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <StudioPageHeader
       eyebrow="Storage"
       title="File storage"
-      description="Upload original game resources and inspect generated assets for the selected game version."
+      description="Manage original resources and inspect generated assets for the selected game version."
       icon="i-lucide-hard-drive"
-    >
-      <template v-if="writable" #actions>
-        <UButton
-          label="New folder"
-          icon="i-lucide-folder-plus"
-          color="neutral"
-          variant="outline"
-          :disabled="Boolean(activeUploads.length)"
-          @click="createFolder"
-        />
-        <UButton
-          label="Upload files"
-          icon="i-lucide-upload"
-          color="neutral"
-          variant="outline"
-          :disabled="Boolean(activeUploads.length)"
-          @click="chooseFiles(false)"
-        />
-        <UButton
-          label="Upload folder"
-          icon="i-lucide-folder-up"
-          :disabled="Boolean(activeUploads.length)"
-          @click="chooseFiles(true)"
-        />
-      </template>
-    </StudioPageHeader>
+    />
 
-    <input
-      ref="fileInput"
-      class="hidden"
-      type="file"
-      multiple
-      @change="selectedFiles($event, false)"
-    >
-    <input
-      ref="folderInput"
-      class="hidden"
-      type="file"
-      multiple
-      webkitdirectory
-      @change="selectedFiles($event, true)"
-    >
+    <input ref="fileInput" class="hidden" type="file" multiple @change="selectedFiles($event, false)">
+    <input ref="folderInput" class="hidden" type="file" multiple webkitdirectory @change="selectedFiles($event, true)">
 
-    <div class="flex gap-2">
-      <UButton
-        label="Original resources"
-        icon="i-lucide-archive"
-        :variant="kind === 'resources' ? 'solid' : 'outline'"
-        :color="kind === 'resources' ? 'primary' : 'neutral'"
-        @click="kind = 'resources'"
-      />
-      <UButton
-        label="Generated assets"
-        icon="i-lucide-package-open"
-        :variant="kind === 'assets' ? 'solid' : 'outline'"
-        :color="kind === 'assets' ? 'primary' : 'neutral'"
-        @click="kind = 'assets'"
-      />
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="inline-flex rounded-lg bg-elevated p-1 ring-1 ring-default">
+        <UButton
+          label="Original resources"
+          icon="i-lucide-archive"
+          size="sm"
+          :variant="kind === 'resources' ? 'solid' : 'ghost'"
+          :color="kind === 'resources' ? 'primary' : 'neutral'"
+          @click="kind = 'resources'"
+        />
+        <UButton
+          label="Generated assets"
+          icon="i-lucide-package-open"
+          size="sm"
+          :variant="kind === 'assets' ? 'solid' : 'ghost'"
+          :color="kind === 'assets' ? 'primary' : 'neutral'"
+          @click="kind = 'assets'"
+        />
+      </div>
+      <div class="flex items-center gap-2 text-sm text-muted">
+        <UIcon :name="writable ? 'i-lucide-pencil-line' : 'i-lucide-lock-keyhole'" class="size-4" />
+        <span>{{ writable ? resourceStorageDescription : 'Generated assets are read-only.' }}</span>
+      </div>
     </div>
 
-    <UAlert
-      v-if="kind === 'assets'"
-      color="info"
-      variant="subtle"
-      icon="i-lucide-shield-check"
-      title="Generated assets are read-only"
-      description="Use asset imports to publish or remove generated outputs without desynchronizing the Studio catalog."
-    />
-    <UAlert
-      v-else
-      color="info"
-      variant="subtle"
-      icon="i-lucide-folders"
-      title="Resources are organized by asset kind"
-      description="Upload packages inside textures, staticmeshes, sounds, music, maps, or scenes. Studio validates the expected package extension for each folder."
-    />
     <UAlert
       v-if="error"
       color="error"
@@ -349,180 +375,66 @@ onMounted(() => void load())
       :description="error"
     />
 
-    <UCard v-if="uploads.length" variant="subtle">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <p class="text-sm font-medium text-highlighted">
-            {{ activeUploads.length ? 'Uploading resources' : 'Upload finished' }}
-          </p>
-          <p class="text-xs text-muted">
-            {{ uploads.filter(item => item.status === 'complete').length }} completed ·
-            {{ uploads.filter(item => item.status === 'failed').length }} failed
-          </p>
-        </div>
-        <span class="text-sm tabular-nums text-muted">{{ uploadProgress }}%</span>
-      </div>
-      <UProgress class="mt-3" :model-value="uploadProgress" :max="100" />
-      <div class="mt-3 max-h-36 space-y-1 overflow-y-auto text-xs">
-        <div
-          v-for="item in uploads"
-          :key="item.id"
-          class="flex items-center gap-2"
-          :class="item.status === 'failed' ? 'text-error' : 'text-muted'"
-        >
-          <UIcon
-            :name="
-              item.status === 'complete'
-                ? 'i-lucide-circle-check'
-                : item.status === 'failed'
-                  ? 'i-lucide-circle-x'
-                  : 'i-lucide-loader-circle'
-            "
-            class="size-3.5 shrink-0"
-            :class="item.status === 'uploading' ? 'animate-spin' : ''"
+    <StudioStorageExplorer
+      :entries="visibleEntries"
+      :total-entries="entries.length"
+      :current-path="currentPath"
+      :loading="loading"
+      :writable="writable"
+      :query="query"
+      :selected-paths="selectedPaths"
+      @navigate="navigate"
+      @refresh="load"
+      @download="download"
+      @rename="rename"
+      @remove="remove"
+      @remove-selected="removeSelected"
+      @select-entry="selectEntry"
+      @select-all="selectVisible"
+      @update:query="query = $event"
+      @drop-files="queueDroppedFiles"
+      @reject-folder-drop="rejectFolderDrop"
+      @choose-files="chooseFiles(false)"
+      @create-folder="createFolder"
+    >
+      <template #toolbar>
+        <div class="flex flex-wrap items-center gap-2">
+          <UInput
+            :model-value="query"
+            icon="i-lucide-search"
+            placeholder="Search this folder"
+            aria-label="Search this folder"
+            class="min-w-48 flex-1 sm:max-w-xs"
+            @update:model-value="query = String($event)"
           />
-          <span class="truncate">{{ item.path }}</span>
-          <span v-if="item.error" class="ml-auto">{{ item.error }}</span>
-        </div>
-      </div>
-    </UCard>
-
-    <UCard :ui="{ body: 'p-0 sm:p-0' }">
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <nav aria-label="Storage path" class="flex min-w-0 flex-wrap items-center gap-1">
-            <template v-for="(item, index) in breadcrumbs" :key="item.path">
-              <UIcon v-if="index" name="i-lucide-chevron-right" class="size-3 text-muted" />
+          <USelect
+            v-model="sort"
+            :items="storageSortOptions"
+            aria-label="Sort entries"
+            class="w-40"
+          />
+          <template v-if="writable">
+            <UButton
+              label="New folder"
+              icon="i-lucide-folder-plus"
+              color="neutral"
+              variant="outline"
+              :disabled="Boolean(activeUploads.length)"
+              @click="createFolder"
+            />
+            <UDropdownMenu :items="uploadMenuItems" :content="{ align: 'end' }">
               <UButton
-                :label="item.label"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click="navigate(item.path)"
+                label="Upload"
+                icon="i-lucide-upload"
+                trailing-icon="i-lucide-chevron-down"
+                :disabled="Boolean(activeUploads.length)"
               />
-            </template>
-          </nav>
-          <UButton
-            icon="i-lucide-refresh-cw"
-            aria-label="Refresh storage"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            :loading="loading"
-            @click="load"
-          />
+            </UDropdownMenu>
+          </template>
         </div>
       </template>
+    </StudioStorageExplorer>
 
-      <div class="min-h-80 overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="border-b border-default bg-elevated/50 text-xs text-muted">
-            <tr>
-              <th class="px-4 py-3 font-medium">Name</th>
-              <th class="px-4 py-3 font-medium">Size</th>
-              <th class="px-4 py-3 font-medium">Modified</th>
-              <th class="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-default">
-            <tr v-if="loading">
-              <td colspan="4">
-                <div
-                  class="grid min-h-64 place-items-center gap-3 p-8 text-center"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <UIcon
-                    name="i-lucide-loader-circle"
-                    class="size-6 animate-spin text-primary"
-                  />
-                  <p class="text-sm text-muted">Loading directory…</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-if="!loading" class="divide-y divide-default">
-            <tr v-if="currentPath">
-              <td colspan="4" class="px-4 py-2">
-                <button
-                  type="button"
-                  class="flex items-center gap-2 text-muted hover:text-highlighted"
-                  @click="navigate(parentPath(currentPath))"
-                >
-                  <UIcon name="i-lucide-corner-left-up" class="size-4" />
-                  Parent directory
-                </button>
-              </td>
-            </tr>
-            <tr v-for="entry in entries" :key="entry.path" class="hover:bg-elevated/30">
-              <td class="max-w-md px-4 py-3">
-                <button
-                  type="button"
-                  class="flex max-w-full items-center gap-3 text-left"
-                  @dblclick="open(entry)"
-                  @click="entry.type === 'directory' && open(entry)"
-                >
-                  <UIcon
-                    :name="entry.type === 'directory' ? 'i-lucide-folder' : 'i-lucide-file'"
-                    class="size-4 shrink-0"
-                    :class="entry.type === 'directory' ? 'text-primary' : 'text-muted'"
-                  />
-                  <span class="truncate font-medium text-highlighted">{{ entry.name }}</span>
-                </button>
-              </td>
-              <td class="whitespace-nowrap px-4 py-3 text-muted">
-                {{ formatSize(entry.size) }}
-              </td>
-              <td class="whitespace-nowrap px-4 py-3 text-muted">
-                {{ new Date(entry.modifiedAt).toLocaleString() }}
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex justify-end gap-1">
-                  <UButton
-                    v-if="entry.type === 'file'"
-                    icon="i-lucide-download"
-                    :aria-label="`Download ${entry.name}`"
-                    color="neutral"
-                    variant="ghost"
-                    size="xs"
-                    @click="download(entry)"
-                  />
-                  <template v-if="writable">
-                    <UButton
-                      icon="i-lucide-pencil"
-                      :aria-label="`Rename ${entry.name}`"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      @click="rename(entry)"
-                    />
-                    <UButton
-                      icon="i-lucide-trash-2"
-                      :aria-label="`Delete ${entry.name}`"
-                      color="error"
-                      variant="ghost"
-                      size="xs"
-                      @click="remove(entry)"
-                    />
-                  </template>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div
-          v-if="!loading && entries.length === 0"
-          class="grid min-h-56 place-items-center p-8 text-center"
-        >
-          <div>
-            <UIcon name="i-lucide-folder-open" class="mx-auto size-8 text-muted" />
-            <p class="mt-3 text-sm font-medium text-highlighted">This directory is empty</p>
-            <p class="mt-1 text-xs text-muted">
-              {{ writable ? 'Upload files or create a folder to get started.' : 'No generated assets are published here.' }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </UCard>
+    <StudioStorageUploadDrawer v-model:open="uploadDrawerOpen" :uploads="uploads" />
   </div>
 </template>

@@ -19,6 +19,8 @@ import {
   moveStorageEntry as moveStorageEntryRequest,
   storageDownloadUrl
 } from '../../app/services/storage-api'
+import { storageUploadPath } from '../../app/utils/storage-upload'
+import { visibleStorageEntries } from '../../app/utils/storage-browser'
 
 describe('storage filesystem', () => {
   let root: string
@@ -73,6 +75,20 @@ describe('storage filesystem', () => {
       .toEqual(['maps'])
   })
 
+  it('stores arbitrary file types at the root and in custom folders', async () => {
+    await writeStorageFile(root, 'README', Readable.from('notes'), false)
+    await writeStorageFile(
+      root,
+      'custom/data/example.bin',
+      Readable.from(Buffer.from([0, 1, 2])),
+      false
+    )
+
+    expect(await readFile(join(root, 'README'), 'utf8')).toBe('notes')
+    expect(await readFile(join(root, 'custom/data/example.bin')))
+      .toEqual(Buffer.from([0, 1, 2]))
+  })
+
   it('hides internal asset markers and rejects symbolic links', async () => {
     await writeFile(join(root, '.l2-asset-version'), 'hash')
     await writeFile(join(root, 'manifest.json'), '{}')
@@ -84,6 +100,44 @@ describe('storage filesystem', () => {
     await expect(listStorage(root, 'linked', 'assets')).rejects.toMatchObject({
       statusCode: 400
     })
+  })
+})
+
+describe('storage upload paths', () => {
+  it('targets the current folder for individual files', () => {
+    expect(storageUploadPath('', 'notes.txt')).toBe('notes.txt')
+    expect(storageUploadPath('custom/files', 'notes.txt'))
+      .toBe('custom/files/notes.txt')
+  })
+
+  it('uploads folder contents without the selected top-level folder', () => {
+    expect(storageUploadPath('imports', 'readme.txt', 'client/readme.txt'))
+      .toBe('imports/readme.txt')
+    expect(storageUploadPath('imports', 'data.bin', 'client/system/data.bin'))
+      .toBe('imports/system/data.bin')
+  })
+})
+
+describe('storage browser entries', () => {
+  const entries = [
+    { name: 'zeta.txt', path: 'zeta.txt', type: 'file' as const, size: 10, modifiedAt: '2026-01-01T00:00:00.000Z' },
+    { name: 'Assets', path: 'Assets', type: 'directory' as const, size: null, modifiedAt: '2026-01-03T00:00:00.000Z' },
+    { name: 'alpha.txt', path: 'alpha.txt', type: 'file' as const, size: 100, modifiedAt: '2026-01-02T00:00:00.000Z' },
+    { name: 'Maps', path: 'Maps', type: 'directory' as const, size: null, modifiedAt: '2026-01-04T00:00:00.000Z' }
+  ]
+
+  it('filters names case-insensitively and keeps directories first', () => {
+    expect(visibleStorageEntries(entries, 'a', 'name-asc').map(entry => entry.name))
+      .toEqual(['Assets', 'Maps', 'alpha.txt', 'zeta.txt'])
+    expect(visibleStorageEntries(entries, 'ALPHA', 'name-asc').map(entry => entry.name))
+      .toEqual(['alpha.txt'])
+  })
+
+  it('sorts files while preserving directory-first grouping', () => {
+    expect(visibleStorageEntries(entries, '', 'size-desc').map(entry => entry.name))
+      .toEqual(['Assets', 'Maps', 'alpha.txt', 'zeta.txt'])
+    expect(visibleStorageEntries(entries, '', 'modified-desc').map(entry => entry.name))
+      .toEqual(['Maps', 'Assets', 'alpha.txt', 'zeta.txt'])
   })
 })
 

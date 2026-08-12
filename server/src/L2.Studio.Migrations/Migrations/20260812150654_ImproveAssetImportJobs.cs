@@ -41,11 +41,11 @@ public partial class ImproveAssetImportJobs : Migration
             {
                 table.PrimaryKey("PK_asset_catalog_source_dependencies", value => value.id);
                 table.ForeignKey(
-                    "FK_asset_catalog_source_dependencies_asset_catalog_sources_source_id",
-                    value => value.source_id,
-                    "content",
-                    "asset_catalog_sources",
-                    "id",
+                    name: "FK_asset_catalog_source_dependencies_asset_catalog_sources_source_id",
+                    column: value => value.source_id,
+                    principalSchema: "content",
+                    principalTable: "asset_catalog_sources",
+                    principalColumn: "id",
                     onDelete: ReferentialAction.Cascade);
             });
         migrationBuilder.CreateIndex(name: "ix_asset_catalog_source_dependencies_key", schema: "content", table: "asset_catalog_source_dependencies", columns: new[] { "kind", "dependency_key" });
