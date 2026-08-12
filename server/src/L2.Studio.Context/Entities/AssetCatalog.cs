@@ -2,6 +2,7 @@ namespace L2.Studio.Context.Entities;
 
 public sealed class AssetCatalog
 {
+    public string GameVersion { get; set; } = "interlude";
     public Guid Id { get; set; }
     public required string Kind { get; set; }
     public required string SourceFolder { get; set; }

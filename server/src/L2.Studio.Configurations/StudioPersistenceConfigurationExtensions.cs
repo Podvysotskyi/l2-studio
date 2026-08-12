@@ -1,4 +1,3 @@
-using L2.Studio.Migrations.Seeding;
 using L2.Studio.Context;
 using L2.Studio.Migrations;
 using Microsoft.EntityFrameworkCore;
@@ -27,12 +26,6 @@ public static class StudioPersistenceConfigurationExtensions
                 postgres.MigrationsAssembly(typeof(MigrationAssemblyMarker).Assembly.FullName);
                 postgres.MigrationsHistoryTable("__EFMigrationsHistory", GameContentDbContext.SchemaName);
             }));
-        services.AddSingleton<NpcLookupSeeder>();
-        services.AddSingleton<PlayerLookupSeeder>();
-        services.AddSingleton<PlayerClassSeeder>();
-        services.AddSingleton<PlayerAppearanceSeeder>();
-        services.AddSingleton<NpcSeeder>();
-        services.AddSingleton<SkillSeeder>();
         return services;
     }
 

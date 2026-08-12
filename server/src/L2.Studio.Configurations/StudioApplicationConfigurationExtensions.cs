@@ -15,6 +15,7 @@ public static class StudioApplicationConfigurationExtensions
         services.AddAssetImportOptions(configuration);
         services.AddHealthChecks().AddGameContentMigrationHealthCheck();
         services.AddSingleton<IContentDirectoryRepository, ContentDirectoryRepository>();
+        services.AddSingleton<IGameVersionRepository, GameVersionRepository>();
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();
         services.AddScoped<IAssetImportRepository, AssetImportRepository>();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
@@ -46,9 +47,7 @@ public static class StudioApplicationConfigurationExtensions
 
     private static IEnumerable<string> Paths(AssetImportOptions options) =>
     [
-        options.SystemTexturesSourcePath, options.TexturesSourcePath, options.MusicSourcePath,
-        options.SoundsSourcePath, options.StaticMeshesSourcePath, options.LevelsSourcePath,
-        options.AssetRootPath
+        options.SourceRootPath, options.AssetRootPath
     ];
 
     private static bool IsAbsoluteHttpUrl(string value) =>

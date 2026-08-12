@@ -20,6 +20,16 @@ import type {
   SkillPage
 } from '../types/responses/content-directory-response'
 import type { StudioServiceInfo } from '../types/responses/studio-service-info'
+import type { GameVersionSummary } from '../types/models/game-version'
+import { selectedGameVersionKey } from '../utils/game-version'
+
+function versionPath(path: string) {
+  return `/api/game-versions/${encodeURIComponent(selectedGameVersionKey())}${path}`
+}
+
+export function getGameVersions(): Promise<GameVersionSummary[]> {
+  return $fetch<GameVersionSummary[]>('/api/game-versions')
+}
 
 export function getStudioServiceInfo(): Promise<StudioServiceInfo> {
   return $fetch<StudioServiceInfo>('/api/system/info')
@@ -28,7 +38,7 @@ export function getStudioServiceInfo(): Promise<StudioServiceInfo> {
 export function getNpcDirectory(
   request: DirectoryRequest = {}
 ): Promise<NpcPage> {
-  return $fetch<NpcPage>('/api/content/npcs', {
+  return $fetch<NpcPage>(versionPath('/content/npcs'), {
     query: directoryQuery(request)
   })
 }
@@ -36,21 +46,21 @@ export function getNpcDirectory(
 export function getSkillDirectory(
   request: DirectoryRequest = {}
 ): Promise<SkillPage> {
-  return $fetch<SkillPage>('/api/content/skills', {
+  return $fetch<SkillPage>(versionPath('/content/skills'), {
     query: directoryQuery(request)
   })
 }
 
 export function getLookupDirectory(kind: LookupKind): Promise<LookupRecord[]> {
-  return $fetch<LookupRecord[]>(`/api/content/${kind}`)
+  return $fetch<LookupRecord[]>(versionPath(`/content/${kind}`))
 }
 
 export function getPlayerClasses(): Promise<PlayerClassRecord[]> {
-  return $fetch<PlayerClassRecord[]>('/api/content/player-classes')
+  return $fetch<PlayerClassRecord[]>(versionPath('/content/player-classes'))
 }
 
 export function getAssetCatalogs(): Promise<AssetCatalogSummary[]> {
-  return $fetch<AssetCatalogSummary[]>('/api/assets/catalogs')
+  return $fetch<AssetCatalogSummary[]>(versionPath('/assets/catalogs'))
 }
 
 export function getAssetCatalog<T, TPackage = never>(
@@ -64,7 +74,7 @@ export function getAssetCatalog<T, TPackage = never>(
 ): Promise<AssetCatalogPage<T, TPackage>> {
   const query = request.query?.trim()
   return $fetch<AssetCatalogPage<T, TPackage>>(
-    `/api/assets/${kind}/catalog`,
+    versionPath(`/assets/${kind}/catalog`),
     {
       query: {
         ...(query ? { query } : {}),
@@ -80,14 +90,14 @@ export function getAssetCatalogEntry<T>(
   kind: 'levels' | 'scenes',
   name: string
 ): Promise<T> {
-  return $fetch<T>(`/api/assets/${kind}/catalog/${encodeURIComponent(name)}`)
+  return $fetch<T>(versionPath(`/assets/${kind}/catalog/${encodeURIComponent(name)}`))
 }
 
 export function getAssetImportJobs(
   kind: AssetImportKind,
   limit = 20
 ): Promise<AssetImportJob[]> {
-  return $fetch<AssetImportJob[]>(`/api/assets/${kind}/imports`, {
+  return $fetch<AssetImportJob[]>(versionPath(`/assets/${kind}/imports`), {
     query: { limit }
   })
 }
@@ -96,7 +106,7 @@ export function startAssetImport(
   kind: AssetImportKind,
   query?: Record<string, string>
 ): Promise<AssetImportJob> {
-  return $fetch<AssetImportJob>(`/api/assets/${kind}/imports`, {
+  return $fetch<AssetImportJob>(versionPath(`/assets/${kind}/imports`), {
     method: 'POST',
     query
   })
@@ -107,7 +117,7 @@ export function startAssetFileImport(
   fileName: string
 ): Promise<AssetImportJob> {
   return $fetch<AssetImportJob>(
-    `/api/assets/${kind}/imports/files/${encodeURIComponent(fileName)}`,
+    versionPath(`/assets/${kind}/imports/files/${encodeURIComponent(fileName)}`),
     { method: 'POST' }
   )
 }
@@ -123,7 +133,7 @@ export function getAssetImportWorkItems(
   } = {}
 ): Promise<AssetImportPage<AssetImportWorkItem>> {
   return $fetch<AssetImportPage<AssetImportWorkItem>>(
-    `/api/assets/${kind}/imports/${runId}/work-items`,
+    versionPath(`/assets/${kind}/imports/${runId}/work-items`),
     {
       query: {
         ...(request.sourceKey ? { sourceKey: request.sourceKey } : {}),
@@ -150,7 +160,7 @@ export function getAssetImportDiagnostics(
   } = {}
 ): Promise<AssetImportPage<AssetImportDiagnostic>> {
   return $fetch<AssetImportPage<AssetImportDiagnostic>>(
-    `/api/assets/${kind}/imports/${runId}/diagnostics`,
+    versionPath(`/assets/${kind}/imports/${runId}/diagnostics`),
     {
       query: {
         ...request,

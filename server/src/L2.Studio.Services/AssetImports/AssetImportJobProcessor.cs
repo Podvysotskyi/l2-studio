@@ -77,9 +77,9 @@ public sealed partial class AssetImportJobProcessor(
         await context.SaveChangesAsync(cancellationToken);
 
         var sourceStagingPath = Path.Combine(
-            Path.GetFullPath(options.Value.AssetRootPath), ".source-staging", item.Id.ToString("N"));
+            AssetRoot(item), ".source-staging", item.Id.ToString("N"));
         var outputStagingPath = Path.Combine(
-            Path.GetFullPath(options.Value.AssetRootPath), ".staging", item.Id.ToString("N"));
+            AssetRoot(item), ".staging", item.Id.ToString("N"));
         try
         {
             if (Directory.Exists(outputStagingPath)) Directory.Delete(outputStagingPath, recursive: true);

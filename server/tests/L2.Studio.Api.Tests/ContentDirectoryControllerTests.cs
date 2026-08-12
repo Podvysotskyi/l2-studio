@@ -17,6 +17,7 @@ public sealed class ContentDirectoryControllerTests
         using var cancellation = new CancellationTokenSource();
 
         var result = await controller.SearchNpcs(
+            "interlude",
             new DirectoryRequest("  Goblin  ", 2, 50),
             cancellation.Token);
 
@@ -33,7 +34,7 @@ public sealed class ContentDirectoryControllerTests
         var repository = new StubContentDirectoryRepository();
         var controller = new ContentDirectoryController(repository);
 
-        await controller.SearchSkills(new DirectoryRequest(null, 1, 25), CancellationToken.None);
+        await controller.SearchSkills("interlude", new DirectoryRequest(null, 1, 25), CancellationToken.None);
 
         Assert.Equal(string.Empty, repository.SkillQuery);
     }
@@ -46,7 +47,7 @@ public sealed class ContentDirectoryControllerTests
         var controller = new ContentDirectoryController(repository);
         using var cancellation = new CancellationTokenSource();
 
-        var result = await controller.GetNpcTypes(cancellation.Token);
+        var result = await controller.GetNpcTypes("interlude", cancellation.Token);
 
         Assert.Same(expected, result);
         Assert.Equal(cancellation.Token, repository.NpcTypesToken);
@@ -63,7 +64,7 @@ public sealed class ContentDirectoryControllerTests
         public string? SkillQuery { get; private set; }
         public CancellationToken NpcTypesToken { get; private set; }
 
-        public Task<NpcDirectoryPage> SearchNpcsAsync(string query, int page, int pageSize, CancellationToken cancellationToken)
+        public Task<NpcDirectoryPage> SearchNpcsAsync(string gameVersion, string query, int page, int pageSize, CancellationToken cancellationToken)
         {
             NpcQuery = query;
             NpcPage = page;
@@ -72,25 +73,25 @@ public sealed class ContentDirectoryControllerTests
             return Task.FromResult(Npcs);
         }
 
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcTypesAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcTypesAsync(string gameVersion, CancellationToken cancellationToken)
         {
             NpcTypesToken = cancellationToken;
             return Task.FromResult(NpcTypes);
         }
 
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcRacesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcSexesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
-        public Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerClassSummary>>([]);
-        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerRacesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
-        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerSexesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
+        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
+        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
+        public Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerClassSummary>>([]);
+        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
+        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
 
-        public Task<SkillDirectoryPage> SearchSkillsAsync(string query, int page, int pageSize, CancellationToken cancellationToken)
+        public Task<SkillDirectoryPage> SearchSkillsAsync(string gameVersion, string query, int page, int pageSize, CancellationToken cancellationToken)
         {
             SkillQuery = query;
             return Task.FromResult(new SkillDirectoryPage([], 0, page, pageSize));
         }
 
-        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillOperateTypesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
-        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillTargetTypesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
+        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillOperateTypesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
+        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillTargetTypesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
     }
 }

@@ -145,7 +145,7 @@ public sealed class StudioConfigurationExtensionsTests
         var values = new Dictionary<string, string?>
         {
             ["ConnectionStrings:PostgreSql"] = ConnectionString,
-            ["AssetImport:TexturesSourcePath"] = "",
+            ["AssetImport:SourceRootPath"] = "",
             ["AssetImport:StudioBaseUrl"] = "ftp://studio.example.com",
             ["AssetImport:LevelPreviewBrowserUrl"] = "relative"
         };

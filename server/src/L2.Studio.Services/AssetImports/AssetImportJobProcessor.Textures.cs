@@ -26,7 +26,7 @@ public sealed partial class AssetImportJobProcessor
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        var assetRootPath = AssetRoot(job);
         var packagePaths = SourceFiles(sourcePath, ".utx", "texture");
         if (packagePaths.Length == 0)
         {

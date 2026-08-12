@@ -27,13 +27,13 @@ public sealed class GameContentModelTests
         var entity = Entity<PlayerClass>(context);
 
         Assert.Equal(
-            [nameof(PlayerClass.Id), nameof(PlayerClass.PlayerSexId), nameof(PlayerClass.PlayerRaceId)],
+            [nameof(PlayerClass.GameVersion), nameof(PlayerClass.Id), nameof(PlayerClass.PlayerSexId), nameof(PlayerClass.PlayerRaceId)],
             entity.FindPrimaryKey()!.Properties.Select(property => property.Name));
         var parent = Assert.Single(entity.GetForeignKeys(), foreignKey =>
             foreignKey.PrincipalEntityType.ClrType == typeof(PlayerClass));
         Assert.Equal(DeleteBehavior.Restrict, parent.DeleteBehavior);
         Assert.Equal(
-            [nameof(PlayerClass.ParentClassId), nameof(PlayerClass.PlayerSexId), nameof(PlayerClass.PlayerRaceId)],
+            [nameof(PlayerClass.GameVersion), nameof(PlayerClass.ParentClassId), nameof(PlayerClass.PlayerSexId), nameof(PlayerClass.PlayerRaceId)],
             parent.Properties.Select(property => property.Name));
     }
 

@@ -26,7 +26,7 @@ public sealed partial class AssetImportJobProcessor
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        var assetRootPath = AssetRoot(job);
         var paths = SourceFiles(sourcePath, ".uax", "sound");
         if (paths.Length == 0)
             throw new InvalidOperationException("The configured sound directory contains no .uax packages.");
@@ -108,7 +108,7 @@ public sealed partial class AssetImportJobProcessor
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        var assetRootPath = AssetRoot(job);
         var paths = SourceFiles(sourcePath, ".ogg", "music");
         if (paths.Length == 0)
         {

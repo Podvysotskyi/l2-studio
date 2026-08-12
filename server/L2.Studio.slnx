@@ -18,7 +18,6 @@
   <Project Path="tests/L2.Studio.Api.Tests/L2.Studio.Api.Tests.csproj" />
   <Project Path="tests/L2.Studio.Configurations.Tests/L2.Studio.Configurations.Tests.csproj" />
   <Project Path="tests/L2.Studio.Context.Tests/L2.Studio.Context.Tests.csproj" />
-  <Project Path="tests/L2.Studio.Migrations.Tests/L2.Studio.Migrations.Tests.csproj" />
   <Project Path="tests/L2.Studio.Repositories.Interfaces.Tests/L2.Studio.Repositories.Interfaces.Tests.csproj" />
   <Project Path="tests/L2.Studio.Repositories.Tests/L2.Studio.Repositories.Tests.csproj" />
   <Project Path="tests/L2.Studio.Services.Tests/L2.Studio.Services.Tests.csproj" />

@@ -84,7 +84,8 @@ public sealed class AssetImportRunHandlers(
         {
             var discovered = run.WorkItems.Select(item => item.NormalizedSourceKey).ToHashSet(StringComparer.Ordinal);
             var catalog = await context.AssetCatalogs.Include(item => item.Sources)
-                .SingleOrDefaultAsync(item => item.Kind == run.Kind && item.IsActive, cancellationToken);
+                .SingleOrDefaultAsync(item => item.GameVersion == run.GameVersion &&
+                    item.Kind == run.Kind && item.IsActive, cancellationToken);
             if (catalog is not null)
             {
                 var removed = catalog.Sources.Where(source => !discovered.Contains(source.NormalizedSourceKey)).ToArray();

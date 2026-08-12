@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 public sealed class AssetImportWorkItem
 {
+    public string GameVersion { get; set; } = "interlude";
     public Guid Id { get; set; }
     public Guid RunId { get; set; }
     public required string ImportKind { get; set; }

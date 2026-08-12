@@ -19,6 +19,7 @@ public sealed class AssetCatalogsControllerTests
         using var cancellation = new CancellationTokenSource();
 
         var result = await controller.Search(
+            "interlude",
             "textures",
             new AssetCatalogRequest("stone", "Terrain", 2, 25),
             cancellation.Token);
@@ -40,10 +41,12 @@ public sealed class AssetCatalogsControllerTests
         var controller = new AssetCatalogsController(repository);
 
         var unsupported = await controller.Search(
+            "interlude",
             "unknown",
             new AssetCatalogRequest(),
             CancellationToken.None);
         var missing = await controller.Search(
+            "interlude",
             "textures",
             new AssetCatalogRequest(),
             CancellationToken.None);
@@ -63,7 +66,7 @@ public sealed class AssetCatalogsControllerTests
         };
         var controller = new AssetCatalogsController(repository);
 
-        var result = await controller.Get("textures", "Stone", CancellationToken.None);
+        var result = await controller.Get("interlude", "textures", "Stone", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var item = Assert.IsType<JsonElement>(ok.Value);
@@ -88,10 +91,11 @@ public sealed class AssetCatalogsControllerTests
         public string? ItemKind { get; private set; }
         public string? ItemName { get; private set; }
 
-        public Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(string gameVersion, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<AssetCatalogSummary>>([]);
 
         public Task<AssetCatalogPage?> SearchAsync(
+            string gameVersion,
             string kind,
             string query,
             string? groupName,
@@ -108,7 +112,7 @@ public sealed class AssetCatalogsControllerTests
             return Task.FromResult(SearchResult);
         }
 
-        public Task<JsonElement?> GetAsync(string kind, string name, CancellationToken cancellationToken)
+        public Task<JsonElement?> GetAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken)
         {
             ItemKind = kind;
             ItemName = name;

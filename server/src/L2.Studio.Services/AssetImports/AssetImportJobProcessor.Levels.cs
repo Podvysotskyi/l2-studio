@@ -37,9 +37,10 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job,
         CancellationToken cancellationToken)
     {
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        var assetRootPath = AssetRoot(job);
         var levelCatalogRecord = await context.AssetCatalogs.AsNoTracking().AsSplitQuery().Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Kind == AssetImportJobValues.Levels && item.IsActive, cancellationToken)
+            .SingleOrDefaultAsync(item => item.GameVersion == job.GameVersion &&
+                item.Kind == AssetImportJobValues.Levels && item.IsActive, cancellationToken)
             ?? throw new InvalidOperationException("Generate the level catalog before generating level previews.");
         var levelCatalog = new LevelCatalogManifest(
             levelCatalogRecord.SchemaVersion, levelCatalogRecord.Kind, levelCatalogRecord.SourceFolder,
@@ -47,7 +48,7 @@ public sealed partial class AssetImportJobProcessor
             levelCatalogRecord.Items.Select(item => JsonSerializer.Deserialize<LevelCatalogEntry>(item.MetadataJson, ManifestJsonOptions)!).ToArray());
         var allLevels = levelCatalog.Levels.OrderBy(level => level.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         var requestedLevelName = LevelPreviewGeneration.RequestedLevelName(
-            options.Value.LevelsSourcePath,
+            SourceRoot(job, AssetImportJobValues.Levels),
             job.SourcePath);
         if (requestedLevelName is not null && !allLevels.Any(level =>
                 string.Equals(level.Name, requestedLevelName, StringComparison.OrdinalIgnoreCase)))
@@ -67,7 +68,7 @@ public sealed partial class AssetImportJobProcessor
         var warnings = new List<string>();
         var entries = new Dictionary<string, LevelPreviewCatalogEntry>(StringComparer.OrdinalIgnoreCase);
         var changed = new List<LevelPreviewRenderLevel>();
-        var previous = await ReadLevelPreviewCatalogAsync(context, cancellationToken);
+        var previous = await ReadLevelPreviewCatalogAsync(context, job.GameVersion, cancellationToken);
 
         try
         {
@@ -196,10 +197,12 @@ public sealed partial class AssetImportJobProcessor
 
     private static async Task<LevelPreviewCatalogManifest?> ReadLevelPreviewCatalogAsync(
         GameContentDbContext context,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         var catalog = await context.AssetCatalogs.AsNoTracking().AsSplitQuery().Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Kind == AssetImportJobValues.LevelPreviews && item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.GameVersion == gameVersion &&
+                item.Kind == AssetImportJobValues.LevelPreviews && item.IsActive, cancellationToken);
         if (catalog is null || catalog.SchemaVersion != 1) return null;
         var metadata = JsonSerializer.Deserialize<LevelPreviewCatalogMetadata>(catalog.MetadataJson, ManifestJsonOptions);
         return new LevelPreviewCatalogManifest(1, catalog.Kind, catalog.SourceHash,
@@ -362,7 +365,7 @@ public sealed partial class AssetImportJobProcessor
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
-        var assetRootPath = Path.GetFullPath(options.Value.AssetRootPath);
+        var assetRootPath = AssetRoot(job);
         if (!File.Exists(sourcePath) && !Directory.Exists(sourcePath))
         {
             throw new DirectoryNotFoundException($"The configured level directory does not exist: {sourcePath}");
@@ -410,9 +413,9 @@ public sealed partial class AssetImportJobProcessor
         job.SourceHash = sources.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
-        var staticMeshes = await LoadStaticMeshLookupAsync(context, cancellationToken);
-        var textures = await LoadTextureLookupAsync(context, cancellationToken);
-        var sounds = await LoadSoundLookupAsync(context, cancellationToken);
+        var staticMeshes = await LoadStaticMeshLookupAsync(context, job.GameVersion, cancellationToken);
+        var textures = await LoadTextureLookupAsync(context, job.GameVersion, cancellationToken);
+        var sounds = await LoadSoundLookupAsync(context, job.GameVersion, cancellationToken);
         var sourceTexturePackages = new Dictionary<string, IReadOnlyDictionary<string, UnrealTexture>>(
             StringComparer.OrdinalIgnoreCase);
         var (finalPath, stagingPath, outputUrlRoot) = OutputPaths(assetRootPath, job);
@@ -484,6 +487,7 @@ public sealed partial class AssetImportJobProcessor
 
                     var bspMeshes = await BuildBspManifestsAsync(
                         context,
+                        job.GameVersion,
                         level.BspModels,
                         levelPath,
                         outputUrlRoot,
@@ -508,6 +512,7 @@ public sealed partial class AssetImportJobProcessor
                             var texture = await ReadSourceTextureAsync(
                                 terrain.TerrainMap,
                                 sourceTexturePackages,
+                                job.GameVersion,
                                 cancellationToken);
                             if (texture is not null)
                             {
@@ -536,6 +541,7 @@ public sealed partial class AssetImportJobProcessor
                             source.Name,
                             textures,
                             sourceTexturePackages,
+                            job.GameVersion,
                             cancellationToken);
                         if (material.Error is not null)
                         {
@@ -824,6 +830,7 @@ public sealed partial class AssetImportJobProcessor
 
     private static async Task<LevelBspMeshManifestEntry[]> BuildBspManifestsAsync(
         GameContentDbContext context,
+        string gameVersion,
         IReadOnlyList<UnrealBspModel> models,
         string outputPath,
         string kind,
@@ -839,6 +846,7 @@ public sealed partial class AssetImportJobProcessor
             .ToArray();
         var catalog = await StaticMeshMaterialCatalogLoader.LoadAsync(
             context,
+            gameVersion,
             references,
             cancellationToken);
         var result = new List<LevelBspMeshManifestEntry>();
@@ -1415,6 +1423,7 @@ public sealed partial class AssetImportJobProcessor
         string levelName,
         IReadOnlyDictionary<string, PublishedTexture> textureUrls,
         Dictionary<string, IReadOnlyDictionary<string, UnrealTexture>> sourceTexturePackages,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         var selection = TerrainLayerSelector.SelectCompletePrefix(terrain.Layers);
@@ -1482,6 +1491,7 @@ public sealed partial class AssetImportJobProcessor
             var alphaMap = await ReadSourceTextureAsync(
                 alpha,
                 sourceTexturePackages,
+                gameVersion,
                 cancellationToken);
             if (alphaMap is null)
             {
@@ -1564,13 +1574,17 @@ public sealed partial class AssetImportJobProcessor
     private async Task<UnrealTexture?> ReadSourceTextureAsync(
         UnrealObjectReference reference,
         Dictionary<string, IReadOnlyDictionary<string, UnrealTexture>> packages,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         if (packages.TryGetValue(reference.PackageName, out var cached))
         {
             return cached.GetValueOrDefault(reference.ObjectName);
         }
-        var textureDirectory = Path.GetFullPath(options.Value.TexturesSourcePath);
+        var textureDirectory = Path.Combine(
+            Path.GetFullPath(options.Value.SourceRootPath),
+            gameVersion == "c1" ? "C1" : gameVersion == "c4" ? "C4" : "Interlude",
+            "textures");
         var path = Directory.EnumerateFiles(textureDirectory, "*.utx")
             .SingleOrDefault(candidate => string.Equals(
                 Path.GetFileNameWithoutExtension(candidate),
@@ -1594,12 +1608,14 @@ public sealed partial class AssetImportJobProcessor
 
     private static async Task<Dictionary<string, PublishedTexture>> LoadTextureLookupAsync(
         GameContentDbContext context,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         var catalog = await context.AssetCatalogs.AsNoTracking()
             .AsSplitQuery()
             .Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Kind == AssetImportJobValues.Textures && item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.GameVersion == gameVersion &&
+                item.Kind == AssetImportJobValues.Textures && item.IsActive, cancellationToken);
         var textures = catalog?.Items.Select(item => JsonSerializer.Deserialize<TextureManifestEntry>(item.MetadataJson, ManifestJsonOptions)!).ToArray() ?? [];
         var metadata = catalog is null ? null : JsonSerializer.Deserialize<TextureCatalogMetadata>(catalog.MetadataJson, ManifestJsonOptions);
         var lookup = textures
@@ -1644,9 +1660,11 @@ public sealed partial class AssetImportJobProcessor
 
     private static async Task<Dictionary<string, string>> LoadSoundLookupAsync(
         GameContentDbContext context,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
-        var items = await ActiveCatalogItemJsonAsync(context, AssetImportJobValues.Sounds, cancellationToken);
+        var items = await ActiveCatalogItemJsonAsync(
+            context, gameVersion, AssetImportJobValues.Sounds, cancellationToken);
         return items.Select(item => JsonSerializer.Deserialize<SoundManifestEntry>(item, ManifestJsonOptions)!)
             .ToDictionary(
             sound => TextureKey(sound.PackageName, sound.ObjectName),
@@ -1656,10 +1674,12 @@ public sealed partial class AssetImportJobProcessor
 
     private static async Task<StaticMeshLookup> LoadStaticMeshLookupAsync(
         GameContentDbContext context,
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         var catalog = await context.AssetCatalogs.AsNoTracking().AsSplitQuery().Include(item => item.Items)
-            .SingleOrDefaultAsync(item => item.Kind == AssetImportJobValues.StaticMeshes && item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.GameVersion == gameVersion &&
+                item.Kind == AssetImportJobValues.StaticMeshes && item.IsActive, cancellationToken);
         if (catalog is null)
         {
             return new StaticMeshLookup(

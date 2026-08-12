@@ -7,6 +7,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
 {
     public const string SchemaName = "content";
 
+    public DbSet<GameVersion> GameVersions => Set<GameVersion>();
     public DbSet<Npc> Npcs => Set<Npc>();
     public DbSet<NpcType> NpcTypes => Set<NpcType>();
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
@@ -33,30 +34,46 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     {
         modelBuilder.HasDefaultSchema(SchemaName);
 
+        var gameVersion = modelBuilder.Entity<GameVersion>();
+        gameVersion.ToTable("game_versions");
+        gameVersion.HasKey(entity => entity.Key);
+        gameVersion.Property(entity => entity.Key).HasColumnName("key").HasMaxLength(32);
+        gameVersion.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+        gameVersion.Property(entity => entity.SourceFolder).HasColumnName("source_folder").HasMaxLength(64);
+        gameVersion.Property(entity => entity.SortOrder).HasColumnName("sort_order");
+        gameVersion.HasIndex(entity => entity.DisplayName).IsUnique();
+        gameVersion.HasData(
+            new GameVersion { Key = "c1", DisplayName = "Chronicle 1", SourceFolder = "C1", SortOrder = 10 },
+            new GameVersion { Key = "c4", DisplayName = "Chronicle 4", SourceFolder = "C4", SortOrder = 20 },
+            new GameVersion { Key = "interlude", DisplayName = "Interlude", SourceFolder = "Interlude", SortOrder = 30 });
+
         var playerRace = modelBuilder.Entity<PlayerRace>();
         playerRace.ToTable("player_races");
-        playerRace.HasKey(entity => entity.Id);
+        playerRace.HasKey(entity => new { entity.GameVersion, entity.Id });
+        playerRace.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerRace.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerRace.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        playerRace.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_player_races_name");
+        playerRace.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_player_races_name");
 
         var playerSex = modelBuilder.Entity<PlayerSex>();
         playerSex.ToTable("player_sexes");
-        playerSex.HasKey(entity => entity.Id);
+        playerSex.HasKey(entity => new { entity.GameVersion, entity.Id });
+        playerSex.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerSex.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerSex.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        playerSex.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_player_sexes_name");
+        playerSex.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_player_sexes_name");
 
         var playerClass = modelBuilder.Entity<PlayerClass>();
         playerClass.ToTable("player_classes");
-        playerClass.HasKey(entity => new { entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerClass.HasKey(entity => new { entity.GameVersion, entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerClass.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerClass.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerClass.Property(entity => entity.PlayerSexId).HasColumnName("player_sex_id").ValueGeneratedNever();
         playerClass.Property(entity => entity.PlayerRaceId).HasColumnName("player_race_id").ValueGeneratedNever();
         playerClass.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
         playerClass.Property(entity => entity.IsMage).HasColumnName("is_mage");
         playerClass.Property(entity => entity.ParentClassId).HasColumnName("parent_class_id").IsRequired(false);
-        playerClass.HasIndex(entity => new { entity.Name, entity.PlayerSexId, entity.PlayerRaceId })
+        playerClass.HasIndex(entity => new { entity.GameVersion, entity.Name, entity.PlayerSexId, entity.PlayerRaceId })
             .IsUnique().HasDatabaseName("ix_player_classes_name_sex_race");
         playerClass.HasIndex(entity => entity.PlayerRaceId).HasDatabaseName("ix_player_classes_player_race_id");
         playerClass.HasIndex(entity => entity.PlayerSexId).HasDatabaseName("ix_player_classes_player_sex_id");
@@ -64,57 +81,61 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .HasDatabaseName("ix_player_classes_parent_sex_race");
         playerClass.HasOne(entity => entity.PlayerRace)
             .WithMany(entity => entity.PlayerClasses)
-            .HasForeignKey(entity => entity.PlayerRaceId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerRaceId })
             .OnDelete(DeleteBehavior.Restrict);
         playerClass.HasOne(entity => entity.PlayerSex)
             .WithMany(entity => entity.PlayerClasses)
-            .HasForeignKey(entity => entity.PlayerSexId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerSexId })
             .OnDelete(DeleteBehavior.Restrict);
         playerClass.HasOne(entity => entity.ParentClass)
             .WithMany(entity => entity.ChildClasses)
-            .HasForeignKey(entity => new { entity.ParentClassId, entity.PlayerSexId, entity.PlayerRaceId })
-            .HasPrincipalKey(entity => new { entity.Id, entity.PlayerSexId, entity.PlayerRaceId })
+            .HasForeignKey(entity => new { entity.GameVersion, entity.ParentClassId, entity.PlayerSexId, entity.PlayerRaceId })
+            .HasPrincipalKey(entity => new { entity.GameVersion, entity.Id, entity.PlayerSexId, entity.PlayerRaceId })
             .OnDelete(DeleteBehavior.Restrict);
 
         var playerFace = modelBuilder.Entity<PlayerFace>();
         playerFace.ToTable("player_faces");
-        playerFace.HasKey(entity => new { entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerFace.HasKey(entity => new { entity.GameVersion, entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerFace.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerFace.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerFace.Property(entity => entity.PlayerSexId).HasColumnName("player_sex_id").ValueGeneratedNever();
         playerFace.Property(entity => entity.PlayerRaceId).HasColumnName("player_race_id").ValueGeneratedNever();
         playerFace.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
         playerFace.HasOne(entity => entity.PlayerRace).WithMany(entity => entity.PlayerFaces)
-            .HasForeignKey(entity => entity.PlayerRaceId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerRaceId }).OnDelete(DeleteBehavior.Restrict);
         playerFace.HasOne(entity => entity.PlayerSex).WithMany(entity => entity.PlayerFaces)
-            .HasForeignKey(entity => entity.PlayerSexId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerSexId }).OnDelete(DeleteBehavior.Restrict);
 
         var playerHairStyle = modelBuilder.Entity<PlayerHairStyle>();
         playerHairStyle.ToTable("player_hair_styles");
-        playerHairStyle.HasKey(entity => new { entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerHairStyle.HasKey(entity => new { entity.GameVersion, entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerHairStyle.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerHairStyle.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerHairStyle.Property(entity => entity.PlayerSexId).HasColumnName("player_sex_id").ValueGeneratedNever();
         playerHairStyle.Property(entity => entity.PlayerRaceId).HasColumnName("player_race_id").ValueGeneratedNever();
         playerHairStyle.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
         playerHairStyle.HasOne(entity => entity.PlayerRace).WithMany(entity => entity.PlayerHairStyles)
-            .HasForeignKey(entity => entity.PlayerRaceId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerRaceId }).OnDelete(DeleteBehavior.Restrict);
         playerHairStyle.HasOne(entity => entity.PlayerSex).WithMany(entity => entity.PlayerHairStyles)
-            .HasForeignKey(entity => entity.PlayerSexId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerSexId }).OnDelete(DeleteBehavior.Restrict);
 
         var playerHairColor = modelBuilder.Entity<PlayerHairColor>();
         playerHairColor.ToTable("player_hair_colors");
-        playerHairColor.HasKey(entity => new { entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerHairColor.HasKey(entity => new { entity.GameVersion, entity.Id, entity.PlayerSexId, entity.PlayerRaceId });
+        playerHairColor.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         playerHairColor.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         playerHairColor.Property(entity => entity.PlayerSexId).HasColumnName("player_sex_id").ValueGeneratedNever();
         playerHairColor.Property(entity => entity.PlayerRaceId).HasColumnName("player_race_id").ValueGeneratedNever();
         playerHairColor.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
         playerHairColor.HasOne(entity => entity.PlayerRace).WithMany(entity => entity.PlayerHairColors)
-            .HasForeignKey(entity => entity.PlayerRaceId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerRaceId }).OnDelete(DeleteBehavior.Restrict);
         playerHairColor.HasOne(entity => entity.PlayerSex).WithMany(entity => entity.PlayerHairColors)
-            .HasForeignKey(entity => entity.PlayerSexId).OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerSexId }).OnDelete(DeleteBehavior.Restrict);
 
         var assetImportRun = modelBuilder.Entity<AssetImportRun>();
         assetImportRun.ToTable("asset_import_runs");
         assetImportRun.HasKey(entity => entity.Id);
+        assetImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         assetImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         assetImportRun.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
         assetImportRun.Property(entity => entity.TriggerType).HasColumnName("trigger_type").HasMaxLength(32);
@@ -131,18 +152,19 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportRun.Property(entity => entity.WarningFileCount).HasColumnName("warning_file_count");
         assetImportRun.Property(entity => entity.FailedFileCount).HasColumnName("failed_file_count");
         assetImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
-        assetImportRun.HasIndex(entity => new { entity.Kind, entity.RequestedAt })
+        assetImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.RequestedAt })
             .HasDatabaseName("ix_asset_import_runs_kind_requested");
-        assetImportRun.HasIndex(entity => entity.Kind).IsUnique()
+        assetImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind }).IsUnique()
             .HasFilter("trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')")
             .HasDatabaseName("ix_asset_import_runs_active_full_scan_kind");
-        assetImportRun.HasIndex(entity => new { entity.Kind, entity.NormalizedRequestedSourceKey }).IsUnique()
+        assetImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.NormalizedRequestedSourceKey }).IsUnique()
             .HasFilter("trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')")
             .HasDatabaseName("ix_asset_import_runs_active_single_source");
 
         var assetImportWorkItem = modelBuilder.Entity<AssetImportWorkItem>();
         assetImportWorkItem.ToTable("asset_import_work_items");
         assetImportWorkItem.HasKey(entity => entity.Id);
+        assetImportWorkItem.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         assetImportWorkItem.Ignore(entity => entity.Kind);
         assetImportWorkItem.Ignore(entity => entity.TotalCount);
         assetImportWorkItem.Ignore(entity => entity.ProcessedCount);
@@ -198,6 +220,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         var assetCatalog = modelBuilder.Entity<AssetCatalog>();
         assetCatalog.ToTable("asset_catalogs");
         assetCatalog.HasKey(entity => entity.Id);
+        assetCatalog.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         assetCatalog.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         assetCatalog.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
         assetCatalog.Property(entity => entity.SourceFolder).HasColumnName("source_folder").HasMaxLength(256);
@@ -207,7 +230,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetCatalog.Property(entity => entity.MetadataJson).HasColumnName("metadata_json").HasColumnType("jsonb");
         assetCatalog.Property(entity => entity.IsActive).HasColumnName("is_active");
         assetCatalog.Property(entity => entity.PublishedAt).HasColumnName("published_at");
-        assetCatalog.HasIndex(entity => entity.Kind)
+        assetCatalog.HasIndex(entity => new { entity.GameVersion, entity.Kind })
             .IsUnique()
             .HasFilter("is_active")
             .HasDatabaseName("ix_asset_catalogs_active_kind");
@@ -268,28 +291,32 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
 
         var npcType = modelBuilder.Entity<NpcType>();
         npcType.ToTable("npc_types");
-        npcType.HasKey(entity => entity.Id);
+        npcType.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npcType.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcType.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_npc_types_name");
+        npcType.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_types_name");
 
         var npcRace = modelBuilder.Entity<NpcRace>();
         npcRace.ToTable("npc_races");
-        npcRace.HasKey(entity => entity.Id);
+        npcRace.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcRace.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npcRace.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcRace.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcRace.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_npc_races_name");
+        npcRace.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_races_name");
 
         var npcSex = modelBuilder.Entity<NpcSex>();
         npcSex.ToTable("npc_sexes");
-        npcSex.HasKey(entity => entity.Id);
+        npcSex.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcSex.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npcSex.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcSex.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcSex.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_npc_sexes_name");
+        npcSex.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_sexes_name");
 
         var npc = modelBuilder.Entity<Npc>();
         npc.ToTable("npcs", table => table.HasCheckConstraint("ck_npcs_level", "level BETWEEN 1 AND 255"));
-        npc.HasKey(entity => entity.Id);
+        npc.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npc.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npc.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npc.Property(entity => entity.Level).HasColumnName("level");
         npc.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(100).IsRequired(false);
@@ -301,43 +328,47 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npc.HasIndex(entity => entity.NpcSexId).HasDatabaseName("ix_npcs_npc_sex_id");
         npc.HasOne(entity => entity.NpcType)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => entity.NpcTypeId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcTypeId })
             .OnDelete(DeleteBehavior.Restrict);
         npc.HasOne(entity => entity.NpcRace)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => entity.NpcRaceId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcRaceId })
             .OnDelete(DeleteBehavior.Restrict);
         npc.HasOne(entity => entity.NpcSex)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => entity.NpcSexId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSexId })
             .OnDelete(DeleteBehavior.Restrict);
 
         var skillIcon = modelBuilder.Entity<SkillIcon>();
         skillIcon.ToTable(
             "skill_icons",
             table => table.HasCheckConstraint("ck_skill_icons_level", "level BETWEEN 1 AND 255"));
-        skillIcon.HasKey(entity => new { entity.SkillId, entity.Level });
+        skillIcon.HasKey(entity => new { entity.GameVersion, entity.SkillId, entity.Level });
+        skillIcon.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         skillIcon.Property(entity => entity.SkillId).HasColumnName("skill_id").ValueGeneratedNever();
         skillIcon.Property(entity => entity.Level).HasColumnName("level").ValueGeneratedNever();
         skillIcon.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
 
         var skillOperateType = modelBuilder.Entity<SkillOperateType>();
         skillOperateType.ToTable("skill_operate_types");
-        skillOperateType.HasKey(entity => entity.Id);
+        skillOperateType.HasKey(entity => new { entity.GameVersion, entity.Id });
+        skillOperateType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         skillOperateType.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         skillOperateType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        skillOperateType.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_skill_operate_types_name");
+        skillOperateType.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_skill_operate_types_name");
 
         var skillTargetType = modelBuilder.Entity<SkillTargetType>();
         skillTargetType.ToTable("skill_target_types");
-        skillTargetType.HasKey(entity => entity.Id);
+        skillTargetType.HasKey(entity => new { entity.GameVersion, entity.Id });
+        skillTargetType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         skillTargetType.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         skillTargetType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        skillTargetType.HasIndex(entity => entity.Name).IsUnique().HasDatabaseName("ix_skill_target_types_name");
+        skillTargetType.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_skill_target_types_name");
 
         var skill = modelBuilder.Entity<Skill>();
         skill.ToTable("skills", table => table.HasCheckConstraint("ck_skills_levels", "levels BETWEEN 1 AND 255"));
-        skill.HasKey(entity => entity.Id);
+        skill.HasKey(entity => new { entity.GameVersion, entity.Id });
+        skill.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         skill.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         skill.Property(entity => entity.Levels).HasColumnName("levels");
         skill.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(100);
@@ -347,15 +378,46 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         skill.HasIndex(entity => entity.SkillTargetTypeId).HasDatabaseName("ix_skills_skill_target_type_id");
         skill.HasOne(entity => entity.SkillOperateType)
             .WithMany(entity => entity.Skills)
-            .HasForeignKey(entity => entity.SkillOperateTypeId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SkillOperateTypeId })
             .OnDelete(DeleteBehavior.Restrict);
         skill.HasOne(entity => entity.SkillTargetType)
             .WithMany(entity => entity.Skills)
-            .HasForeignKey(entity => entity.SkillTargetTypeId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SkillTargetTypeId })
             .OnDelete(DeleteBehavior.Restrict);
         skill.HasMany(entity => entity.SkillIcons)
             .WithOne(entity => entity.Skill)
-            .HasForeignKey(entity => entity.SkillId)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SkillId })
             .OnDelete(DeleteBehavior.Cascade);
+
+        playerRace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerSex.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerClass.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerFace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerHairStyle.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerHairColor.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcRace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSex.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npc.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        skillTargetType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        skill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        skillIcon.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        assetImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        assetImportWorkItem.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        assetCatalog.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+
+        foreach (var entityType in new[]
+        {
+            typeof(PlayerRace), typeof(PlayerSex), typeof(PlayerClass), typeof(PlayerFace),
+            typeof(PlayerHairStyle), typeof(PlayerHairColor), typeof(NpcType), typeof(NpcRace),
+            typeof(NpcSex), typeof(Npc), typeof(SkillOperateType), typeof(SkillTargetType),
+            typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),
+            typeof(AssetCatalog)
+        })
+        {
+            modelBuilder.Entity(entityType).Property<string>(nameof(PlayerRace.GameVersion))
+                .HasDefaultValue("interlude");
+        }
     }
 }

@@ -10,6 +10,7 @@ public sealed class ContentDirectoryRepository(
     : IContentDirectoryRepository
 {
     public async Task<NpcDirectoryPage> SearchNpcsAsync(
+        string gameVersion,
         string query,
         int page,
         int pageSize,
@@ -20,8 +21,8 @@ public sealed class ContentDirectoryRepository(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var npcs = context.Npcs
             .AsNoTracking()
-            .Where(npc => query == string.Empty ||
-                (npc.Name != null && EF.Functions.ILike(npc.Name, searchPattern, "\\")));
+            .Where(npc => npc.GameVersion == gameVersion && (query == string.Empty ||
+                (npc.Name != null && EF.Functions.ILike(npc.Name, searchPattern, "\\"))));
         var total = await npcs.LongCountAsync(cancellationToken);
         if (offset > int.MaxValue)
         {
@@ -48,44 +49,52 @@ public sealed class ContentDirectoryRepository(
     }
 
     public async Task<IReadOnlyList<NpcLookupSummary>> GetNpcTypesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await context.NpcTypes
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<NpcLookupSummary>> GetNpcRacesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await context.NpcRaces
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<NpcLookupSummary>> GetNpcSexesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await context.NpcSexes
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var variants = await context.PlayerClasses
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .ThenBy(item => item.PlayerRaceId)
             .ThenBy(item => item.PlayerSexId)
@@ -123,24 +132,29 @@ public sealed class ContentDirectoryRepository(
     }
 
     public async Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerRacesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        return await context.PlayerRaces.AsNoTracking().OrderBy(item => item.Id)
+        return await context.PlayerRaces.AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion).OrderBy(item => item.Id)
             .Select(item => new PlayerLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerSexesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        return await context.PlayerSexes.AsNoTracking().OrderBy(item => item.Id)
+        return await context.PlayerSexes.AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion).OrderBy(item => item.Id)
             .Select(item => new PlayerLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<SkillDirectoryPage> SearchSkillsAsync(
+        string gameVersion,
         string query,
         int page,
         int pageSize,
@@ -151,7 +165,8 @@ public sealed class ContentDirectoryRepository(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var skills = context.Skills
             .AsNoTracking()
-            .Where(skill => query == string.Empty || EF.Functions.ILike(skill.Name, searchPattern, "\\"));
+            .Where(skill => skill.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(skill.Name, searchPattern, "\\")));
         var total = await skills.LongCountAsync(cancellationToken);
         if (offset > int.MaxValue)
         {
@@ -177,22 +192,26 @@ public sealed class ContentDirectoryRepository(
     }
 
     public async Task<IReadOnlyList<SkillLookupSummary>> GetSkillOperateTypesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await context.SkillOperateTypes
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .Select(item => new SkillLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<SkillLookupSummary>> GetSkillTargetTypesAsync(
+        string gameVersion,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await context.SkillTargetTypes
             .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion)
             .OrderBy(item => item.Id)
             .Select(item => new SkillLookupSummary((int)item.Id, item.Name))
             .ToListAsync(cancellationToken);

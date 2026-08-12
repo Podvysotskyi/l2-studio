@@ -38,11 +38,13 @@ public sealed class AssetImportDiscoveryHandlers(
 
     private async Task DiscoverAsync(Guid runId, string kind, CancellationToken cancellationToken)
     {
+        string gameVersion;
         await using (var claimContext = await contextFactory.CreateDbContextAsync(cancellationToken))
         {
             var run = await claimContext.AssetImportRuns.SingleOrDefaultAsync(item => item.Id == runId, cancellationToken);
             if (run is null || run.DiscoveryFinishedAt is not null || AssetImportJobValues.TerminalStatuses.Contains(run.Status)) return;
             run.Status = AssetImportJobValues.Discovering;
+            gameVersion = run.GameVersion;
             run.StartedAt ??= timeProvider.GetUtcNow();
             await claimContext.SaveChangesAsync(cancellationToken);
         }
@@ -51,8 +53,8 @@ public sealed class AssetImportDiscoveryHandlers(
         try
         {
             sources = kind == AssetImportJobValues.LevelPreviews
-                ? await DiscoverPreviewSourcesAsync(cancellationToken)
-                : await DiscoverFileSourcesAsync(kind, cancellationToken);
+                ? await DiscoverPreviewSourcesAsync(gameVersion, cancellationToken)
+                : await DiscoverFileSourcesAsync(gameVersion, kind, cancellationToken);
         }
         catch (Exception exception) when (IsDiscoveryFailure(exception))
         {
@@ -76,6 +78,7 @@ public sealed class AssetImportDiscoveryHandlers(
             var item = new AssetImportWorkItem
             {
                 Id = Guid.NewGuid(),
+                GameVersion = current.GameVersion,
                 RunId = current.Id,
                 ImportKind = kind,
                 SourceKey = source.SourceKey,
@@ -116,10 +119,11 @@ public sealed class AssetImportDiscoveryHandlers(
     }
 
     private async Task<IReadOnlyList<DiscoveredSource>> DiscoverFileSourcesAsync(
+        string gameVersion,
         string kind,
         CancellationToken cancellationToken)
     {
-        var root = Path.GetFullPath(SourceRoot(kind));
+        var root = Path.GetFullPath(SourceRoot(gameVersion, kind));
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"The configured source directory does not exist: {root}");
         var extension = ExpectedExtension(kind);
         var paths = Directory.EnumerateFiles(root)
@@ -153,15 +157,18 @@ public sealed class AssetImportDiscoveryHandlers(
         return result;
     }
 
-    private async Task<IReadOnlyList<DiscoveredSource>> DiscoverPreviewSourcesAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<DiscoveredSource>> DiscoverPreviewSourcesAsync(
+        string gameVersion,
+        CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var sources = await context.AssetCatalogSources.AsNoTracking()
-            .Where(source => source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive)
+            .Where(source => source.Catalog.GameVersion == gameVersion &&
+                source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive)
             .OrderBy(source => source.SourceKey)
             .Select(source => new { source.SourceKey, source.SourceHash })
             .ToListAsync(cancellationToken);
-        var root = Path.GetFullPath(options.Value.LevelsSourcePath);
+        var root = Path.GetFullPath(SourceRoot(gameVersion, AssetImportJobValues.Levels));
         return sources.Select(source => new DiscoveredSource(
             source.SourceKey,
             Path.Combine(root, source.SourceKey),
@@ -191,15 +198,21 @@ public sealed class AssetImportDiscoveryHandlers(
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private string SourceRoot(string kind) => kind switch
+    private string SourceRoot(string gameVersion, string kind) => Path.Combine(
+        options.Value.SourceRootPath,
+        SourceFolder(gameVersion),
+        kind switch
     {
-        AssetImportJobValues.SystemTextures => options.Value.SystemTexturesSourcePath,
-        AssetImportJobValues.Textures => options.Value.TexturesSourcePath,
-        AssetImportJobValues.Music => options.Value.MusicSourcePath,
-        AssetImportJobValues.Sounds => options.Value.SoundsSourcePath,
-        AssetImportJobValues.StaticMeshes => options.Value.StaticMeshesSourcePath,
-        AssetImportJobValues.Levels or AssetImportJobValues.Scenes => options.Value.LevelsSourcePath,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        AssetImportJobValues.Levels or AssetImportJobValues.Scenes => "maps",
+        var value => value
+    });
+
+    private static string SourceFolder(string gameVersion) => gameVersion switch
+    {
+        "c1" => "C1",
+        "c4" => "C4",
+        "interlude" => "Interlude",
+        _ => throw new ArgumentOutOfRangeException(nameof(gameVersion))
     };
 
     private static string ExpectedExtension(string kind) => kind switch

@@ -4,6 +4,7 @@ namespace L2.Studio.Context.Entities;
 
 public sealed class Skill
 {
+    public string GameVersion { get; set; } = "interlude";
     public int Id { get; set; }
     public short Levels { get; set; }
     public required string Name { get; set; }

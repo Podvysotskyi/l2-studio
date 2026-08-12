@@ -62,6 +62,7 @@ public sealed partial class AssetImportJobProcessor
     {
         await catalogStore.PublishAsync(new AssetCatalogPublication(
             job.Id,
+            job.GameVersion,
             job.Kind,
             job.SourceKey,
             job.NormalizedSourceKey,
@@ -106,17 +107,36 @@ public sealed partial class AssetImportJobProcessor
         return (
             Path.Combine(assetRootPath, relative),
             Path.Combine(assetRootPath, ".staging", job.Id.ToString("N")),
-            relative.Replace('\\', '/'));
+            Path.Combine("versions", job.GameVersion, relative).Replace('\\', '/'));
     }
 
     private static async Task<string[]> ActiveCatalogItemJsonAsync(
         GameContentDbContext context,
+        string gameVersion,
         string kind,
         CancellationToken cancellationToken) =>
         await context.AssetCatalogItems.AsNoTracking()
-            .Where(item => item.Catalog.Kind == kind && item.Catalog.IsActive)
+            .Where(item => item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind && item.Catalog.IsActive)
             .Select(item => item.MetadataJson)
             .ToArrayAsync(cancellationToken);
+
+    private string AssetRoot(AssetImportJob job) => Path.Combine(
+        Path.GetFullPath(options.Value.AssetRootPath),
+        "versions",
+        job.GameVersion);
+
+    private string SourceRoot(AssetImportJob job, string kind) => Path.Combine(
+        Path.GetFullPath(options.Value.SourceRootPath),
+        job.GameVersion switch
+        {
+            "c1" => "C1",
+            "c4" => "C4",
+            "interlude" => "Interlude",
+            _ => throw new InvalidOperationException($"Unknown game version '{job.GameVersion}'.")
+        },
+        kind is AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews or AssetImportJobValues.Scenes
+            ? "maps"
+            : kind);
 
     private static void Promote(string stagingPath, string finalPath)
     {

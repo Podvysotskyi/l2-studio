@@ -4,6 +4,7 @@ namespace L2.Studio.Context.Entities;
 
 public sealed class Npc
 {
+    public string GameVersion { get; set; } = "interlude";
     public int Id { get; set; }
     public short Level { get; set; }
     public string? Name { get; set; }

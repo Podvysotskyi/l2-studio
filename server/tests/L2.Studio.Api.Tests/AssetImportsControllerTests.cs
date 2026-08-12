@@ -18,11 +18,11 @@ public sealed class AssetImportsControllerTests
         var controller = new AssetImportsController(repository);
         using var cancellation = new CancellationTokenSource();
 
-        var result = await controller.Queue("textures", cancellation.Token);
+        var result = await controller.Queue("interlude", "textures", cancellation.Token);
 
         var accepted = Assert.IsType<AcceptedResult>(result.Result);
         Assert.Same(run, accepted.Value);
-        Assert.Equal($"/api/assets/textures/imports/{run.Id}", accepted.Location);
+        Assert.Equal($"/api/game-versions/interlude/assets/textures/imports/{run.Id}", accepted.Location);
         Assert.Equal("textures", repository.FullScanKind);
         Assert.Equal(cancellation.Token, repository.FullScanToken);
     }
@@ -33,8 +33,8 @@ public sealed class AssetImportsControllerTests
         var repository = new StubAssetImportRepository();
         var controller = new AssetImportsController(repository);
 
-        var unknown = await controller.Queue("unknown", CancellationToken.None);
-        var conflict = await controller.Queue("textures", CancellationToken.None);
+        var unknown = await controller.Queue("interlude", "unknown", CancellationToken.None);
+        var conflict = await controller.Queue("interlude", "textures", CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(unknown.Result);
         Assert.IsType<ConflictObjectResult>(conflict.Result);
@@ -50,7 +50,7 @@ public sealed class AssetImportsControllerTests
         };
         var controller = new AssetImportsController(repository);
 
-        var invalid = await controller.QueueFile("textures", "Example.usx", CancellationToken.None);
+        var invalid = await controller.QueueFile("textures", "interlude", "Example.usx", CancellationToken.None);
         var invalidProblem = Assert.IsType<ValidationProblemDetails>(
             Assert.IsType<BadRequestObjectResult>(invalid.Result).Value);
         Assert.Equal(
@@ -58,7 +58,7 @@ public sealed class AssetImportsControllerTests
             Assert.Single(invalidProblem.Errors["fileName"]));
 
         repository.FileException = new AssetImportTargetNotFoundException("Missing.utx");
-        var missing = await controller.QueueFile("textures", "Missing.utx", CancellationToken.None);
+        var missing = await controller.QueueFile("textures", "interlude", "Missing.utx", CancellationToken.None);
         Assert.IsType<NotFoundObjectResult>(missing.Result);
     }
 
@@ -68,7 +68,7 @@ public sealed class AssetImportsControllerTests
         var repository = new StubAssetImportRepository();
         var controller = new AssetImportsController(repository);
 
-        var result = await controller.List("textures", 101, CancellationToken.None);
+        var result = await controller.List("textures", "interlude", 101, CancellationToken.None);
         var problem = Assert.IsType<ValidationProblemDetails>(
             Assert.IsType<BadRequestObjectResult>(result.Result).Value);
 
@@ -83,7 +83,7 @@ public sealed class AssetImportsControllerTests
         var repository = new StubAssetImportRepository { RecentResult = expected };
         var controller = new AssetImportsController(repository);
 
-        var result = await controller.List("textures", 10, CancellationToken.None);
+        var result = await controller.List("textures", "interlude", 10, CancellationToken.None);
 
         Assert.Same(expected, Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal("textures", repository.RecentKind);
@@ -98,9 +98,9 @@ public sealed class AssetImportsControllerTests
         var id = Guid.NewGuid();
 
         var workItems = await controller.GetWorkItems(
-            "textures", id, null, "invalid", 1, 50, CancellationToken.None);
+            "textures", "interlude", id, null, "invalid", 1, 50, CancellationToken.None);
         var diagnostics = await controller.GetDiagnostics(
-            "textures", id, null, "notice", null, null, null, null, 1, 50, CancellationToken.None);
+            "textures", "interlude", id, null, "notice", null, null, null, null, 1, 50, CancellationToken.None);
 
         var workItemProblem = Assert.IsType<ValidationProblemDetails>(
             Assert.IsType<BadRequestObjectResult>(workItems.Result).Value);
@@ -138,20 +138,20 @@ public sealed class AssetImportsControllerTests
         public string? RecentKind { get; private set; }
         public int RecentLimit { get; private set; }
 
-        public Task<AssetImportRunSummary?> QueueFullScanAsync(string kind, CancellationToken cancellationToken)
+        public Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, CancellationToken cancellationToken)
         {
             FullScanKind = kind;
             FullScanToken = cancellationToken;
             return Task.FromResult(FullScanResult);
         }
 
-        public Task<AssetImportRunSummary?> QueueSingleFileAsync(string kind, string fileName, CancellationToken cancellationToken)
+        public Task<AssetImportRunSummary?> QueueSingleFileAsync(string gameVersion, string kind, string fileName, CancellationToken cancellationToken)
         {
             if (FileException is not null) throw FileException;
             return Task.FromResult<AssetImportRunSummary?>(null);
         }
 
-        public Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(string kind, int limit, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(string gameVersion, string kind, int limit, CancellationToken cancellationToken)
         {
             RecentRequested = true;
             RecentKind = kind;
@@ -159,8 +159,8 @@ public sealed class AssetImportsControllerTests
             return Task.FromResult(RecentResult);
         }
 
-        public Task<AssetImportRunSummary?> GetAsync(Guid id, string kind, CancellationToken cancellationToken) => Task.FromResult<AssetImportRunSummary?>(null);
-        public Task<AssetImportWorkItemPage?> GetWorkItemsAsync(Guid runId, string kind, string? sourceKey, string? status, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportWorkItemPage?>(null);
-        public Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(Guid runId, string kind, string? sourceKey, string? severity, string? code, string? stage, string? workItemStatus, string? query, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportDiagnosticPage?>(null);
+        public Task<AssetImportRunSummary?> GetAsync(Guid id, string gameVersion, string kind, CancellationToken cancellationToken) => Task.FromResult<AssetImportRunSummary?>(null);
+        public Task<AssetImportWorkItemPage?> GetWorkItemsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? status, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportWorkItemPage?>(null);
+        public Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? severity, string? code, string? stage, string? workItemStatus, string? query, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportDiagnosticPage?>(null);
     }
 }

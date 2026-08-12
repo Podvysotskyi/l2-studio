@@ -19,15 +19,18 @@ internal static class StaticMeshMaterialCatalogLoader
 
     public static async Task<StaticMeshMaterialCatalog> LoadAsync(
         GameContentDbContext context,
+        string gameVersion,
         IReadOnlyCollection<TextureMaterialReference> rootReferences,
         CancellationToken cancellationToken) => await LoadAsync(
             context,
+            gameVersion,
             rootReferences,
             [],
             cancellationToken);
 
     public static async Task<StaticMeshMaterialCatalog> LoadAsync(
         GameContentDbContext context,
+        string gameVersion,
         IReadOnlyCollection<TextureMaterialReference> rootReferences,
         IReadOnlyCollection<TextureMaterialManifestEntry> embeddedMaterials,
         CancellationToken cancellationToken)
@@ -37,7 +40,7 @@ internal static class StaticMeshMaterialCatalogLoader
         {
             var catalog = await context.AssetCatalogs
                 .AsNoTracking()
-                .Where(item => item.Kind == kind && item.IsActive)
+                .Where(item => item.GameVersion == gameVersion && item.Kind == kind && item.IsActive)
                 .Select(item => new TextureCatalogHeader(
                     item.Id,
                     item.Kind,

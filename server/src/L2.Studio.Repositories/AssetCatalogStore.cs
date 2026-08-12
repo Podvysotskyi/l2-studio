@@ -34,12 +34,14 @@ public sealed partial class AssetCatalogStore(
         }
 
         var catalog = await context.AssetCatalogs.Include(item => item.Sources)
-            .SingleOrDefaultAsync(item => item.Kind == publication.Kind && item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.GameVersion == publication.GameVersion &&
+                item.Kind == publication.Kind && item.IsActive, cancellationToken);
         if (catalog is null)
         {
             catalog = new AssetCatalog
             {
                 Id = Guid.NewGuid(),
+                GameVersion = publication.GameVersion,
                 Kind = publication.Kind,
                 SourceFolder = publication.SourceFolder,
                 SourceHash = publication.SourceHash,
@@ -131,7 +133,8 @@ public sealed partial class AssetCatalogStore(
             return;
         }
         var catalog = await context.AssetCatalogs.Include(item => item.Sources)
-            .SingleOrDefaultAsync(item => item.Kind == workItem.ImportKind && item.IsActive, cancellationToken);
+            .SingleOrDefaultAsync(item => item.GameVersion == workItem.GameVersion &&
+                item.Kind == workItem.ImportKind && item.IsActive, cancellationToken);
         var previous = catalog?.Sources.SingleOrDefault(source => source.NormalizedSourceKey == workItem.NormalizedSourceKey);
         var previousOutputRoot = previous?.OutputRoot;
         if (previous is not null)

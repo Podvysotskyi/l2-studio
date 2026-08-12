@@ -4,6 +4,7 @@ namespace L2.Studio.Context.Entities;
 
 public sealed class PlayerRace
 {
+    public string GameVersion { get; set; } = "interlude";
     public PlayerRaceId Id { get; set; }
     public required string Name { get; set; }
     public ICollection<PlayerClass> PlayerClasses { get; set; } = [];

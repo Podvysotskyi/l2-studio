@@ -27,13 +27,19 @@ test('starts a scan, observes file progress, inspects diagnostics, and retries o
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    if (url.pathname === '/api/assets/textures/imports' && request.method() === 'POST') {
+    if (url.pathname === '/api/game-versions') {
+      await route.fulfill({ json: [
+        { key: 'interlude', displayName: 'Interlude', sourceFolder: 'Interlude', sortOrder: 30, isDefault: true }
+      ] })
+      return
+    }
+    if (url.pathname === '/api/game-versions/interlude/assets/textures/imports' && request.method() === 'POST') {
       scanStarted = true
       await route.fulfill({ json: baseRun })
       return
     }
     if (url.pathname.endsWith('/imports') && request.method() === 'GET') {
-      const kind = url.pathname.split('/')[3]
+      const kind = url.pathname.split('/')[5]
       await route.fulfill({ json: kind === 'textures' && scanStarted ? [baseRun] : [] })
       return
     }

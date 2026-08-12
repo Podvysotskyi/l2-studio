@@ -22,17 +22,19 @@ public sealed partial class AssetImportRepository(
     private static partial Regex WorldLevelNamePattern();
 
     public async Task<AssetImportRunSummary?> QueueFullScanAsync(
+        string gameVersion,
         string kind,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        await AcquireKindLockAsync(context, kind, cancellationToken);
-        if (await HasConflictingRunAsync(context, kind, null, cancellationToken)) return null;
+        await AcquireKindLockAsync(context, gameVersion, kind, cancellationToken);
+        if (await HasConflictingRunAsync(context, gameVersion, kind, null, cancellationToken)) return null;
 
         var run = new AssetImportRun
         {
             Id = Guid.NewGuid(),
+            GameVersion = gameVersion,
             Kind = kind,
             TriggerType = AssetImportJobValues.FullScan,
             Status = AssetImportJobValues.Queued,
@@ -46,21 +48,23 @@ public sealed partial class AssetImportRepository(
     }
 
     public async Task<AssetImportRunSummary?> QueueSingleFileAsync(
+        string gameVersion,
         string kind,
         string fileName,
         CancellationToken cancellationToken)
     {
-        var source = await ValidateSingleFileAsync(kind, fileName, cancellationToken);
+        var source = await ValidateSingleFileAsync(gameVersion, kind, fileName, cancellationToken);
         var normalized = NormalizeSourceKey(source.FileName);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-        await AcquireKindLockAsync(context, kind, cancellationToken);
-        if (await HasConflictingRunAsync(context, kind, normalized, cancellationToken)) return null;
+        await AcquireKindLockAsync(context, gameVersion, kind, cancellationToken);
+        if (await HasConflictingRunAsync(context, gameVersion, kind, normalized, cancellationToken)) return null;
 
         var now = timeProvider.GetUtcNow();
         var run = new AssetImportRun
         {
             Id = Guid.NewGuid(),
+            GameVersion = gameVersion,
             Kind = kind,
             TriggerType = AssetImportJobValues.SingleFile,
             Status = AssetImportJobValues.Queued,
@@ -73,6 +77,7 @@ public sealed partial class AssetImportRepository(
         var item = new AssetImportWorkItem
         {
             Id = Guid.NewGuid(),
+            GameVersion = gameVersion,
             RunId = run.Id,
             ImportKind = kind,
             SourceKey = source.FileName,
@@ -91,13 +96,14 @@ public sealed partial class AssetImportRepository(
     }
 
     public async Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(
+        string gameVersion,
         string kind,
         int limit,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var runs = await context.AssetImportRuns.AsNoTracking()
-            .Where(run => run.Kind == kind)
+            .Where(run => run.GameVersion == gameVersion && run.Kind == kind)
             .OrderByDescending(run => run.RequestedAt)
             .Take(limit)
             .ToListAsync(cancellationToken);
@@ -106,18 +112,20 @@ public sealed partial class AssetImportRepository(
 
     public async Task<AssetImportRunSummary?> GetAsync(
         Guid id,
+        string gameVersion,
         string kind,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var run = await context.AssetImportRuns.AsNoTracking()
-            .Where(run => run.Id == id && run.Kind == kind)
+            .Where(run => run.Id == id && run.GameVersion == gameVersion && run.Kind == kind)
             .SingleOrDefaultAsync(cancellationToken);
         return run is null ? null : ToSummary(run);
     }
 
     public async Task<AssetImportWorkItemPage?> GetWorkItemsAsync(
         Guid runId,
+        string gameVersion,
         string kind,
         string? sourceKey,
         string? status,
@@ -127,7 +135,7 @@ public sealed partial class AssetImportRepository(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (!await context.AssetImportRuns.AsNoTracking().AnyAsync(
-                run => run.Id == runId && run.Kind == kind, cancellationToken)) return null;
+                run => run.Id == runId && run.GameVersion == gameVersion && run.Kind == kind, cancellationToken)) return null;
         var query = context.AssetImportWorkItems.AsNoTracking().Where(item => item.RunId == runId);
         if (!string.IsNullOrWhiteSpace(sourceKey))
             query = query.Where(item => EF.Functions.ILike(item.SourceKey, $"%{EscapeLike(sourceKey.Trim())}%", "\\"));
@@ -146,6 +154,7 @@ public sealed partial class AssetImportRepository(
 
     public async Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(
         Guid runId,
+        string gameVersion,
         string kind,
         string? sourceKey,
         string? severity,
@@ -159,7 +168,7 @@ public sealed partial class AssetImportRepository(
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (!await context.AssetImportRuns.AsNoTracking().AnyAsync(
-                run => run.Id == runId && run.Kind == kind, cancellationToken)) return null;
+                run => run.Id == runId && run.GameVersion == gameVersion && run.Kind == kind, cancellationToken)) return null;
         var diagnostics = context.AssetImportDiagnostics.AsNoTracking().Where(item => item.RunId == runId);
         if (!string.IsNullOrWhiteSpace(sourceKey)) diagnostics = diagnostics.Where(item => item.SourceKey == sourceKey);
         if (!string.IsNullOrWhiteSpace(severity)) diagnostics = diagnostics.Where(item => item.Severity == severity);
@@ -185,6 +194,7 @@ public sealed partial class AssetImportRepository(
     }
 
     private async Task<ValidatedSource> ValidateSingleFileAsync(
+        string gameVersion,
         string kind,
         string fileName,
         CancellationToken cancellationToken)
@@ -206,7 +216,7 @@ public sealed partial class AssetImportRepository(
         if (kind == AssetImportJobValues.Scenes && WorldLevelNamePattern().IsMatch(stem))
             throw new ArgumentException("The file is a world level, not a client scene.", nameof(fileName));
 
-        var root = Path.GetFullPath(SourceRoot(kind));
+        var root = Path.GetFullPath(SourceRoot(gameVersion, kind));
         string fullPath;
         try
         {
@@ -223,7 +233,7 @@ public sealed partial class AssetImportRepository(
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var normalized = NormalizeSourceKey(Path.GetFileName(fullPath));
             var levelSourceHash = await context.AssetCatalogSources.AsNoTracking().Where(source =>
-                source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive &&
+                source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive &&
                 source.NormalizedSourceKey == normalized)
                 .Select(source => source.SourceHash)
                 .SingleOrDefaultAsync(cancellationToken);
@@ -237,30 +247,41 @@ public sealed partial class AssetImportRepository(
         return new ValidatedSource(Path.GetFileName(fullPath), fullPath, sourceHash);
     }
 
-    private string SourceRoot(string kind) => kind switch
+    private string SourceRoot(string gameVersion, string kind) => Path.Combine(
+        options.Value.SourceRootPath,
+        SourceFolder(gameVersion),
+        kind switch
     {
-        AssetImportJobValues.SystemTextures => options.Value.SystemTexturesSourcePath,
-        AssetImportJobValues.Textures => options.Value.TexturesSourcePath,
-        AssetImportJobValues.Music => options.Value.MusicSourcePath,
-        AssetImportJobValues.Sounds => options.Value.SoundsSourcePath,
-        AssetImportJobValues.StaticMeshes => options.Value.StaticMeshesSourcePath,
-        AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews or AssetImportJobValues.Scenes => options.Value.LevelsSourcePath,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews or AssetImportJobValues.Scenes => "maps",
+        var value => value
+    });
+
+    private static string SourceFolder(string gameVersion) => gameVersion switch
+    {
+        "c1" => "C1",
+        "c4" => "C4",
+        "interlude" => "Interlude",
+        _ => throw new ArgumentOutOfRangeException(nameof(gameVersion))
     };
 
-    private static async Task AcquireKindLockAsync(GameContentDbContext context, string kind, CancellationToken token)
+    private static async Task AcquireKindLockAsync(
+        GameContentDbContext context,
+        string gameVersion,
+        string kind,
+        CancellationToken token)
     {
-        var key = $"l2-asset-import:{kind}";
+        var key = $"l2-asset-import:{gameVersion}:{kind}";
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtext({key}))", token);
     }
 
     private static Task<bool> HasConflictingRunAsync(
         GameContentDbContext context,
+        string gameVersion,
         string kind,
         string? normalizedSourceKey,
         CancellationToken token) =>
-        context.AssetImportRuns.AnyAsync(run => run.Kind == kind &&
+        context.AssetImportRuns.AnyAsync(run => run.GameVersion == gameVersion && run.Kind == kind &&
             AssetImportJobValues.ActiveStatuses.Contains(run.Status) &&
             (normalizedSourceKey == null || run.TriggerType == AssetImportJobValues.FullScan ||
                 run.NormalizedRequestedSourceKey == normalizedSourceKey), token);

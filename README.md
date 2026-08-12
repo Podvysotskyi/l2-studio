@@ -13,7 +13,7 @@ Studio is organized into focused .NET projects:
 - `L2.Studio.Configurations` — dependency registration, CORS, health checks, and host composition
 - `L2.Studio.Contracts` — browser-facing models, requests, and responses
 - `L2.Studio.Context` — EF Core entities and content model mapping
-- `L2.Studio.Migrations` — database migrations and content seed data
+- `L2.Studio.Migrations` — database migrations and version metadata
 - `L2.Studio.Repositories.Interfaces` — persistence abstractions and shared import models
 - `L2.Studio.Repositories` — runtime persistence, catalog access, and source-path validation
 - `L2.Studio.Services` — import orchestration, manifests, preview generation, and asset processing
@@ -68,6 +68,13 @@ is sequential within a Worker process; scaling the Worker horizontally would
 allow different heavy files to convert concurrently.
 
 Do not commit original source packages or generated private assets.
+
+Studio partitions authored content, import state, catalogs, and generated
+outputs by game version. The global UI selector sends version-scoped API routes;
+the worker reads sources from `C1`, `C4`, or `Interlude` below the configured
+source root and publishes files below `versions/{version}/` in the asset root.
+Studio does not generate bootstrap content at startup; import or author each
+version's content explicitly.
 
 ## Checks
 

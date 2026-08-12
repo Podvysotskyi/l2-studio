@@ -2,6 +2,7 @@ namespace L2.Studio.Repositories.Interfaces.Models;
 
 public sealed record AssetCatalogPublication(
     Guid WorkItemId,
+    string GameVersion,
     string Kind,
     string SourceKey,
     string NormalizedSourceKey,
