@@ -36,6 +36,32 @@ export function requireResourceStorage(kind: StorageKind) {
     })
 }
 
+const resourceExtensions: Record<string, string> = {
+  textures: '.utx',
+  staticmeshes: '.usx',
+  sounds: '.uax',
+  music: '.ogg',
+  maps: '.unr',
+  scenes: '.unr'
+}
+
+export function requireCanonicalResourceFile(pathValue: unknown) {
+  if (typeof pathValue !== 'string')
+    throw createError({ statusCode: 400, statusMessage: 'A resource path is required.' })
+  const segments = pathValue.split('/')
+  const expected = resourceExtensions[segments[0] ?? '']
+  if (!expected || segments.length < 2)
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Upload resources inside a canonical asset-kind folder.'
+    })
+  if (!segments.at(-1)?.toLowerCase().endsWith(expected))
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Files in '${segments[0]}' must use the ${expected} extension.`
+    })
+}
+
 async function gameVersions(event: H3Event) {
   const now = Date.now()
   if (versionCache && versionCache.expiresAt > now) return versionCache.versions

@@ -76,7 +76,6 @@ test('starts a scan, observes file progress, inspects diagnostics, and retries o
               runId: baseRun.id,
               importKind: 'textures',
               sourceKey: 'broken.utx',
-              sourcePath: '/sources/broken.utx',
               sourceHash: '1'.repeat(64),
               status: 'failed',
               attemptCount: 1,

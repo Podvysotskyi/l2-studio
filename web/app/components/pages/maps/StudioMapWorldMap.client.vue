@@ -20,9 +20,11 @@ const props = defineProps<{
   previews: ReadonlyMap<string, MapPreviewCatalogEntry>
   previewJobActive: boolean
   queueingPreviewName?: string
+  reimportingMapName?: string
 }>()
 const emit = defineEmits<{
   generatePreview: [mapName: string]
+  reimport: [map: MapCatalogEntry]
 }>()
 
 const viewport = ref<HTMLElement>()
@@ -397,6 +399,15 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
           "
         />
         <div class="mt-5 grid gap-2">
+          <UButton
+            label="Re-import map"
+            icon="i-lucide-rotate-cw"
+            color="neutral"
+            variant="outline"
+            block
+            :loading="reimportingMapName === selectedMap.name"
+            @click="emit('reimport', selectedMap)"
+          />
           <UButton
             :label="
               selectedPreview?.imageUrl

@@ -1,12 +1,18 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using L2.Studio.Context;
 using L2.Studio.Contracts;
 using L2.Studio.Repositories.Interfaces;
+using L2.Studio.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace L2.Studio.Repositories;
 
-public sealed class AssetCatalogRepository(IDbContextFactory<GameContentDbContext> contextFactory)
+public sealed class AssetCatalogRepository(
+    IDbContextFactory<GameContentDbContext> contextFactory,
+    IOptions<AssetImportOptions> options,
+    TimeProvider timeProvider)
     : IAssetCatalogRepository
 {
     public async Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(
@@ -69,6 +75,102 @@ public sealed class AssetCatalogRepository(IDbContextFactory<GameContentDbContex
         return json is null ? null : Parse(json);
     }
 
+    public async Task<AssetArtifactPage> GetArtifactsAsync(
+        string gameVersion,
+        string? kind,
+        string? sourceKey,
+        bool? current,
+        string? integrityStatus,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var artifacts = context.AssetArtifacts.AsNoTracking().Where(item => item.GameVersion == gameVersion);
+        if (!string.IsNullOrWhiteSpace(kind)) artifacts = artifacts.Where(item => item.Kind == kind);
+        if (!string.IsNullOrWhiteSpace(sourceKey))
+        {
+            var pattern = $"%{EscapeLikePattern(sourceKey.Trim())}%";
+            artifacts = artifacts.Where(item => EF.Functions.ILike(item.SourceKey, pattern, "\\"));
+        }
+        if (!string.IsNullOrWhiteSpace(integrityStatus))
+            artifacts = artifacts.Where(item => item.IntegrityStatus == integrityStatus);
+        if (current is not null)
+            artifacts = current.Value
+                ? artifacts.Where(item => item.Publications.Any())
+                : artifacts.Where(item => !item.Publications.Any());
+        var total = await artifacts.LongCountAsync(cancellationToken);
+        var items = await artifacts.OrderByDescending(item => item.CreatedAt).ThenBy(item => item.SourceKey)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(item => new AssetArtifactSummary(
+                item.Id, item.Kind, item.SourceKey, item.SourceHash, item.RecipeVersion,
+                item.BuildFingerprint, item.ContentHash, item.OutputRoot, item.SchemaVersion,
+                item.Protocol, item.FileCount, item.SizeBytes, item.IntegrityStatus,
+                item.LastVerifiedAt, item.CreatedAt, item.Publications.Any()))
+            .ToListAsync(cancellationToken);
+        return new AssetArtifactPage(items, total, page, pageSize);
+    }
+
+    public async Task<AssetArtifactDetail?> GetArtifactAsync(
+        string gameVersion,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var artifact = await context.AssetArtifacts.AsNoTracking().Include(item => item.Files)
+            .Include(item => item.Dependencies)
+            .SingleOrDefaultAsync(item => item.GameVersion == gameVersion && item.Id == id, cancellationToken);
+        if (artifact is null) return null;
+        var summary = new AssetArtifactSummary(
+            artifact.Id, artifact.Kind, artifact.SourceKey, artifact.SourceHash, artifact.RecipeVersion,
+            artifact.BuildFingerprint, artifact.ContentHash, artifact.OutputRoot, artifact.SchemaVersion,
+            artifact.Protocol, artifact.FileCount, artifact.SizeBytes, artifact.IntegrityStatus,
+            artifact.LastVerifiedAt, artifact.CreatedAt,
+            await context.AssetCatalogSources.AsNoTracking().AnyAsync(item => item.ArtifactId == artifact.Id, cancellationToken));
+        return new AssetArtifactDetail(
+            summary,
+            artifact.Files.OrderBy(file => file.RelativePath).Select(file => new AssetArtifactFileSummary(
+                file.RelativePath, file.PublicPath, file.Role, file.MediaType, file.SizeBytes, file.Sha256)).ToArray(),
+            artifact.Dependencies.OrderBy(item => item.Kind).ThenBy(item => item.DependencyKey)
+                .Select(item => new AssetArtifactDependencySummary(
+                    item.Kind, item.DependencyKey, item.ResolvedArtifactId, item.ResolvedSourceKey,
+                    item.BuildFingerprint, item.IsResolved)).ToArray());
+    }
+
+    public async Task<AssetArtifactDetail?> VerifyArtifactAsync(
+        string gameVersion,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var artifact = await context.AssetArtifacts.Include(item => item.Files)
+            .SingleOrDefaultAsync(item => item.GameVersion == gameVersion && item.Id == id, cancellationToken);
+        if (artifact is null) return null;
+        var root = ContainedPath(Path.GetFullPath(options.Value.AssetRootPath), artifact.OutputRoot);
+        var marker = Path.Combine(root, ".l2-asset-version");
+        var healthy = Directory.Exists(root) && File.Exists(Path.Combine(root, ".l2-artifact.json")) &&
+            File.Exists(marker) && string.Equals(
+                (await File.ReadAllTextAsync(marker, cancellationToken)).Trim(),
+                artifact.BuildFingerprint, StringComparison.Ordinal);
+        foreach (var file in artifact.Files)
+        {
+            if (!healthy) break;
+            var path = ContainedPath(root, file.RelativePath);
+            if (!File.Exists(path) || new FileInfo(path).Length != file.SizeBytes)
+            {
+                healthy = false;
+                break;
+            }
+            await using var stream = File.OpenRead(path);
+            var hash = Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellationToken));
+            if (!string.Equals(hash, file.Sha256, StringComparison.Ordinal)) healthy = false;
+        }
+        artifact.IntegrityStatus = healthy ? "healthy" : Directory.Exists(root) ? "corrupt" : "missing";
+        artifact.LastVerifiedAt = timeProvider.GetUtcNow();
+        await context.SaveChangesAsync(cancellationToken);
+        return await GetArtifactAsync(gameVersion, id, cancellationToken);
+    }
+
     private static async Task<AssetCatalogSummary> SummaryAsync(GameContentDbContext context, Guid id, CancellationToken token) =>
         await context.AssetCatalogs.AsNoTracking().Where(catalog => catalog.Id == id)
             .Select(catalog => new AssetCatalogSummary(catalog.Kind, catalog.SourceFolder, catalog.SourceHash,
@@ -77,6 +179,15 @@ public sealed class AssetCatalogRepository(IDbContextFactory<GameContentDbContex
                 catalog.Groups.Count, catalog.PublishedAt)).SingleAsync(token);
 
     private static JsonElement Parse(string json) => JsonSerializer.Deserialize<JsonElement>(json);
+    private static string ContainedPath(string root, string relativePath)
+    {
+        if (Path.IsPathRooted(relativePath)) throw new InvalidDataException("Artifact paths must be relative.");
+        var path = Path.GetFullPath(Path.Combine(root, relativePath));
+        var relative = Path.GetRelativePath(root, path);
+        if (Path.IsPathRooted(relative) || relative.StartsWith("..", StringComparison.Ordinal))
+            throw new InvalidDataException("Artifact path escaped the configured root.");
+        return path;
+    }
     private static string EscapeLikePattern(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

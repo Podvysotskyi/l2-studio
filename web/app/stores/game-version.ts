@@ -11,7 +11,8 @@ import {
 export const useGameVersionStore = defineStore('game-version', () => {
   const versions = ref<GameVersionSummary[]>([])
   const selected = ref(selectedGameVersionKey())
-  const loading = ref(false)
+  const loading = ref(true)
+  const error = ref(false)
   const options = computed(() =>
     versions.value.map(version => ({
       label: version.displayName,
@@ -21,6 +22,7 @@ export const useGameVersionStore = defineStore('game-version', () => {
 
   async function load() {
     loading.value = true
+    error.value = false
     try {
       versions.value = await getGameVersions()
       selected.value = resolveSelectedGameVersionKey(
@@ -28,6 +30,9 @@ export const useGameVersionStore = defineStore('game-version', () => {
         selectedGameVersionKey()
       )
       persist()
+    } catch (cause) {
+      error.value = true
+      throw cause
     } finally {
       loading.value = false
     }
@@ -45,5 +50,5 @@ export const useGameVersionStore = defineStore('game-version', () => {
       window.localStorage.setItem(gameVersionStorageKey, selected.value)
   }
 
-  return { versions, selected, options, loading, load, select }
+  return { versions, selected, options, loading, error, load, select }
 })

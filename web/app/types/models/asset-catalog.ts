@@ -30,13 +30,63 @@ export interface AssetCatalogPage<TItem, TGroup = never> {
   pageSize: number
 }
 
+export interface AssetArtifactSummary {
+  id: string
+  kind: AssetImportKind
+  sourceKey: string
+  sourceHash: string
+  recipeVersion: string
+  buildFingerprint: string
+  contentHash: string
+  outputRoot: string
+  schemaVersion: number
+  protocol: number | null
+  fileCount: number
+  sizeBytes: number
+  integrityStatus: 'healthy' | 'missing' | 'corrupt'
+  lastVerifiedAt: string | null
+  createdAt: string
+  isCurrent: boolean
+}
+
+export interface AssetArtifactFile {
+  relativePath: string
+  publicPath: string
+  role: string
+  mediaType: string
+  sizeBytes: number
+  sha256: string
+}
+
+export interface AssetArtifactDependency {
+  kind: AssetImportKind
+  dependencyKey: string
+  resolvedArtifactId: string | null
+  resolvedSourceKey: string | null
+  buildFingerprint: string | null
+  isResolved: boolean
+}
+
+export interface AssetArtifactDetail {
+  artifact: AssetArtifactSummary
+  files: AssetArtifactFile[]
+  dependencies: AssetArtifactDependency[]
+}
+
+export interface AssetArtifactPage {
+  items: AssetArtifactSummary[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface TexturePackage {
   name: string
   fileName: string
   sha256: string
   textureCount: number
   materialCount: number
-  originalFolder: 'systextures' | 'textures'
+  originalFolder: string
   path: string
 }
 
@@ -117,7 +167,7 @@ export interface TextureManifestEntry {
   gpuCompressed: boolean
   mipCount: number
   animation: TextureAnimationManifestEntry | null
-  originalFolder: 'systextures' | 'textures'
+  originalFolder: string
   path: string
 }
 

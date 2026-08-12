@@ -4,8 +4,11 @@ namespace L2.Studio.Repositories.Interfaces;
 
 public interface IAssetImportRepository
 {
-    Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, CancellationToken cancellationToken);
-    Task<AssetImportRunSummary?> QueueSingleFileAsync(string gameVersion, string kind, string fileName, CancellationToken cancellationToken);
+    Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, bool force, CancellationToken cancellationToken);
+    Task<AssetImportRunSummary?> QueueSingleFileAsync(string gameVersion, string kind, string fileName, bool force, CancellationToken cancellationToken);
+    Task<AssetImportRunSummary?> QueueResourceAsync(string gameVersion, string kind, string resourceName, string? packageName, bool force, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StaleAssetSourceSummary>> GetStaleAsync(string gameVersion, string kind, CancellationToken cancellationToken);
+    Task<AssetImportRunSummary?> QueueStaleAsync(string gameVersion, string kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(string gameVersion, string kind, int limit, CancellationToken cancellationToken);
     Task<AssetImportRunSummary?> GetAsync(Guid id, string gameVersion, string kind, CancellationToken cancellationToken);
     Task<AssetImportWorkItemPage?> GetWorkItemsAsync(

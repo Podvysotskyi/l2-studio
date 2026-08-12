@@ -33,7 +33,7 @@ export default defineNuxtConfig({
     storageResourcesRoot:
       process.env.NUXT_STORAGE_RESOURCES_ROOT ?? '/workspace/resources',
     storageAssetsRoot:
-      process.env.NUXT_STORAGE_ASSETS_ROOT ?? '/workspace/assets',
+      process.env.NUXT_STORAGE_ASSETS_ROOT ?? '/workspace/assets/public',
     public: {
       apiBase: '',
       assetBaseUrl:

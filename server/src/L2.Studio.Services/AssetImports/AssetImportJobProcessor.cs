@@ -33,6 +33,7 @@ public sealed partial class AssetImportJobProcessor(
     TimeProvider timeProvider,
     ILogger<AssetImportJobProcessor> logger) : IAssetImportWorkItemProcessor
 {
+    private readonly List<AssetCatalogDependencyPublication> dependencyHints = [];
     internal const int MapSchemaVersion = 12;
     internal const int SceneSchemaVersion = 11;
 
@@ -40,9 +41,11 @@ public sealed partial class AssetImportJobProcessor(
     {
         WriteIndented = true
     };
+    private static readonly JsonSerializerOptions CompactManifestJsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task ProcessAsync(Guid workItemId, CancellationToken cancellationToken)
     {
+        dependencyHints.Clear();
         await using var executionLock = TryAcquireExecutionLock(workItemId);
         if (executionLock is null)
         {
@@ -53,7 +56,7 @@ public sealed partial class AssetImportJobProcessor(
         var item = await context.AssetImportWorkItems.Include(work => work.Run)
             .SingleOrDefaultAsync(work => work.Id == workItemId, cancellationToken);
         if (item is null) return;
-        if (AssetImportJobValues.TerminalStatuses.Contains(item.Status))
+        if (AssetImportJobValues.WorkItemTerminalStatuses.Contains(item.Status))
         {
             await PublishCompletionAsync(item, cancellationToken);
             return;
@@ -62,6 +65,8 @@ public sealed partial class AssetImportJobProcessor(
         item.Status = AssetImportJobValues.Running;
         item.AttemptCount++;
         item.StartedAt = timeProvider.GetUtcNow();
+        item.LastHeartbeatAt = item.StartedAt;
+        item.Run.LastHeartbeatAt = item.StartedAt;
         item.FinishedAt = null;
         item.TotalResourceCount = 0;
         item.ProcessedResourceCount = 0;
@@ -75,11 +80,13 @@ public sealed partial class AssetImportJobProcessor(
         await context.AssetImportDiagnostics.Where(diagnostic => diagnostic.WorkItemId == item.Id)
             .ExecuteDeleteAsync(cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
+        await using var heartbeat = AssetImportHeartbeatLease.Start(
+            contextFactory, timeProvider, item.RunId, item.Id, cancellationToken);
 
         var sourceStagingPath = Path.Combine(
-            AssetRoot(item), ".source-staging", item.Id.ToString("N"));
+            Path.GetFullPath(options.Value.SourceSnapshotRootPath), item.Id.ToString("N"));
         var outputStagingPath = Path.Combine(
-            AssetRoot(item), ".staging", item.Id.ToString("N"));
+            AssetWorkRoot(item), item.Id.ToString("N"));
         try
         {
             if (Directory.Exists(outputStagingPath)) Directory.Delete(outputStagingPath, recursive: true);
@@ -94,6 +101,9 @@ public sealed partial class AssetImportJobProcessor(
                 item.ConversionSourcePath = snapshotPath;
                 await context.SaveChangesAsync(cancellationToken);
             }
+
+            item.ArtifactFingerprint = await PreliminaryArtifactFingerprintAsync(context, item, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
 
             if (item.ImportKind == AssetImportJobValues.Music)
                 await ImportMusicAsync(context, item, cancellationToken);
@@ -121,6 +131,31 @@ public sealed partial class AssetImportJobProcessor(
         {
             if (Directory.Exists(sourceStagingPath)) Directory.Delete(sourceStagingPath, recursive: true);
         }
+    }
+
+    private static async Task<string> PreliminaryArtifactFingerprintAsync(
+        GameContentDbContext context,
+        AssetImportWorkItem item,
+        CancellationToken cancellationToken)
+    {
+        if (item.SourceHash is null) throw new InvalidOperationException("The source hash is unavailable.");
+        var previous = await context.AssetCatalogSources.AsNoTracking().Include(source => source.Dependencies)
+            .SingleOrDefaultAsync(source => source.Catalog.GameVersion == item.GameVersion &&
+                source.Catalog.Kind == item.ImportKind && source.Catalog.IsActive &&
+                source.NormalizedSourceKey == item.NormalizedSourceKey, cancellationToken);
+        if (previous is null) return AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash, []);
+        var active = await context.AssetCatalogSources.AsNoTracking()
+            .Where(source => source.Catalog.GameVersion == item.GameVersion && source.Catalog.IsActive)
+            .Select(source => new { source.Catalog.Kind, source.NormalizedSourceKey, source.ArtifactFingerprint, source.SourceHash })
+            .ToArrayAsync(cancellationToken);
+        var dependencies = previous.Dependencies.Select(dependency =>
+        {
+            var current = dependency.ResolvedSourceKey is null ? null : active.FirstOrDefault(source =>
+                source.Kind == dependency.Kind && source.NormalizedSourceKey == dependency.ResolvedSourceKey.ToLowerInvariant());
+            return (dependency.Kind, dependency.DependencyKey,
+                current?.ArtifactFingerprint ?? current?.SourceHash ?? "missing");
+        });
+        return AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash, dependencies);
     }
 
     private async Task PersistWarningsAndCompletionAsync(
@@ -196,7 +231,7 @@ public sealed partial class AssetImportJobProcessor(
 
     private FileStream? TryAcquireExecutionLock(Guid workItemId)
     {
-        var lockRoot = Path.Combine(Path.GetFullPath(options.Value.AssetRootPath), ".locks");
+        var lockRoot = Path.Combine(Path.GetFullPath(options.Value.SourceSnapshotRootPath), ".locks");
         Directory.CreateDirectory(lockRoot);
         try
         {

@@ -15,6 +15,7 @@ public sealed record AssetImportRunSummary(
     int SucceededFileCount,
     int WarningFileCount,
     int FailedFileCount,
+    int ReusedFileCount,
     string? Error);
 
 public sealed record AssetImportWorkItemSummary(
@@ -22,8 +23,8 @@ public sealed record AssetImportWorkItemSummary(
     Guid RunId,
     string ImportKind,
     string SourceKey,
-    string SourcePath,
     string? SourceHash,
+    string? ArtifactFingerprint,
     string Status,
     int AttemptCount,
     DateTimeOffset CreatedAt,
@@ -35,6 +36,12 @@ public sealed record AssetImportWorkItemSummary(
     int WarningCount,
     string? Error,
     DateTimeOffset? UnpublishedAt);
+
+public sealed record StaleAssetSourceSummary(
+    string SourceKey,
+    IReadOnlyList<string> ResourceNames,
+    DateTimeOffset StaleAt,
+    IReadOnlyList<string> Reasons);
 
 public sealed record AssetImportDiagnosticSummary(
     long Id,

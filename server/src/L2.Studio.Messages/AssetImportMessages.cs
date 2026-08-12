@@ -30,3 +30,5 @@ public sealed record AssetImportWorkItemCompleted(Guid RunId, Guid WorkItemId);
 public sealed record FinalizeAssetImportRun(Guid RunId);
 public sealed record DeleteAssetVersion(string RelativePath, bool Force);
 public sealed record ReconcileAssetStorage;
+public sealed record ValidateAssetRelease(Guid ReleaseId);
+public sealed record ActivateAssetRelease(string GameVersion, Guid ReleaseId);

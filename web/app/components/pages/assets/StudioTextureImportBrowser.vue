@@ -1,64 +1,102 @@
 <script setup lang="ts">
+import type { TreeItem } from '@nuxt/ui'
 import type { AssetCatalogPage, TextureManifestEntry, TexturePackage } from '~/types/studio'
 import type { AssetImportJob } from '../../../types/models/asset-import-job'
 import { computed, onBeforeUnmount, watch } from 'vue'
-import { getAssetCatalog, getAssetImportJobs, startAssetImport } from '../../../services/studio-api'
+import { getAssetCatalog, getAssetImportJobs, startAssetImport, startAssetResourceImport } from '../../../services/studio-api'
+
+interface TextureTreeItem extends TreeItem {
+  folder?: string
+  packageName?: string
+  children?: TextureTreeItem[]
+}
 
 const route = useRoute()
 const router = useRouter()
 const jobs = ref<AssetImportJob[]>([])
 const catalog = ref<AssetCatalogPage<TextureManifestEntry, TexturePackage>>()
+const treeCatalog = ref<AssetCatalogPage<TextureManifestEntry, TexturePackage>>()
 const query = ref('')
 const page = ref(1)
 const pageSize = ref(100)
 const queueing = ref(false)
 const error = ref<string>()
 const selectedTexture = ref<TextureManifestEntry>()
+const reimporting = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
-const folder = computed(() => route.query.folder === 'systextures' || route.query.folder === 'textures' ? route.query.folder : undefined)
+const folder = computed(() => typeof route.query.folder === 'string' && route.query.folder.length ? route.query.folder : undefined)
 const packageName = computed(() => typeof route.query.package === 'string' ? route.query.package : undefined)
 const activeJob = computed(() => jobs.value.find(job => ['queued', 'discovering', 'running'].includes(job.status)))
-const folders = ['systextures', 'textures'] as const
-const packages = computed(() => catalog.value?.groups ?? [])
 const textures = computed(() => catalog.value?.items ?? [])
-const previewOpen = computed({
-  get: () => selectedTexture.value !== undefined,
-  set: open => { if (!open) selectedTexture.value = undefined }
+const selectedFolder = computed(() => folder.value && packageName.value ? { folder: folder.value, packageName: packageName.value } : undefined)
+const treeItems = computed<TextureTreeItem[]>(() => {
+  const groups = (treeCatalog.value?.groups ?? []).filter(item => item.textureCount > 0)
+  return [...new Set(groups.map(item => item.originalFolder))].sort().flatMap((sourceFolder) => {
+    const children = groups
+      .filter(item => item.originalFolder === sourceFolder)
+      .map(item => ({
+        label: item.name,
+        folder: sourceFolder,
+        packageName: item.name,
+        icon: 'i-lucide-folder'
+      }))
+    return children.length ? [{
+      label: sourceFolder,
+      icon: 'i-lucide-folder',
+      defaultExpanded: true,
+      children
+    }] : []
+  })
 })
-const title = computed(() => packageName.value ?? folder.value ?? 'Textures')
-const description = computed(() => packageName.value
-  ? `/${folder.value}/${packageName.value}`
-  : folder.value ? `/${folder.value}` : '/')
+const selectedTreeItem = computed(() => treeItems.value
+  .flatMap(item => item.children ?? [])
+  .find(item => item.folder === folder.value && item.packageName === packageName.value))
 
-watch([() => route.query.folder, () => route.query.package, query, pageSize], () => {
+watch([folder, packageName], () => {
+  selectedTexture.value = undefined
+  page.value = 1
+  void loadCatalog()
+})
+watch([query, pageSize], () => {
   page.value = 1
   void loadCatalog()
 })
 watch(page, () => void loadCatalog())
 
-function navigate(nextFolder?: string, nextPackage?: string) {
-  void router.push({ path: '/assets/textures', query: {
-    ...(nextFolder ? { folder: nextFolder } : {}),
-    ...(nextPackage ? { package: nextPackage } : {})
-  } })
+function selectFolder(item: TextureTreeItem | undefined) {
+  if (!item?.folder || !item.packageName) return
+  selectedTexture.value = undefined
+  void router.push({
+    path: '/assets/textures',
+    query: { folder: item.folder, package: item.packageName }
+  })
 }
 
-function back() {
-  if (packageName.value) navigate(folder.value)
-  else if (folder.value) navigate()
+async function loadTree() {
+  try {
+    treeCatalog.value = await getAssetCatalog<TextureManifestEntry, TexturePackage>('textures', { pageSize: 1 })
+  } catch {
+    treeCatalog.value = undefined
+  }
 }
 
 async function loadCatalog() {
+  if (!selectedFolder.value) {
+    catalog.value = undefined
+    return
+  }
   try {
     catalog.value = await getAssetCatalog<TextureManifestEntry, TexturePackage>('textures', {
       query: query.value,
-      originalFolder: folder.value,
-      packageName: packageName.value,
+      originalFolder: selectedFolder.value.folder,
+      packageName: selectedFolder.value.packageName,
       page: page.value,
       pageSize: pageSize.value
     })
-  } catch { catalog.value = undefined }
+  } catch {
+    catalog.value = undefined
+  }
 }
 
 async function loadJobs(schedule = true) {
@@ -66,21 +104,44 @@ async function loadJobs(schedule = true) {
   try {
     jobs.value = await getAssetImportJobs('textures')
     error.value = undefined
-    if (!activeJob.value) await loadCatalog()
-  } catch { error.value = 'Texture import jobs could not be loaded from the Studio API.' }
+    if (!activeJob.value) {
+      await Promise.all([loadTree(), loadCatalog()])
+    }
+  } catch {
+    error.value = 'Texture import jobs could not be loaded from the Studio API.'
+  }
   if (schedule && activeJob.value) pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
 async function queueImport() {
   queueing.value = true
   error.value = undefined
-  try { await startAssetImport('textures'); await loadJobs() }
-  catch { error.value = 'The texture import could not be queued. Another texture import may already be active.' }
-  finally { queueing.value = false }
+  try {
+    await startAssetImport('textures')
+    await loadJobs()
+  } catch {
+    error.value = 'The texture import could not be queued. Another texture import may already be active.'
+  } finally {
+    queueing.value = false
+  }
 }
 
-function previewWidth(texture: TextureManifestEntry | undefined) {
-  return texture ? `${Math.min(1024, Math.max(256, texture.width * 4))}px` : undefined
+async function reimportTexture() {
+  if (!selectedTexture.value) return
+  reimporting.value = true
+  error.value = undefined
+  try {
+    await startAssetResourceImport('textures', selectedTexture.value.objectName, selectedTexture.value.packageName)
+    await loadJobs()
+  } catch {
+    error.value = 'The texture package re-import could not be queued.'
+  } finally {
+    reimporting.value = false
+  }
+}
+
+function previewWidth(texture: TextureManifestEntry) {
+  return `${Math.min(1024, Math.max(256, texture.width * 4))}px`
 }
 
 onMounted(() => void loadJobs())
@@ -103,37 +164,42 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     </UCard>
 
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 class="text-sm font-semibold text-highlighted">{{ title }}</h2><p class="text-xs text-muted">{{ description }}</p></div>
-          <UButton v-if="folder" label="Up" icon="i-lucide-arrow-up" color="neutral" variant="outline" @click="back" />
-        </div>
-        <div class="mt-3 flex items-center gap-1 text-xs text-muted"><button type="button" class="hover:text-primary" @click="navigate()">/</button><template v-if="folder"><span>/</span><button type="button" class="hover:text-primary" @click="navigate(folder)">{{ folder }}</button></template><template v-if="packageName"><span>/</span><span>{{ packageName }}</span></template></div>
-      </template>
+      <div v-if="treeCatalog" class="grid min-h-[36rem] md:h-[clamp(40rem,calc(100dvh-20rem),64rem)] md:min-h-0" :class="selectedTexture ? 'md:grid-cols-[16rem_minmax(0,1fr)_minmax(20rem,28rem)]' : 'md:grid-cols-[16rem_minmax(0,1fr)]'">
+        <aside class="border-b border-default p-3 md:flex md:min-h-0 md:flex-col md:border-r md:border-b-0">
+          <h2 class="mb-3 text-sm font-semibold text-highlighted">Folders</h2>
+          <UTree :items="treeItems" :model-value="selectedTreeItem" :get-key="item => item.packageName ? `${item.folder}/${item.packageName}` : item.label ?? ''" class="min-h-0 flex-1 overflow-y-auto" @update:model-value="selectFolder" />
+          <p v-if="treeItems.length === 0" class="p-3 text-sm text-muted">No texture folders are available.</p>
+        </aside>
 
-      <div v-if="catalog" class="min-h-[36rem]">
-        <div class="border-b border-default p-3"><UInput v-model="query" icon="i-lucide-search" placeholder="Search texture paths" aria-label="Search texture paths" /></div>
-        <div v-if="!folder && !query" class="grid gap-3 p-4 sm:grid-cols-2">
-          <button v-for="item in folders" :key="item" type="button" class="flex items-center gap-3 rounded-lg border border-default p-4 text-left hover:bg-elevated" @click="navigate(item)"><UIcon name="i-lucide-folder" class="size-6 text-primary" /><span class="font-medium">{{ item }}</span></button>
-        </div>
-        <div v-else-if="!packageName && !query" class="divide-y divide-default">
-          <button v-for="item in packages" :key="item.path" type="button" class="flex w-full items-center gap-3 p-4 text-left hover:bg-elevated" @click="navigate(folder, item.name)"><UIcon name="i-lucide-folder" class="size-5 text-primary" /><span class="min-w-0 flex-1 truncate font-medium">{{ item.name }}</span><span class="text-xs text-muted">{{ item.textureCount }} textures</span></button>
-          <p v-if="packages.length === 0" class="p-8 text-center text-sm text-muted">No texture packages are available in this folder.</p>
-        </div>
-        <div v-else class="divide-y divide-default">
-          <article v-for="texture in textures" :key="texture.path" class="flex min-w-0 items-center gap-4 p-4">
-            <button v-if="texture.url" type="button" class="shrink-0" :aria-label="`Preview ${texture.path}`" @click="selectedTexture = texture"><img :src="texture.url" :alt="texture.path" width="64" height="64" class="size-16 rounded-md bg-elevated object-contain [image-rendering:pixelated]" /></button>
-            <div v-else class="grid size-16 shrink-0 place-items-center rounded-md bg-elevated text-warning"><UIcon name="i-lucide-image-off" class="size-6" /></div>
-            <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium text-highlighted">{{ texture.objectName }}</p><p class="mt-1 truncate text-xs text-muted">{{ texture.path }} · {{ texture.width }}×{{ texture.height }} · {{ texture.format }}</p><p v-if="texture.error" class="mt-1 truncate text-xs text-error">{{ texture.error }}</p></div>
-            <UBadge :color="texture.status === 'resolved' ? 'success' : 'warning'" variant="subtle" class="shrink-0">{{ texture.status }}</UBadge>
-          </article>
-          <p v-if="textures.length === 0" class="p-8 text-center text-sm text-muted">No textures match the current path and search.</p>
-          <StudioTableFooter v-model:page="page" v-model:page-size="pageSize" :total="catalog.total" :page-size-options="[50, 100, 200]" />
-        </div>
+        <section class="min-w-0 md:flex md:min-h-0 md:flex-col" aria-label="Texture files">
+          <div class="border-b border-default p-3">
+            <h2 class="text-sm font-semibold text-highlighted">{{ packageName ?? 'Texture files' }}</h2>
+            <p class="mt-1 text-xs text-muted">{{ selectedFolder ? `/${selectedFolder.folder}/${selectedFolder.packageName}` : 'Select a folder to view its textures.' }}</p>
+            <UInput v-model="query" class="mt-3" icon="i-lucide-search" placeholder="Search texture paths" aria-label="Search texture paths" :disabled="!selectedFolder" />
+          </div>
+          <div v-if="selectedFolder && catalog" class="min-h-0 divide-y divide-default overflow-y-auto md:flex-1">
+            <button v-for="texture in textures" :key="texture.path" type="button" class="flex w-full min-w-0 items-center gap-4 p-4 text-left hover:bg-elevated" :class="selectedTexture?.path === texture.path ? 'bg-primary/5' : ''" :aria-label="`Select ${texture.path}`" @click="selectedTexture = texture">
+              <img v-if="texture.url" :src="texture.url" :alt="texture.path" width="64" height="64" class="size-16 shrink-0 rounded-md bg-elevated object-contain [image-rendering:pixelated]" />
+              <div v-else class="grid size-16 shrink-0 place-items-center rounded-md bg-elevated text-warning"><UIcon name="i-lucide-image-off" class="size-6" /></div>
+              <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-highlighted">{{ texture.objectName }}</span><span class="mt-1 block truncate text-xs text-muted">{{ texture.path }} · {{ texture.width }}×{{ texture.height }} · {{ texture.format }}</span><span v-if="texture.error" class="mt-1 block truncate text-xs text-error">{{ texture.error }}</span></span>
+              <UBadge :color="texture.status === 'resolved' ? 'success' : 'warning'" variant="subtle" class="shrink-0">{{ texture.status }}</UBadge>
+            </button>
+            <p v-if="textures.length === 0" class="p-8 text-center text-sm text-muted">No textures match the selected folder and search.</p>
+          </div>
+          <div v-else class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted">Select a folder to view its textures.</div>
+          <StudioTableFooter v-if="selectedFolder && catalog" v-model:page="page" v-model:page-size="pageSize" :total="catalog.total" :page-size-options="[50, 100, 200]" />
+        </section>
+
+        <aside v-if="selectedTexture" class="min-w-0 border-t border-default md:flex md:min-h-0 md:flex-col md:border-t-0 md:border-l">
+          <div class="border-b border-default p-3"><h2 class="truncate text-sm font-semibold text-highlighted">{{ selectedTexture.objectName }}</h2><p class="mt-1 truncate text-xs text-muted">{{ selectedTexture.path }}</p></div>
+          <div class="grid min-h-64 flex-1 place-items-center overflow-auto bg-black/30 p-3">
+            <img v-if="selectedTexture.url" :src="selectedTexture.url" :alt="selectedTexture.path" :style="{ width: previewWidth(selectedTexture) }" class="h-auto max-h-[58vh] max-w-full object-contain [image-rendering:pixelated]" />
+            <div v-else class="text-center text-sm text-muted"><UIcon name="i-lucide-image-off" class="mx-auto mb-2 size-6" />Preview unavailable</div>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-t border-default p-3 text-xs text-muted"><span>{{ selectedTexture.width }}×{{ selectedTexture.height }} · {{ selectedTexture.format }} · {{ selectedTexture.mipCount }} mips</span><UButton label="Re-import package" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting" @click="reimportTexture" /></div>
+        </aside>
       </div>
       <div v-else class="grid min-h-64 place-items-center p-8 text-center text-sm text-muted">No imported texture catalog is available. Queue the first import.</div>
     </UCard>
-
-    <UModal v-model:open="previewOpen" :title="selectedTexture?.objectName" :description="selectedTexture?.path" :ui="{ content: 'max-w-[min(96vw,80rem)]' }"><template #body><div class="grid max-h-[78vh] place-items-center overflow-auto bg-black/30 p-2"><img v-if="selectedTexture?.url" :src="selectedTexture.url" :alt="selectedTexture.path" :style="{ width: previewWidth(selectedTexture) }" class="h-auto max-h-[74vh] max-w-full object-contain [image-rendering:pixelated]" /></div></template></UModal>
   </div>
 </template>

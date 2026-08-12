@@ -110,14 +110,6 @@ async function rename(entry: StorageEntry) {
   await moveWithConflict(entry.path, parent ? `${parent}/${name}` : name)
 }
 
-async function move(entry: StorageEntry) {
-  const destination = window
-    .prompt('Destination path from the selected version root', entry.path)
-    ?.trim()
-  if (!destination || destination === entry.path) return
-  await moveWithConflict(entry.path, destination)
-}
-
 async function moveWithConflict(path: string, destination: string) {
   try {
     await moveStorageEntry(path, destination)
@@ -341,6 +333,14 @@ onMounted(() => void load())
       description="Use asset imports to publish or remove generated outputs without desynchronizing the Studio catalog."
     />
     <UAlert
+      v-else
+      color="info"
+      variant="subtle"
+      icon="i-lucide-folders"
+      title="Resources are organized by asset kind"
+      description="Upload packages inside textures, staticmeshes, sounds, music, maps, or scenes. Studio validates the expected package extension for each folder."
+    />
+    <UAlert
       v-if="error"
       color="error"
       variant="subtle"
@@ -425,6 +425,23 @@ onMounted(() => void load())
             </tr>
           </thead>
           <tbody class="divide-y divide-default">
+            <tr v-if="loading">
+              <td colspan="4">
+                <div
+                  class="grid min-h-64 place-items-center gap-3 p-8 text-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <UIcon
+                    name="i-lucide-loader-circle"
+                    class="size-6 animate-spin text-primary"
+                  />
+                  <p class="text-sm text-muted">Loading directory…</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-if="!loading" class="divide-y divide-default">
             <tr v-if="currentPath">
               <td colspan="4" class="px-4 py-2">
                 <button
@@ -478,14 +495,6 @@ onMounted(() => void load())
                       variant="ghost"
                       size="xs"
                       @click="rename(entry)"
-                    />
-                    <UButton
-                      icon="i-lucide-folder-input"
-                      :aria-label="`Move ${entry.name}`"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      @click="move(entry)"
                     />
                     <UButton
                       icon="i-lucide-trash-2"

@@ -9,7 +9,8 @@ import { computed, onBeforeUnmount, watch } from 'vue'
 import {
   getAssetCatalog,
   getAssetImportJobs,
-  startAssetImport
+  startAssetImport,
+  startAssetResourceImport
 } from '../../../services/studio-api'
 
 const jobs = ref<AssetImportJob[]>([])
@@ -24,6 +25,7 @@ const page = ref(1)
 const pageSize = ref(50)
 const queueing = ref(false)
 const error = ref<string>()
+const reimporting = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -100,6 +102,19 @@ async function queueImport() {
       'The static-mesh import could not be queued. Another import may already be active.'
   } finally {
     queueing.value = false
+  }
+}
+
+async function reimportMesh(mesh: StaticMeshManifestEntry) {
+  reimporting.value = `${mesh.packageName}/${mesh.objectName}`
+  error.value = undefined
+  try {
+    await startAssetResourceImport('staticmeshes', mesh.objectName, mesh.packageName)
+    await loadJobs()
+  } catch {
+    error.value = 'The static-mesh package re-import could not be queued.'
+  } finally {
+    reimporting.value = undefined
   }
 }
 
@@ -229,14 +244,12 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <div
             class="max-h-[42rem] divide-y divide-default overflow-y-auto md:min-h-0 md:flex-1 md:max-h-none"
           >
-            <button
+            <div
               v-for="mesh in visibleMeshes"
               :key="`${mesh.packageName}/${mesh.objectName}`"
-              type="button"
-              class="flex w-full items-center gap-4 p-4 text-left hover:bg-elevated disabled:cursor-not-allowed"
-              :disabled="!mesh.url"
-              @click="showPreview(mesh)"
+              class="flex w-full items-center gap-4 p-4 text-left hover:bg-elevated"
             >
+              <button type="button" class="flex min-w-0 flex-1 items-center gap-4 text-left disabled:cursor-not-allowed" :disabled="!mesh.url" @click="showPreview(mesh)">
               <span
                 class="grid size-14 shrink-0 place-items-center rounded-lg bg-elevated text-primary"
                 ><UIcon name="i-lucide-box" class="size-7"
@@ -278,7 +291,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                 name="i-lucide-maximize-2"
                 class="size-4 text-muted"
               />
-            </button>
+              </button>
+              <UButton label="Re-import" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting === `${mesh.packageName}/${mesh.objectName}`" @click="reimportMesh(mesh)" />
+            </div>
             <div
               v-if="visibleMeshes.length === 0"
               class="grid min-h-48 place-items-center p-8 text-sm text-muted"

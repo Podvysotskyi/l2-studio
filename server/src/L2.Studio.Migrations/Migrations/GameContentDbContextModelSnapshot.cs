@@ -23,6 +23,229 @@ namespace L2.Studio.Migrations.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BuildFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("build_fingerprint");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("FileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("file_count");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("IntegrityStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("integrity_status");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LastVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_verified_at");
+
+                    b.Property<string>("NormalizedSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_source_key");
+
+                    b.Property<string>("OutputRoot")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("output_root");
+
+                    b.Property<int?>("Protocol")
+                        .HasColumnType("integer")
+                        .HasColumnName("protocol");
+
+                    b.Property<Guid>("PublishingWorkItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publishing_work_item_id");
+
+                    b.Property<string>("RecipeVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("recipe_version");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutputRoot")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_artifacts_output_root");
+
+                    b.HasIndex("PublishingWorkItemId");
+
+                    b.HasIndex("GameVersion", "Kind", "IntegrityStatus")
+                        .HasDatabaseName("ix_asset_artifacts_integrity");
+
+                    b.HasIndex("GameVersion", "Kind", "NormalizedSourceKey", "BuildFingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_artifacts_build");
+
+                    b.ToTable("asset_artifacts", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifactDependency", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<string>("BuildFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("build_fingerprint");
+
+                    b.Property<string>("DependencyKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("dependency_key");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_resolved");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("ResolvedArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_artifact_id");
+
+                    b.Property<string>("ResolvedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("resolved_source_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResolvedArtifactId")
+                        .HasDatabaseName("ix_asset_artifact_dependencies_resolved");
+
+                    b.HasIndex("ArtifactId", "Kind", "DependencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_artifact_dependencies_key");
+
+                    b.ToTable("asset_artifact_dependencies", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifactFile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("media_type");
+
+                    b.Property<string>("PublicPath")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_path");
+
+                    b.Property<string>("RelativePath")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("relative_path");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArtifactId", "RelativePath")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_artifact_files_path");
+
+                    b.ToTable("asset_artifact_files", "content");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -186,9 +409,22 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ArtifactFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_fingerprint");
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
                     b.Property<Guid>("CatalogId")
                         .HasColumnType("uuid")
                         .HasColumnName("catalog_id");
+
+                    b.Property<bool>("IsStale")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_stale");
 
                     b.Property<string>("MetadataJson")
                         .IsRequired()
@@ -232,13 +468,78 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("source_key");
 
+                    b.Property<DateTimeOffset?>("StaleAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stale_at");
+
+                    b.Property<string>("StaleReasonsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("stale_reasons_json")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ArtifactId");
 
                     b.HasIndex("CatalogId", "NormalizedSourceKey")
                         .IsUnique()
                         .HasDatabaseName("ix_asset_catalog_sources_catalog_source");
 
                     b.ToTable("asset_catalog_sources", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSourceDependency", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ArtifactFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_fingerprint");
+
+                    b.Property<string>("DependencyKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("dependency_key");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_resolved");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("ResolvedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("resolved_source_key");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceId");
+
+                    b.HasIndex("Kind", "DependencyKey")
+                        .HasDatabaseName("ix_asset_catalog_source_dependencies_key");
+
+                    b.HasIndex("Kind", "ResolvedSourceKey")
+                        .HasDatabaseName("ix_asset_catalog_source_dependencies_source");
+
+                    b.ToTable("asset_catalog_source_dependencies", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportDiagnostic", b =>
@@ -340,6 +641,10 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
 
+                    b.Property<bool>("Force")
+                        .HasColumnType("boolean")
+                        .HasColumnName("force");
+
                     b.Property<string>("GameVersion")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -354,6 +659,10 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("kind");
 
+                    b.Property<DateTimeOffset?>("LastHeartbeatAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_heartbeat_at");
+
                     b.Property<string>("NormalizedRequestedSourceKey")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -367,6 +676,10 @@ namespace L2.Studio.Migrations.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("requested_source_key");
+
+                    b.Property<int>("ReusedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reused_file_count");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -416,6 +729,11 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ArtifactFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("artifact_fingerprint");
+
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
@@ -446,6 +764,10 @@ namespace L2.Studio.Migrations.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("import_kind");
+
+                    b.Property<DateTimeOffset?>("LastHeartbeatAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_heartbeat_at");
 
                     b.Property<string>("NormalizedSourceKey")
                         .IsRequired()
@@ -516,6 +838,249 @@ namespace L2.Studio.Migrations.Migrations
                         .HasDatabaseName("ix_asset_import_work_items_run_status");
 
                     b.ToTable("asset_import_work_items", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetRelease", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CharacterSelectionCameraSequence")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("character_selection_camera_sequence");
+
+                    b.Property<long?>("CharacterSelectionSceneFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("character_selection_scene_file_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("game_version");
+
+                    b.Property<long?>("LoadingArtworkFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("loading_artwork_file_id");
+
+                    b.Property<string>("LoginCameraSequence")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("login_camera_sequence");
+
+                    b.Property<long?>("LoginMusicFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("login_music_file_id");
+
+                    b.Property<long?>("LoginSceneFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("login_scene_file_id");
+
+                    b.Property<string>("ManifestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("manifest_hash");
+
+                    b.Property<string>("ManifestPath")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("manifest_path");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("notes");
+
+                    b.Property<long?>("PrimaryLogoFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("primary_logo_file_id");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("ValidatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("validated_at");
+
+                    b.Property<string>("ValidatedSnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("validated_snapshot_hash");
+
+                    b.Property<string>("ValidationIssuesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("validation_issues_json");
+
+                    b.Property<DateTimeOffset?>("ValidationRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("validation_requested_at");
+
+                    b.Property<string>("ValidationStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("validation_status");
+
+                    b.Property<long?>("VersionLogoFileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version_logo_file_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacterSelectionSceneFileId");
+
+                    b.HasIndex("LoadingArtworkFileId");
+
+                    b.HasIndex("LoginMusicFileId");
+
+                    b.HasIndex("LoginSceneFileId");
+
+                    b.HasIndex("PrimaryLogoFileId");
+
+                    b.HasIndex("VersionLogoFileId");
+
+                    b.HasIndex("GameVersion", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_releases_version_name");
+
+                    b.HasIndex("GameVersion", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_asset_releases_version_status");
+
+                    b.ToTable("asset_releases", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleaseArtifact", b =>
+                {
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<Guid>("ArtifactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("artifact_id");
+
+                    b.Property<bool>("IsRoot")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_root");
+
+                    b.HasKey("ReleaseId", "ArtifactId");
+
+                    b.HasIndex("ArtifactId")
+                        .HasDatabaseName("ix_asset_release_artifacts_artifact");
+
+                    b.ToTable("asset_release_artifacts", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleaseEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("DetailsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details_json");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReleaseId");
+
+                    b.ToTable("asset_release_events", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleasePointer", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("game_version");
+
+                    b.Property<Guid?>("DesiredReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("desired_release_id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid?>("PublishedReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_release_id");
+
+                    b.Property<DateTimeOffset?>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("GameVersion");
+
+                    b.HasIndex("DesiredReleaseId");
+
+                    b.HasIndex("PublishedReleaseId");
+
+                    b.ToTable("asset_release_pointers", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.GameVersion", b =>
@@ -1049,6 +1614,52 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("skill_target_types", "content");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifact", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetImportWorkItem", "PublishingWorkItem")
+                        .WithMany()
+                        .HasForeignKey("PublishingWorkItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PublishingWorkItem");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifactDependency", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifact", "Artifact")
+                        .WithMany("Dependencies")
+                        .HasForeignKey("ArtifactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifact", "ResolvedArtifact")
+                        .WithMany()
+                        .HasForeignKey("ResolvedArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Artifact");
+
+                    b.Navigation("ResolvedArtifact");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifactFile", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifact", "Artifact")
+                        .WithMany("Files")
+                        .HasForeignKey("ArtifactId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Artifact");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalog", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -1098,13 +1709,32 @@ namespace L2.Studio.Migrations.Migrations
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSource", b =>
                 {
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifact", "Artifact")
+                        .WithMany("Publications")
+                        .HasForeignKey("ArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("L2.Studio.Context.Entities.AssetCatalog", "Catalog")
                         .WithMany("Sources")
                         .HasForeignKey("CatalogId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Artifact");
+
                     b.Navigation("Catalog");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSourceDependency", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetCatalogSource", "Source")
+                        .WithMany("Dependencies")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Source");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportDiagnostic", b =>
@@ -1149,6 +1779,98 @@ namespace L2.Studio.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("Run");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetRelease", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("CharacterSelectionSceneFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("LoadingArtworkFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("LoginMusicFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("LoginSceneFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("PrimaryLogoFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifactFile", null)
+                        .WithMany()
+                        .HasForeignKey("VersionLogoFileId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleaseArtifact", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetArtifact", "Artifact")
+                        .WithMany("Releases")
+                        .HasForeignKey("ArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetRelease", "Release")
+                        .WithMany("Artifacts")
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Artifact");
+
+                    b.Navigation("Release");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleaseEvent", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetRelease", "Release")
+                        .WithMany("Events")
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Release");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetReleasePointer", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.AssetRelease", "DesiredRelease")
+                        .WithMany()
+                        .HasForeignKey("DesiredReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithOne()
+                        .HasForeignKey("L2.Studio.Context.Entities.AssetReleasePointer", "GameVersion")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.AssetRelease", "PublishedRelease")
+                        .WithMany()
+                        .HasForeignKey("PublishedReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DesiredRelease");
+
+                    b.Navigation("PublishedRelease");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
@@ -1393,6 +2115,17 @@ namespace L2.Studio.Migrations.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifact", b =>
+                {
+                    b.Navigation("Dependencies");
+
+                    b.Navigation("Files");
+
+                    b.Navigation("Publications");
+
+                    b.Navigation("Releases");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalog", b =>
                 {
                     b.Navigation("Groups");
@@ -1404,6 +2137,8 @@ namespace L2.Studio.Migrations.Migrations
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetCatalogSource", b =>
                 {
+                    b.Navigation("Dependencies");
+
                     b.Navigation("Groups");
 
                     b.Navigation("Items");
@@ -1419,6 +2154,13 @@ namespace L2.Studio.Migrations.Migrations
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
                 {
                     b.Navigation("Diagnostics");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetRelease", b =>
+                {
+                    b.Navigation("Artifacts");
+
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcRace", b =>

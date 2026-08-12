@@ -90,8 +90,10 @@ public sealed class AssetImportRunHandlers(
                 var removed = catalog.Sources.Where(source => !discovered.Contains(source.NormalizedSourceKey)).ToArray();
                 foreach (var source in removed)
                 {
+                    await MarkRemovedDependencyStaleAsync(
+                        context, run.GameVersion, run.Kind, source.NormalizedSourceKey,
+                        source.SourceKey, timeProvider.GetUtcNow(), cancellationToken);
                     context.AssetCatalogSources.Remove(source);
-                    await outbox.PublishAsync(new DeleteAssetVersion(source.OutputRoot, true));
                 }
                 var remaining = catalog.Sources.Where(source => !removed.Contains(source)).ToArray();
                 catalog.SourceHash = AggregateHash(remaining.Select(source =>
@@ -112,11 +114,12 @@ public sealed class AssetImportRunHandlers(
 
     internal static void ApplyCounts(AssetImportRun run)
     {
-        run.CompletedFileCount = run.WorkItems.Count(item => AssetImportJobValues.TerminalStatuses.Contains(item.Status));
+        run.CompletedFileCount = run.WorkItems.Count(item => AssetImportJobValues.WorkItemTerminalStatuses.Contains(item.Status));
         run.SucceededFileCount = run.WorkItems.Count(item =>
             item.Status is AssetImportJobValues.Succeeded or AssetImportJobValues.SucceededWithWarnings);
         run.WarningFileCount = run.WorkItems.Count(item => item.WarningCount > 0);
         run.FailedFileCount = run.WorkItems.Count(item => item.Status == AssetImportJobValues.Failed);
+        run.ReusedFileCount = run.WorkItems.Count(item => item.Status == AssetImportJobValues.Reused);
     }
 
     private static string AggregateHash(IEnumerable<(string SourceKey, string SourceHash)> sources)
@@ -124,6 +127,32 @@ public sealed class AssetImportRunHandlers(
         var value = string.Join('\n', sources.OrderBy(item => item.SourceKey, StringComparer.Ordinal)
             .Select(item => $"{item.SourceKey}\0{item.SourceHash}"));
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
+
+    private static async Task MarkRemovedDependencyStaleAsync(
+        GameContentDbContext context,
+        string gameVersion,
+        string kind,
+        string normalizedSourceKey,
+        string sourceKey,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var dependencies = await context.AssetCatalogSourceDependencies.Include(dependency => dependency.Source)
+            .ThenInclude(source => source.Catalog)
+            .Where(dependency => dependency.Kind == kind &&
+                dependency.ResolvedSourceKey == normalizedSourceKey &&
+                dependency.Source.Catalog.GameVersion == gameVersion && dependency.Source.Catalog.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var dependency in dependencies)
+        {
+            dependency.Source.IsStale = true;
+            dependency.Source.StaleAt ??= now;
+            var reasons = JsonSerializer.Deserialize<List<string>>(dependency.Source.StaleReasonsJson) ?? [];
+            var reason = $"Dependency {kind}:{sourceKey} was removed.";
+            if (!reasons.Contains(reason, StringComparer.Ordinal)) reasons.Add(reason);
+            dependency.Source.StaleReasonsJson = JsonSerializer.Serialize(reasons);
+        }
     }
 }
 
@@ -150,17 +179,27 @@ public sealed class AssetStorageHandlers(
         var running = await context.AssetImportWorkItems.AsNoTracking()
             .Where(item => item.Status == AssetImportJobValues.Running)
             .Select(item => item.Id).ToListAsync(cancellationToken);
-        var stagingRoot = Path.Combine(root, ".staging");
-        CleanStagingRoot(stagingRoot, running);
-        CleanStagingRoot(Path.Combine(root, ".source-staging"), running);
+        CleanStagingRoot(Path.GetFullPath(options.Value.AssetWorkRootPath), running);
+        CleanStagingRoot(Path.GetFullPath(options.Value.SourceSnapshotRootPath), running, ".locks");
 
         var affectedCatalogs = new HashSet<AssetCatalog>();
-        var sources = await context.AssetCatalogSources.Include(source => source.Catalog).ToListAsync(cancellationToken);
+        var sources = await context.AssetCatalogSources.Include(source => source.Catalog)
+            .Include(source => source.Artifact).ToListAsync(cancellationToken);
         foreach (var source in sources)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var outputPath = ContainedPath(root, source.OutputRoot);
-            if (Directory.Exists(outputPath) && File.Exists(Path.Combine(outputPath, ".l2-asset-version"))) continue;
+            var marker = Path.Combine(outputPath, ".l2-asset-version");
+            if (Directory.Exists(outputPath) && File.Exists(marker) &&
+                string.Equals((await File.ReadAllTextAsync(marker, cancellationToken)).Trim(),
+                    source.Artifact.BuildFingerprint, StringComparison.Ordinal))
+            {
+                source.Artifact.IntegrityStatus = "healthy";
+                source.Artifact.LastVerifiedAt = timeProvider.GetUtcNow();
+                continue;
+            }
+            source.Artifact.IntegrityStatus = Directory.Exists(outputPath) ? "corrupt" : "missing";
+            source.Artifact.LastVerifiedAt = timeProvider.GetUtcNow();
             var runId = await context.AssetImportWorkItems.Where(item => item.Id == source.PublishingWorkItemId)
                 .Select(item => (Guid?)item.RunId).SingleOrDefaultAsync(cancellationToken);
             if (runId is not null)
@@ -177,6 +216,7 @@ public sealed class AssetStorageHandlers(
                     CreatedAt = timeProvider.GetUtcNow()
                 });
             }
+            await MarkMissingDependencyStaleAsync(context, source, timeProvider.GetUtcNow(), cancellationToken);
             affectedCatalogs.Add(source.Catalog);
             context.AssetCatalogSources.Remove(source);
         }
@@ -192,25 +232,14 @@ public sealed class AssetStorageHandlers(
         }
         await context.SaveChangesAsync(cancellationToken);
 
-        var referenced = await context.AssetCatalogSources.AsNoTracking()
-            .Select(source => new { source.OutputRoot, source.ReferencedOutputRootsJson })
-            .ToListAsync(cancellationToken);
-        var referencedRoots = referenced.Select(source => source.OutputRoot)
-            .Concat(referenced.SelectMany(source =>
-                JsonSerializer.Deserialize<string[]>(source.ReferencedOutputRootsJson) ?? []))
-            .ToHashSet(StringComparer.Ordinal);
-        foreach (var marker in Directory.EnumerateFiles(root, ".l2-asset-version", SearchOption.AllDirectories).ToArray())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var directory = Path.GetDirectoryName(marker)!;
-            var relative = Path.GetRelativePath(root, directory).Replace('\\', '/');
-            if (!referencedRoots.Contains(relative)) Directory.Delete(directory, recursive: true);
-        }
     }
 
     private async Task<bool> IsReferencedAsync(string relativePath, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (await context.AssetArtifacts.AsNoTracking().AnyAsync(
+                artifact => artifact.OutputRoot == relativePath, cancellationToken))
+            return true;
         if (await context.AssetCatalogSources.AsNoTracking().AnyAsync(source => source.OutputRoot == relativePath, cancellationToken))
             return true;
         var json = await context.AssetCatalogSources.AsNoTracking()
@@ -219,11 +248,39 @@ public sealed class AssetStorageHandlers(
             .Contains(relativePath, StringComparer.Ordinal);
     }
 
-    private static void CleanStagingRoot(string stagingRoot, IReadOnlyCollection<Guid> running)
+    private static async Task MarkMissingDependencyStaleAsync(
+        GameContentDbContext context,
+        AssetCatalogSource missing,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var dependencies = await context.AssetCatalogSourceDependencies.Include(dependency => dependency.Source)
+            .ThenInclude(source => source.Catalog)
+            .Where(dependency => dependency.Kind == missing.Catalog.Kind &&
+                dependency.ResolvedSourceKey == missing.NormalizedSourceKey &&
+                dependency.Source.Catalog.GameVersion == missing.Catalog.GameVersion &&
+                dependency.Source.Catalog.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var dependency in dependencies)
+        {
+            dependency.Source.IsStale = true;
+            dependency.Source.StaleAt ??= now;
+            var reasons = JsonSerializer.Deserialize<List<string>>(dependency.Source.StaleReasonsJson) ?? [];
+            var reason = $"Dependency {missing.Catalog.Kind}:{missing.SourceKey} is unavailable.";
+            if (!reasons.Contains(reason, StringComparer.Ordinal)) reasons.Add(reason);
+            dependency.Source.StaleReasonsJson = JsonSerializer.Serialize(reasons);
+        }
+    }
+
+    private static void CleanStagingRoot(
+        string stagingRoot,
+        IReadOnlyCollection<Guid> running,
+        string? ignoredDirectory = null)
     {
         if (!Directory.Exists(stagingRoot)) return;
         foreach (var path in Directory.EnumerateDirectories(stagingRoot))
         {
+            if (Path.GetFileName(path) == ignoredDirectory) continue;
             if (!Guid.TryParseExact(Path.GetFileName(path), "N", out var id) || !running.Contains(id))
                 Directory.Delete(path, recursive: true);
         }

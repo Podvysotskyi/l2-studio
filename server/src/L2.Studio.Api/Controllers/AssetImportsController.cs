@@ -1,4 +1,5 @@
 using L2.Studio.Contracts;
+using L2.Studio.Contracts.Requests;
 using L2.Studio.Exceptions;
 using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Repositories.Interfaces.Models;
@@ -11,26 +12,50 @@ namespace L2.Studio.Api.Controllers;
 public sealed class AssetImportsController(IAssetImportRepository repository) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<AssetImportRunSummary>> Queue(string gameVersion, string kind, CancellationToken token)
+    public async Task<ActionResult<AssetImportRunSummary>> Queue(
+        string gameVersion, string kind, [FromBody] AssetImportRequest? request, CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        var run = await repository.QueueFullScanAsync(gameVersion, kind, token);
+        AssetImportRunSummary? run;
+        try
+        {
+            if (kind == AssetImportJobValues.MapPreviews && !string.IsNullOrWhiteSpace(request?.MapName))
+            {
+                var fileName = request.MapName.EndsWith(".unr", StringComparison.OrdinalIgnoreCase)
+                    ? request.MapName
+                    : request.MapName + ".unr";
+                run = await repository.QueueSingleFileAsync(gameVersion, kind, fileName, request.Force, token);
+            }
+            else
+            {
+                run = await repository.QueueFullScanAsync(gameVersion, kind, request?.Force ?? false, token);
+            }
+        }
+        catch (ArgumentException exception)
+        {
+            return ValidationError("mapName", exception.Message);
+        }
+        catch (AssetImportTargetNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
         return run is null
             ? Conflict(new { message = $"An import for '{kind}' conflicts with an active run." })
             : Accepted($"/api/game-versions/{gameVersion}/assets/{kind}/imports/{run.Id}", run);
     }
 
-    [HttpPost("files/{fileName}")]
+    [HttpPost("files/{**fileName}")]
     public async Task<ActionResult<AssetImportRunSummary>> QueueFile(
         string kind,
         string gameVersion,
         string fileName,
+        [FromQuery] bool force,
         CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
         try
         {
-            var run = await repository.QueueSingleFileAsync(gameVersion, kind, fileName, token);
+            var run = await repository.QueueSingleFileAsync(gameVersion, kind, fileName, force, token);
             return run is null
                 ? Conflict(new { message = $"The requested '{kind}' file conflicts with an active run." })
                 : Accepted($"/api/game-versions/{gameVersion}/assets/{kind}/imports/{run.Id}", run);
@@ -46,6 +71,53 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         {
             return NotFound(new { message = exception.Message });
         }
+    }
+
+    [HttpPost("resources")]
+    public async Task<ActionResult<AssetImportRunSummary>> QueueResource(
+        string kind,
+        string gameVersion,
+        [FromBody] AssetResourceImportRequest request,
+        CancellationToken token)
+    {
+        if (kind is not (AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes or AssetImportJobValues.Maps)) return NotFound();
+        if (string.IsNullOrWhiteSpace(request.ResourceName)) return ValidationError("resourceName", "A resource name is required.");
+        if (kind is AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes && string.IsNullOrWhiteSpace(request.PackageName))
+            return ValidationError("packageName", "A package name is required.");
+        try
+        {
+            var run = await repository.QueueResourceAsync(gameVersion, kind, request.ResourceName, request.PackageName, request.Force, token);
+            return run is null
+                ? Conflict(new { message = $"The requested '{kind}' resource conflicts with an active run." })
+                : Accepted($"/api/game-versions/{gameVersion}/assets/{kind}/imports/{run.Id}", run);
+        }
+        catch (ArgumentException exception)
+        {
+            return ValidationError("resourceName", exception.Message);
+        }
+        catch (AssetImportTargetNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    [HttpGet("stale")]
+    public async Task<ActionResult<IReadOnlyList<StaleAssetSourceSummary>>> ListStale(
+        string kind, string gameVersion, CancellationToken token)
+    {
+        if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
+        return Ok(await repository.GetStaleAsync(gameVersion, kind, token));
+    }
+
+    [HttpPost("stale")]
+    public async Task<ActionResult<AssetImportRunSummary>> QueueStale(
+        string kind, string gameVersion, CancellationToken token)
+    {
+        if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
+        var run = await repository.QueueStaleAsync(gameVersion, kind, token);
+        return run is null
+            ? Conflict(new { message = $"A stale rebuild for '{kind}' conflicts with an active run." })
+            : Accepted($"/api/game-versions/{gameVersion}/assets/{kind}/imports/{run.Id}", run);
     }
 
     [HttpGet]
@@ -82,7 +154,7 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
         if (page < 1) return ValidationError("page", "Page must be at least 1.");
         if (pageSize is < 1 or > 100) return ValidationError("pageSize", "Page size must be between 1 and 100.");
-        if (status is not null && !AssetImportJobValues.ActiveStatuses.Concat(AssetImportJobValues.TerminalStatuses).Contains(status))
+        if (status is not null && !AssetImportJobValues.ActiveStatuses.Concat(AssetImportJobValues.WorkItemTerminalStatuses).Contains(status))
             return ValidationError("status", "Work-item status is invalid.");
         var result = await repository.GetWorkItemsAsync(id, gameVersion, kind, sourceKey, status, page, pageSize, token);
         return result is null ? NotFound() : Ok(result);

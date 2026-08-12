@@ -6,7 +6,7 @@ namespace L2.Studio.Repositories.Tests;
 public sealed class AssetImportPathValidatorTests
 {
     [Fact]
-    public void RejectsValuesThatAreNotSingleFilenames()
+    public void RejectsInvalidOrEscapingSourceKeys()
     {
         using var directory = new TemporaryDirectory();
         foreach (var fileName in new[]
@@ -14,8 +14,9 @@ public sealed class AssetImportPathValidatorTests
                      "",
                      " ",
                      "../Example.utx",
-                     "nested/Example.utx",
-                     "nested\\Example.utx"
+                     "/Example.utx",
+                     "nested/../Example.utx",
+                     "nested\\..\\Example.utx"
                  })
         {
             Assert.Throws<ArgumentException>(() =>
@@ -24,6 +25,21 @@ public sealed class AssetImportPathValidatorTests
                     fileName,
                     ".utx"));
         }
+    }
+
+    [Fact]
+    public void ResolvesNestedSourceKeys()
+    {
+        using var directory = new TemporaryDirectory();
+        var nested = System.IO.Path.Combine(directory.Path, "System", "Textures");
+        Directory.CreateDirectory(nested);
+        var source = System.IO.Path.Combine(nested, "Example.UTX");
+        File.WriteAllText(source, "source");
+
+        Assert.Equal(source, AssetImportPathValidator.ResolveContainedFile(
+            directory.Path,
+            "System/Textures/example.utx",
+            ".utx"));
     }
 
     [Fact]
@@ -86,6 +102,21 @@ public sealed class AssetImportPathValidatorTests
             AssetImportPathValidator.ResolveContainedFile(
                 directory.Path,
                 "Linked.utx",
+                ".utx"));
+    }
+
+    [Fact]
+    public void RejectsFilesBelowSymbolicLinkDirectories()
+    {
+        using var directory = new TemporaryDirectory();
+        using var outside = new TemporaryDirectory();
+        File.WriteAllText(System.IO.Path.Combine(outside.Path, "Example.utx"), "source");
+        Directory.CreateSymbolicLink(System.IO.Path.Combine(directory.Path, "linked"), outside.Path);
+
+        Assert.Throws<ArgumentException>(() =>
+            AssetImportPathValidator.ResolveContainedFile(
+                directory.Path,
+                "linked/Example.utx",
                 ".utx"));
     }
 

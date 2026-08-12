@@ -828,7 +828,7 @@ public sealed partial class AssetImportJobProcessor
         return result.ToArray();
     }
 
-    private static async Task<MapBspMeshManifestEntry[]> BuildBspManifestsAsync(
+    private async Task<MapBspMeshManifestEntry[]> BuildBspManifestsAsync(
         GameContentDbContext context,
         string gameVersion,
         IReadOnlyList<UnrealBspModel> models,
@@ -849,6 +849,7 @@ public sealed partial class AssetImportJobProcessor
             gameVersion,
             references,
             cancellationToken);
+        await TrackTextureDependenciesAsync(context, gameVersion, references, cancellationToken);
         var result = new List<MapBspMeshManifestEntry>();
         foreach (var model in models)
         {
@@ -1581,15 +1582,19 @@ public sealed partial class AssetImportJobProcessor
         {
             return cached.GetValueOrDefault(reference.ObjectName);
         }
-        var textureDirectory = Path.Combine(
+        var versionRoot = Path.Combine(
             Path.GetFullPath(options.Value.SourceRootPath),
-            gameVersion == "c1" ? "C1" : gameVersion == "c4" ? "C4" : "Interlude",
-            "textures");
-        var path = Directory.EnumerateFiles(textureDirectory, "*.utx")
-            .SingleOrDefault(candidate => string.Equals(
+            gameVersion == "c1" ? "C1" : gameVersion == "c4" ? "C4" : "Interlude");
+        var matches = Directory.EnumerateFiles(versionRoot, "*", SearchOption.AllDirectories)
+            .Where(candidate => string.Equals(Path.GetExtension(candidate), ".utx", StringComparison.OrdinalIgnoreCase))
+            .Where(candidate => new FileInfo(candidate).LinkTarget is null)
+            .Where(candidate => string.Equals(
                 Path.GetFileNameWithoutExtension(candidate),
                 reference.PackageName,
-                StringComparison.OrdinalIgnoreCase));
+                StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToArray();
+        var path = matches.Length == 1 ? matches[0] : null;
         if (path is null)
         {
             packages[reference.PackageName] = new Dictionary<string, UnrealTexture>(StringComparer.OrdinalIgnoreCase);
@@ -1899,12 +1904,18 @@ public sealed partial class AssetImportJobProcessor
         T manifest,
         CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.SerializeToUtf8Bytes(manifest, ManifestJsonOptions);
+        var contents = SerializeManifest(manifest);
+        await File.WriteAllBytesAsync(path, contents, cancellationToken);
+        return Convert.ToHexStringLower(SHA256.HashData(contents));
+    }
+
+    internal static byte[] SerializeManifest<T>(T manifest)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(manifest, CompactManifestJsonOptions);
         var contents = new byte[json.Length + 1];
         json.CopyTo(contents, 0);
         contents[^1] = (byte)'\n';
-        await File.WriteAllBytesAsync(path, contents, cancellationToken);
-        return Convert.ToHexStringLower(SHA256.HashData(contents));
+        return contents;
     }
 
 }

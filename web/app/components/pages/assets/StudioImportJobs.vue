@@ -4,14 +4,18 @@ import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import {
   getAssetImportDiagnostics,
+  getStaleAssetSources,
   getAssetImportWorkItems,
+  rebuildStaleAssetSources,
+  startAssetImport,
   startAssetFileImport
 } from '../../../services/studio-api'
 import { useAssetImportsStore } from '../../../stores/asset-imports'
 import type {
   AssetImportDiagnostic,
   AssetImportJob,
-  AssetImportWorkItem
+  AssetImportWorkItem,
+  StaleAssetSource
 } from '../../../types/models/asset-import-job'
 
 const importStore = useAssetImportsStore()
@@ -25,6 +29,9 @@ const detailError = ref<string>()
 const diagnosticQuery = ref('')
 const severityFilter = ref<'all' | 'warning' | 'error'>('all')
 const reimporting = ref<string>()
+const staleByKind = ref<Partial<Record<AssetImportKind, StaleAssetSource[]>>>({})
+const rebuildingStale = ref(false)
+const forcingKind = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const importKinds: AssetImportKind[] = [
@@ -53,6 +60,11 @@ const visibleJobs = computed(() =>
 const hasActiveJob = computed(() =>
   jobs.value.some((job) => isActive(job.status))
 )
+const staleCount = computed(() => Object.values(staleByKind.value)
+  .reduce((total, sources) => total + (sources?.length ?? 0), 0))
+const visibleStaleSources = computed(() => importKinds
+  .filter((kind) => kindFilter.value === 'all' || kind === kindFilter.value)
+  .flatMap((kind) => (staleByKind.value[kind] ?? []).map((source) => ({ kind, source }))))
 const expandedRun = computed(() =>
   jobs.value.find((job) => job.id === expandedRunId.value)
 )
@@ -94,7 +106,12 @@ function formatDate(value: string | null) {
 async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
-    await importStore.load(importKinds)
+    await Promise.all([
+      importStore.load(importKinds),
+      Promise.all(importKinds.map(async (kind) => {
+        staleByKind.value[kind] = await getStaleAssetSources(kind)
+      }))
+    ])
     if (expandedRun.value && isActive(expandedRun.value.status)) {
       await loadDetails(expandedRun.value)
     }
@@ -150,6 +167,60 @@ async function reimport(run: AssetImportJob, item: AssetImportWorkItem) {
   }
 }
 
+async function forceReimport(run: AssetImportJob, item: AssetImportWorkItem) {
+  reimporting.value = item.id
+  detailError.value = undefined
+  try {
+    await startAssetFileImport(run.kind, item.sourceKey, true)
+    await loadJobs(false)
+  } catch {
+    detailError.value = 'The forced single-file rebuild could not be started.'
+  } finally {
+    reimporting.value = undefined
+  }
+}
+
+async function rebuildAllStale() {
+  rebuildingStale.value = true
+  detailError.value = undefined
+  try {
+    const kinds = importKinds.filter((kind) => staleByKind.value[kind]?.length)
+    await Promise.all(kinds.map((kind) => rebuildStaleAssetSources(kind)))
+    await loadJobs(false)
+  } catch {
+    detailError.value = 'One or more stale rebuilds could not be queued.'
+  } finally {
+    rebuildingStale.value = false
+  }
+}
+
+async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSource) {
+  reimporting.value = `${kind}:${source.sourceKey}`
+  detailError.value = undefined
+  try {
+    await startAssetFileImport(kind, source.sourceKey)
+    await loadJobs(false)
+  } catch {
+    detailError.value = `The stale rebuild for ${source.sourceKey} could not be queued.`
+  } finally {
+    reimporting.value = undefined
+  }
+}
+
+async function forceRebuildKind() {
+  if (kindFilter.value === 'all') return
+  forcingKind.value = true
+  detailError.value = undefined
+  try {
+    await startAssetImport(kindFilter.value, { force: true })
+    await loadJobs(false)
+  } catch {
+    detailError.value = `The forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild could not be queued.`
+  } finally {
+    forcingKind.value = false
+  }
+}
+
 onMounted(() => void loadJobs())
 onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
@@ -163,6 +234,26 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       icon="i-lucide-history"
     >
       <template #actions>
+        <UButton
+          v-if="kindFilter !== 'all'"
+          icon="i-lucide-hammer"
+          :label="`Force rebuild ${kindLabel(kindFilter).toLowerCase()}`"
+          color="warning"
+          variant="outline"
+          :loading="forcingKind"
+          :disabled="hasActiveJob"
+          @click="forceRebuildKind"
+        />
+        <UButton
+          v-if="staleCount"
+          icon="i-lucide-refresh-ccw-dot"
+          :label="`Rebuild all stale (${staleCount})`"
+          color="warning"
+          variant="soft"
+          :loading="rebuildingStale"
+          :disabled="hasActiveJob"
+          @click="rebuildAllStale"
+        />
         <UButton
           icon="i-lucide-refresh-cw"
           label="Refresh"
@@ -182,6 +273,39 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Import history unavailable"
       :description="error"
     />
+
+    <UCard v-if="visibleStaleSources.length" :ui="{ body: 'p-0 sm:p-0' }">
+      <template #header>
+        <div>
+          <h2 class="text-sm font-semibold text-highlighted">Stale resources</h2>
+          <p class="text-xs text-muted">Published output remains available until you explicitly rebuild it.</p>
+        </div>
+      </template>
+      <div class="divide-y divide-default">
+        <div v-for="entry in visibleStaleSources" :key="`${entry.kind}:${entry.source.sourceKey}`" class="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <UBadge color="warning" variant="subtle">Stale</UBadge>
+              <UBadge color="neutral" variant="outline">{{ kindLabel(entry.kind) }}</UBadge>
+              <span class="truncate text-sm font-medium text-highlighted">{{ entry.source.sourceKey }}</span>
+            </div>
+            <p class="mt-2 text-xs text-muted">{{ entry.source.reasons.join(' · ') }}</p>
+            <p v-if="entry.source.resourceNames.length" class="mt-1 truncate text-xs text-dimmed">
+              {{ entry.source.resourceNames.join(', ') }}
+            </p>
+          </div>
+          <UButton
+            label="Rebuild"
+            icon="i-lucide-refresh-cw"
+            size="xs"
+            color="warning"
+            variant="soft"
+            :loading="reimporting === `${entry.kind}:${entry.source.sourceKey}`"
+            @click="rebuildStaleSource(entry.kind, entry.source)"
+          />
+        </div>
+      </div>
+    </UCard>
 
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <template #header>
@@ -224,6 +348,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               <span>{{ run.succeededFileCount }} succeeded</span>
               <span>{{ run.warningFileCount }} warning</span>
               <span>{{ run.failedFileCount }} failed</span>
+              <span>{{ run.reusedFileCount }} reused</span>
               <span>Finished {{ formatDate(run.finishedAt) }}</span>
             </div>
             <UProgress
@@ -262,15 +387,26 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                       </p>
                       <p v-if="item.error" class="mt-1 text-xs text-error">{{ item.error }}</p>
                     </div>
-                    <UButton
-                      label="Re-import"
-                      icon="i-lucide-rotate-cw"
-                      size="xs"
-                      color="neutral"
-                      variant="outline"
-                      :loading="reimporting === item.id"
-                      @click="reimport(run, item)"
-                    />
+                    <div class="flex gap-2">
+                      <UButton
+                        label="Re-import"
+                        icon="i-lucide-rotate-cw"
+                        size="xs"
+                        color="neutral"
+                        variant="outline"
+                        :loading="reimporting === item.id"
+                        @click="reimport(run, item)"
+                      />
+                      <UButton
+                        label="Force rebuild"
+                        icon="i-lucide-hammer"
+                        size="xs"
+                        color="warning"
+                        variant="soft"
+                        :loading="reimporting === item.id"
+                        @click="forceReimport(run, item)"
+                      />
+                    </div>
                   </div>
                 </div>
                 <p v-if="!workItems.length" class="p-4 text-sm text-muted">

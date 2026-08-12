@@ -122,5 +122,18 @@ public sealed class AssetCatalogsControllerTests
             ItemName = name;
             return Task.FromResult(ItemResult);
         }
+
+        public Task<AssetArtifactPage> GetArtifactsAsync(
+            string gameVersion, string? kind, string? sourceKey, bool? current,
+            string? integrityStatus, int page, int pageSize, CancellationToken cancellationToken) =>
+            Task.FromResult(new AssetArtifactPage([], 0, page, pageSize));
+
+        public Task<AssetArtifactDetail?> GetArtifactAsync(
+            string gameVersion, Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<AssetArtifactDetail?>(null);
+
+        public Task<AssetArtifactDetail?> VerifyArtifactAsync(
+            string gameVersion, Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<AssetArtifactDetail?>(null);
     }
 }

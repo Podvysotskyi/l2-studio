@@ -9,6 +9,7 @@ public sealed class AssetImportRun
     public required string Status { get; set; }
     public string? RequestedSourceKey { get; set; }
     public string? NormalizedRequestedSourceKey { get; set; }
+    public bool Force { get; set; }
     public DateTimeOffset RequestedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? DiscoveryFinishedAt { get; set; }
@@ -18,6 +19,8 @@ public sealed class AssetImportRun
     public int SucceededFileCount { get; set; }
     public int WarningFileCount { get; set; }
     public int FailedFileCount { get; set; }
+    public int ReusedFileCount { get; set; }
+    public DateTimeOffset? LastHeartbeatAt { get; set; }
     public string? Error { get; set; }
     public ICollection<AssetImportWorkItem> WorkItems { get; set; } = [];
     public ICollection<AssetImportDiagnostic> Diagnostics { get; set; } = [];

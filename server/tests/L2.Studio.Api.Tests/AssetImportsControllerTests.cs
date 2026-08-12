@@ -1,5 +1,6 @@
 using L2.Studio.Api.Controllers;
 using L2.Studio.Contracts;
+using L2.Studio.Contracts.Requests;
 using L2.Studio.Exceptions;
 using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Repositories.Interfaces.Models;
@@ -18,7 +19,7 @@ public sealed class AssetImportsControllerTests
         var controller = new AssetImportsController(repository);
         using var cancellation = new CancellationTokenSource();
 
-        var result = await controller.Queue("interlude", "textures", cancellation.Token);
+        var result = await controller.Queue("interlude", "textures", new AssetImportRequest(), cancellation.Token);
 
         var accepted = Assert.IsType<AcceptedResult>(result.Result);
         Assert.Same(run, accepted.Value);
@@ -33,8 +34,8 @@ public sealed class AssetImportsControllerTests
         var repository = new StubAssetImportRepository();
         var controller = new AssetImportsController(repository);
 
-        var unknown = await controller.Queue("interlude", "unknown", CancellationToken.None);
-        var conflict = await controller.Queue("interlude", "textures", CancellationToken.None);
+        var unknown = await controller.Queue("interlude", "unknown", null, CancellationToken.None);
+        var conflict = await controller.Queue("interlude", "textures", null, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(unknown.Result);
         Assert.IsType<ConflictObjectResult>(conflict.Result);
@@ -50,7 +51,7 @@ public sealed class AssetImportsControllerTests
         };
         var controller = new AssetImportsController(repository);
 
-        var invalid = await controller.QueueFile("textures", "interlude", "Example.usx", CancellationToken.None);
+        var invalid = await controller.QueueFile("textures", "interlude", "Example.usx", false, CancellationToken.None);
         var invalidProblem = Assert.IsType<ValidationProblemDetails>(
             Assert.IsType<BadRequestObjectResult>(invalid.Result).Value);
         Assert.Equal(
@@ -58,7 +59,7 @@ public sealed class AssetImportsControllerTests
             Assert.Single(invalidProblem.Errors["fileName"]));
 
         repository.FileException = new AssetImportTargetNotFoundException("Missing.utx");
-        var missing = await controller.QueueFile("textures", "interlude", "Missing.utx", CancellationToken.None);
+        var missing = await controller.QueueFile("textures", "interlude", "Missing.utx", false, CancellationToken.None);
         Assert.IsType<NotFoundObjectResult>(missing.Result);
     }
 
@@ -125,6 +126,7 @@ public sealed class AssetImportsControllerTests
         0,
         0,
         0,
+        0,
         null);
 
     private sealed class StubAssetImportRepository : IAssetImportRepository
@@ -138,18 +140,27 @@ public sealed class AssetImportsControllerTests
         public string? RecentKind { get; private set; }
         public int RecentLimit { get; private set; }
 
-        public Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, CancellationToken cancellationToken)
+        public Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, bool force, CancellationToken cancellationToken)
         {
             FullScanKind = kind;
             FullScanToken = cancellationToken;
             return Task.FromResult(FullScanResult);
         }
 
-        public Task<AssetImportRunSummary?> QueueSingleFileAsync(string gameVersion, string kind, string fileName, CancellationToken cancellationToken)
+        public Task<AssetImportRunSummary?> QueueSingleFileAsync(string gameVersion, string kind, string fileName, bool force, CancellationToken cancellationToken)
         {
             if (FileException is not null) throw FileException;
             return Task.FromResult<AssetImportRunSummary?>(null);
         }
+
+        public Task<AssetImportRunSummary?> QueueResourceAsync(string gameVersion, string kind, string resourceName, string? packageName, bool force, CancellationToken cancellationToken) =>
+            Task.FromResult<AssetImportRunSummary?>(null);
+
+        public Task<IReadOnlyList<StaleAssetSourceSummary>> GetStaleAsync(string gameVersion, string kind, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StaleAssetSourceSummary>>([]);
+
+        public Task<AssetImportRunSummary?> QueueStaleAsync(string gameVersion, string kind, CancellationToken cancellationToken) =>
+            Task.FromResult<AssetImportRunSummary?>(null);
 
         public Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(string gameVersion, string kind, int limit, CancellationToken cancellationToken)
         {

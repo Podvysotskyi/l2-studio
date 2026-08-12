@@ -29,6 +29,14 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<AssetCatalogSource> AssetCatalogSources => Set<AssetCatalogSource>();
     public DbSet<AssetCatalogGroup> AssetCatalogGroups => Set<AssetCatalogGroup>();
     public DbSet<AssetCatalogItem> AssetCatalogItems => Set<AssetCatalogItem>();
+    public DbSet<AssetCatalogSourceDependency> AssetCatalogSourceDependencies => Set<AssetCatalogSourceDependency>();
+    public DbSet<AssetArtifact> AssetArtifacts => Set<AssetArtifact>();
+    public DbSet<AssetArtifactFile> AssetArtifactFiles => Set<AssetArtifactFile>();
+    public DbSet<AssetArtifactDependency> AssetArtifactDependencies => Set<AssetArtifactDependency>();
+    public DbSet<AssetRelease> AssetReleases => Set<AssetRelease>();
+    public DbSet<AssetReleaseArtifact> AssetReleaseArtifacts => Set<AssetReleaseArtifact>();
+    public DbSet<AssetReleaseEvent> AssetReleaseEvents => Set<AssetReleaseEvent>();
+    public DbSet<AssetReleasePointer> AssetReleasePointers => Set<AssetReleasePointer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -137,6 +145,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
         assetImportRun.Property(entity => entity.RequestedSourceKey).HasColumnName("requested_source_key").HasMaxLength(256);
         assetImportRun.Property(entity => entity.NormalizedRequestedSourceKey).HasColumnName("normalized_requested_source_key").HasMaxLength(256);
+        assetImportRun.Property(entity => entity.Force).HasColumnName("force");
         assetImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
         assetImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
         assetImportRun.Property(entity => entity.DiscoveryFinishedAt).HasColumnName("discovery_finished_at");
@@ -146,6 +155,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportRun.Property(entity => entity.SucceededFileCount).HasColumnName("succeeded_file_count");
         assetImportRun.Property(entity => entity.WarningFileCount).HasColumnName("warning_file_count");
         assetImportRun.Property(entity => entity.FailedFileCount).HasColumnName("failed_file_count");
+        assetImportRun.Property(entity => entity.ReusedFileCount).HasColumnName("reused_file_count");
+        assetImportRun.Property(entity => entity.LastHeartbeatAt).HasColumnName("last_heartbeat_at");
         assetImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
         assetImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.RequestedAt })
             .HasDatabaseName("ix_asset_import_runs_kind_requested");
@@ -172,6 +183,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportWorkItem.Property(entity => entity.NormalizedSourceKey).HasColumnName("normalized_source_key").HasMaxLength(256);
         assetImportWorkItem.Property(entity => entity.SourcePath).HasColumnName("source_path").HasMaxLength(1024);
         assetImportWorkItem.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
+        assetImportWorkItem.Property(entity => entity.ArtifactFingerprint).HasColumnName("artifact_fingerprint").HasMaxLength(64);
         assetImportWorkItem.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
         assetImportWorkItem.Property(entity => entity.AttemptCount).HasColumnName("attempt_count");
         assetImportWorkItem.Property(entity => entity.CreatedAt).HasColumnName("created_at");
@@ -183,6 +195,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportWorkItem.Property(entity => entity.WarningCount).HasColumnName("warning_count");
         assetImportWorkItem.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
         assetImportWorkItem.Property(entity => entity.UnpublishedAt).HasColumnName("unpublished_at");
+        assetImportWorkItem.Property(entity => entity.LastHeartbeatAt).HasColumnName("last_heartbeat_at");
         assetImportWorkItem.HasIndex(entity => new { entity.RunId, entity.NormalizedSourceKey }).IsUnique()
             .HasDatabaseName("ix_asset_import_work_items_run_source");
         assetImportWorkItem.HasIndex(entity => new { entity.RunId, entity.Status })
@@ -212,6 +225,162 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetImportDiagnostic.HasOne(entity => entity.WorkItem).WithMany(entity => entity.Diagnostics)
             .HasForeignKey(entity => entity.WorkItemId).OnDelete(DeleteBehavior.Cascade);
 
+        var assetArtifact = modelBuilder.Entity<AssetArtifact>();
+        assetArtifact.ToTable("asset_artifacts");
+        assetArtifact.HasKey(entity => entity.Id);
+        assetArtifact.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        assetArtifact.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        assetArtifact.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
+        assetArtifact.Property(entity => entity.SourceKey).HasColumnName("source_key").HasMaxLength(256);
+        assetArtifact.Property(entity => entity.NormalizedSourceKey).HasColumnName("normalized_source_key").HasMaxLength(256);
+        assetArtifact.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
+        assetArtifact.Property(entity => entity.RecipeVersion).HasColumnName("recipe_version").HasMaxLength(128);
+        assetArtifact.Property(entity => entity.BuildFingerprint).HasColumnName("build_fingerprint").HasMaxLength(64);
+        assetArtifact.Property(entity => entity.ContentHash).HasColumnName("content_hash").HasMaxLength(64);
+        assetArtifact.Property(entity => entity.OutputRoot).HasColumnName("output_root").HasMaxLength(1024);
+        assetArtifact.Property(entity => entity.SchemaVersion).HasColumnName("schema_version");
+        assetArtifact.Property(entity => entity.Protocol).HasColumnName("protocol");
+        assetArtifact.Property(entity => entity.FileCount).HasColumnName("file_count");
+        assetArtifact.Property(entity => entity.SizeBytes).HasColumnName("size_bytes");
+        assetArtifact.Property(entity => entity.IntegrityStatus).HasColumnName("integrity_status").HasMaxLength(32);
+        assetArtifact.Property(entity => entity.LastVerifiedAt).HasColumnName("last_verified_at");
+        assetArtifact.Property(entity => entity.PublishingWorkItemId).HasColumnName("publishing_work_item_id");
+        assetArtifact.Property(entity => entity.CreatedAt).HasColumnName("created_at");
+        assetArtifact.HasIndex(entity => new
+            { entity.GameVersion, entity.Kind, entity.NormalizedSourceKey, entity.BuildFingerprint })
+            .IsUnique().HasDatabaseName("ix_asset_artifacts_build");
+        assetArtifact.HasIndex(entity => entity.OutputRoot).IsUnique()
+            .HasDatabaseName("ix_asset_artifacts_output_root");
+        assetArtifact.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.IntegrityStatus })
+            .HasDatabaseName("ix_asset_artifacts_integrity");
+        assetArtifact.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetArtifact.HasOne(entity => entity.PublishingWorkItem).WithMany()
+            .HasForeignKey(entity => entity.PublishingWorkItemId).OnDelete(DeleteBehavior.Restrict);
+
+        var assetArtifactFile = modelBuilder.Entity<AssetArtifactFile>();
+        assetArtifactFile.ToTable("asset_artifact_files");
+        assetArtifactFile.HasKey(entity => entity.Id);
+        assetArtifactFile.Property(entity => entity.Id).HasColumnName("id");
+        assetArtifactFile.Property(entity => entity.ArtifactId).HasColumnName("artifact_id");
+        assetArtifactFile.Property(entity => entity.RelativePath).HasColumnName("relative_path").HasMaxLength(1024);
+        assetArtifactFile.Property(entity => entity.PublicPath).HasColumnName("public_path").HasMaxLength(2048);
+        assetArtifactFile.Property(entity => entity.Role).HasColumnName("role").HasMaxLength(64);
+        assetArtifactFile.Property(entity => entity.MediaType).HasColumnName("media_type").HasMaxLength(128);
+        assetArtifactFile.Property(entity => entity.SizeBytes).HasColumnName("size_bytes");
+        assetArtifactFile.Property(entity => entity.Sha256).HasColumnName("sha256").HasMaxLength(64);
+        assetArtifactFile.HasIndex(entity => new { entity.ArtifactId, entity.RelativePath }).IsUnique()
+            .HasDatabaseName("ix_asset_artifact_files_path");
+        assetArtifactFile.HasOne(entity => entity.Artifact).WithMany(entity => entity.Files)
+            .HasForeignKey(entity => entity.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+
+        var assetArtifactDependency = modelBuilder.Entity<AssetArtifactDependency>();
+        assetArtifactDependency.ToTable("asset_artifact_dependencies");
+        assetArtifactDependency.HasKey(entity => entity.Id);
+        assetArtifactDependency.Property(entity => entity.Id).HasColumnName("id");
+        assetArtifactDependency.Property(entity => entity.ArtifactId).HasColumnName("artifact_id");
+        assetArtifactDependency.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
+        assetArtifactDependency.Property(entity => entity.DependencyKey).HasColumnName("dependency_key").HasMaxLength(512);
+        assetArtifactDependency.Property(entity => entity.ResolvedArtifactId).HasColumnName("resolved_artifact_id");
+        assetArtifactDependency.Property(entity => entity.ResolvedSourceKey).HasColumnName("resolved_source_key").HasMaxLength(256);
+        assetArtifactDependency.Property(entity => entity.BuildFingerprint).HasColumnName("build_fingerprint").HasMaxLength(64);
+        assetArtifactDependency.Property(entity => entity.IsResolved).HasColumnName("is_resolved");
+        assetArtifactDependency.HasIndex(entity => new { entity.ArtifactId, entity.Kind, entity.DependencyKey }).IsUnique()
+            .HasDatabaseName("ix_asset_artifact_dependencies_key");
+        assetArtifactDependency.HasIndex(entity => entity.ResolvedArtifactId)
+            .HasDatabaseName("ix_asset_artifact_dependencies_resolved");
+        assetArtifactDependency.HasOne(entity => entity.Artifact).WithMany(entity => entity.Dependencies)
+            .HasForeignKey(entity => entity.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+        assetArtifactDependency.HasOne(entity => entity.ResolvedArtifact).WithMany()
+            .HasForeignKey(entity => entity.ResolvedArtifactId).OnDelete(DeleteBehavior.Restrict);
+
+        var assetRelease = modelBuilder.Entity<AssetRelease>();
+        assetRelease.ToTable("asset_releases");
+        assetRelease.HasKey(entity => entity.Id);
+        assetRelease.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        assetRelease.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        assetRelease.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(120);
+        assetRelease.Property(entity => entity.Notes).HasColumnName("notes").HasMaxLength(4000);
+        assetRelease.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        assetRelease.Property(entity => entity.SnapshotHash).HasColumnName("snapshot_hash").HasMaxLength(64);
+        assetRelease.Property(entity => entity.ValidationStatus).HasColumnName("validation_status").HasMaxLength(32);
+        assetRelease.Property(entity => entity.ValidationIssuesJson).HasColumnName("validation_issues_json").HasColumnType("jsonb");
+        assetRelease.Property(entity => entity.ValidatedSnapshotHash).HasColumnName("validated_snapshot_hash").HasMaxLength(64);
+        assetRelease.Property(entity => entity.ValidationRequestedAt).HasColumnName("validation_requested_at");
+        assetRelease.Property(entity => entity.ValidatedAt).HasColumnName("validated_at");
+        assetRelease.Property(entity => entity.ManifestPath).HasColumnName("manifest_path").HasMaxLength(1024);
+        assetRelease.Property(entity => entity.ManifestHash).HasColumnName("manifest_hash").HasMaxLength(64);
+        assetRelease.Property(entity => entity.LoginSceneFileId).HasColumnName("login_scene_file_id");
+        assetRelease.Property(entity => entity.LoginCameraSequence).HasColumnName("login_camera_sequence").HasMaxLength(256);
+        assetRelease.Property(entity => entity.LoginMusicFileId).HasColumnName("login_music_file_id");
+        assetRelease.Property(entity => entity.PrimaryLogoFileId).HasColumnName("primary_logo_file_id");
+        assetRelease.Property(entity => entity.VersionLogoFileId).HasColumnName("version_logo_file_id");
+        assetRelease.Property(entity => entity.LoadingArtworkFileId).HasColumnName("loading_artwork_file_id");
+        assetRelease.Property(entity => entity.CharacterSelectionSceneFileId).HasColumnName("character_selection_scene_file_id");
+        assetRelease.Property(entity => entity.CharacterSelectionCameraSequence).HasColumnName("character_selection_camera_sequence").HasMaxLength(256);
+        assetRelease.Property(entity => entity.CreatedAt).HasColumnName("created_at");
+        assetRelease.Property(entity => entity.UpdatedAt).HasColumnName("updated_at");
+        assetRelease.Property(entity => entity.PublishedAt).HasColumnName("published_at");
+        assetRelease.Property(entity => entity.RetiredAt).HasColumnName("retired_at");
+        assetRelease.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique()
+            .HasDatabaseName("ix_asset_releases_version_name");
+        assetRelease.HasIndex(entity => new { entity.GameVersion, entity.Status, entity.CreatedAt })
+            .HasDatabaseName("ix_asset_releases_version_status");
+        assetRelease.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.LoginSceneFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.LoginMusicFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.PrimaryLogoFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.VersionLogoFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.LoadingArtworkFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        assetRelease.HasOne<AssetArtifactFile>().WithMany().HasForeignKey(entity => entity.CharacterSelectionSceneFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        var assetReleaseArtifact = modelBuilder.Entity<AssetReleaseArtifact>();
+        assetReleaseArtifact.ToTable("asset_release_artifacts");
+        assetReleaseArtifact.HasKey(entity => new { entity.ReleaseId, entity.ArtifactId });
+        assetReleaseArtifact.Property(entity => entity.ReleaseId).HasColumnName("release_id");
+        assetReleaseArtifact.Property(entity => entity.ArtifactId).HasColumnName("artifact_id");
+        assetReleaseArtifact.Property(entity => entity.IsRoot).HasColumnName("is_root");
+        assetReleaseArtifact.HasIndex(entity => entity.ArtifactId).HasDatabaseName("ix_asset_release_artifacts_artifact");
+        assetReleaseArtifact.HasOne(entity => entity.Release).WithMany(entity => entity.Artifacts)
+            .HasForeignKey(entity => entity.ReleaseId).OnDelete(DeleteBehavior.Cascade);
+        assetReleaseArtifact.HasOne(entity => entity.Artifact).WithMany(entity => entity.Releases)
+            .HasForeignKey(entity => entity.ArtifactId).OnDelete(DeleteBehavior.Restrict);
+
+        var assetReleaseEvent = modelBuilder.Entity<AssetReleaseEvent>();
+        assetReleaseEvent.ToTable("asset_release_events");
+        assetReleaseEvent.HasKey(entity => entity.Id);
+        assetReleaseEvent.Property(entity => entity.Id).HasColumnName("id");
+        assetReleaseEvent.Property(entity => entity.ReleaseId).HasColumnName("release_id");
+        assetReleaseEvent.Property(entity => entity.Action).HasColumnName("action").HasMaxLength(64);
+        assetReleaseEvent.Property(entity => entity.DetailsJson).HasColumnName("details_json").HasColumnType("jsonb");
+        assetReleaseEvent.Property(entity => entity.OccurredAt).HasColumnName("occurred_at");
+        assetReleaseEvent.HasOne(entity => entity.Release).WithMany(entity => entity.Events)
+            .HasForeignKey(entity => entity.ReleaseId).OnDelete(DeleteBehavior.Cascade);
+
+        var assetReleasePointer = modelBuilder.Entity<AssetReleasePointer>();
+        assetReleasePointer.ToTable("asset_release_pointers");
+        assetReleasePointer.HasKey(entity => entity.GameVersion);
+        assetReleasePointer.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        assetReleasePointer.Property(entity => entity.DesiredReleaseId).HasColumnName("desired_release_id");
+        assetReleasePointer.Property(entity => entity.PublishedReleaseId).HasColumnName("published_release_id");
+        assetReleasePointer.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        assetReleasePointer.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        assetReleasePointer.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        assetReleasePointer.Property(entity => entity.PublishedAt).HasColumnName("published_at");
+        assetReleasePointer.HasOne<GameVersion>().WithOne().HasForeignKey<AssetReleasePointer>(entity => entity.GameVersion)
+            .OnDelete(DeleteBehavior.Cascade);
+        assetReleasePointer.HasOne(entity => entity.DesiredRelease).WithMany()
+            .HasForeignKey(entity => entity.DesiredReleaseId).OnDelete(DeleteBehavior.Restrict);
+        assetReleasePointer.HasOne(entity => entity.PublishedRelease).WithMany()
+            .HasForeignKey(entity => entity.PublishedReleaseId).OnDelete(DeleteBehavior.Restrict);
+
         var assetCatalog = modelBuilder.Entity<AssetCatalog>();
         assetCatalog.ToTable("asset_catalogs");
         assetCatalog.HasKey(entity => entity.Id);
@@ -235,18 +404,43 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetCatalogSource.HasKey(entity => entity.Id);
         assetCatalogSource.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         assetCatalogSource.Property(entity => entity.CatalogId).HasColumnName("catalog_id");
+        assetCatalogSource.Property(entity => entity.ArtifactId).HasColumnName("artifact_id");
         assetCatalogSource.Property(entity => entity.PublishingWorkItemId).HasColumnName("publishing_work_item_id");
         assetCatalogSource.Property(entity => entity.SourceKey).HasColumnName("source_key").HasMaxLength(256);
         assetCatalogSource.Property(entity => entity.NormalizedSourceKey).HasColumnName("normalized_source_key").HasMaxLength(256);
         assetCatalogSource.Property(entity => entity.SourceHash).HasColumnName("source_hash").HasMaxLength(64);
+        assetCatalogSource.Property(entity => entity.ArtifactFingerprint).HasColumnName("artifact_fingerprint").HasMaxLength(64);
         assetCatalogSource.Property(entity => entity.OutputRoot).HasColumnName("output_root").HasMaxLength(1024);
         assetCatalogSource.Property(entity => entity.MetadataJson).HasColumnName("metadata_json").HasColumnType("jsonb");
         assetCatalogSource.Property(entity => entity.ReferencedOutputRootsJson).HasColumnName("referenced_output_roots_json").HasColumnType("jsonb");
         assetCatalogSource.Property(entity => entity.PublishedAt).HasColumnName("published_at");
+        assetCatalogSource.Property(entity => entity.IsStale).HasColumnName("is_stale");
+        assetCatalogSource.Property(entity => entity.StaleAt).HasColumnName("stale_at");
+        assetCatalogSource.Property(entity => entity.StaleReasonsJson).HasColumnName("stale_reasons_json")
+            .HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb");
         assetCatalogSource.HasIndex(entity => new { entity.CatalogId, entity.NormalizedSourceKey }).IsUnique()
             .HasDatabaseName("ix_asset_catalog_sources_catalog_source");
+
+        var assetCatalogSourceDependency = modelBuilder.Entity<AssetCatalogSourceDependency>();
+        assetCatalogSourceDependency.ToTable("asset_catalog_source_dependencies");
+        assetCatalogSourceDependency.HasKey(entity => entity.Id);
+        assetCatalogSourceDependency.Property(entity => entity.Id).HasColumnName("id");
+        assetCatalogSourceDependency.Property(entity => entity.SourceId).HasColumnName("source_id");
+        assetCatalogSourceDependency.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(64);
+        assetCatalogSourceDependency.Property(entity => entity.DependencyKey).HasColumnName("dependency_key").HasMaxLength(512);
+        assetCatalogSourceDependency.Property(entity => entity.ResolvedSourceKey).HasColumnName("resolved_source_key").HasMaxLength(256);
+        assetCatalogSourceDependency.Property(entity => entity.ArtifactFingerprint).HasColumnName("artifact_fingerprint").HasMaxLength(64);
+        assetCatalogSourceDependency.Property(entity => entity.IsResolved).HasColumnName("is_resolved");
+        assetCatalogSourceDependency.HasIndex(entity => new { entity.Kind, entity.DependencyKey })
+            .HasDatabaseName("ix_asset_catalog_source_dependencies_key");
+        assetCatalogSourceDependency.HasIndex(entity => new { entity.Kind, entity.ResolvedSourceKey })
+            .HasDatabaseName("ix_asset_catalog_source_dependencies_source");
+        assetCatalogSourceDependency.HasOne(entity => entity.Source).WithMany(entity => entity.Dependencies)
+            .HasForeignKey(entity => entity.SourceId).OnDelete(DeleteBehavior.Cascade);
         assetCatalogSource.HasOne(entity => entity.Catalog).WithMany(entity => entity.Sources)
             .HasForeignKey(entity => entity.CatalogId).OnDelete(DeleteBehavior.Cascade);
+        assetCatalogSource.HasOne(entity => entity.Artifact).WithMany(entity => entity.Publications)
+            .HasForeignKey(entity => entity.ArtifactId).OnDelete(DeleteBehavior.Restrict);
 
         var assetCatalogGroup = modelBuilder.Entity<AssetCatalogGroup>();
         assetCatalogGroup.ToTable("asset_catalog_groups");

@@ -69,6 +69,8 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<AssetImportWorkItemCompleted>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<FinalizeAssetImportRun>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DeleteAssetVersion>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ValidateAssetRelease>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ActivateAssetRelease>().ToPostgresqlQueue(ControlQueue);
     }
 
     private static void RouteFileMessages(WolverineOptions options)

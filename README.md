@@ -55,9 +55,15 @@ Studio has a standalone development stack containing PostgreSQL, the Studio API 
 docker compose up --build
 ```
 
-Original game resources persist in the `l2-studio_resources-data` Docker volume and generated assets persist in `l2-studio_assets-data`. The Studio web application writes resources through its server-side file manager, while the API and Worker mount them read-only. The Worker writes generated assets; Studio and the asset server mount those files read-only.
+Original game resources persist in the `l2-studio_resources-data` Docker volume and generated assets persist in `l2-studio_assets-data`. The Studio web application writes resources through its server-side file manager, while the API and Worker mount them read-only. The Worker writes generated assets; Studio and the asset server mount only the `public` subtree read-only. Import source snapshots live in the Worker-only `l2-studio_import-work` volume and generated output staging lives outside the public subtree.
 
-Open **Operations → File storage** to upload files or complete folders. Storage is scoped by the global game-version selector. Original resources are stored beneath the version's source folder (`C1`, `C4`, or `Interlude`); generated assets are shown from `versions/{version-key}`. The generated-assets browser is intentionally read-only because published files are indexed by the Studio catalog and must be changed through asset imports.
+Open **Operations → File storage** to upload files or complete folders. Storage is scoped by the global game-version selector. Original resources are stored beneath the version's source folder (`C1`, `C4`, or `Interlude`) and one of the canonical `textures`, `staticmeshes`, `sounds`, `music`, `maps`, or `scenes` folders. Uploads are rejected when their package extension does not match that folder. Generated assets are shown from `public/versions/{version-key}` and are intentionally read-only because published files must be changed through asset imports.
+
+Open **Operations → Artifact registry** to inspect immutable generated builds. The registry records each build fingerprint, recipe version, aggregate content hash, output file with its SHA-256 and media type, dependencies, active-publication state, and integrity status. Superseded builds remain registered and on disk. Use **Verify file integrity** for a deep hash audit; Worker startup performs a lightweight active-publication reconciliation.
+
+Open **Operations → Releases** to assemble and validate a version-scoped snapshot of healthy artifacts, select the client entry points, and publish it. Publishing writes an immutable `client-manifest.json` beneath `versions/{version}/releases/{release-id}/`; activating a release atomically updates the non-cached `versions/{version}/current.json` pointer. Only one release is live for a game version, and rolling back is simply activating an earlier published release.
+
+Generated map, scene, and release manifests use compact JSON. The asset server compresses sufficiently large JSON responses with gzip while retaining immutable caching for versioned manifests and revalidation for `current.json`.
 
 Uploads stream directly into the resources volume and are promoted atomically after completion. Deletes are permanent, so back up the Docker volume before removing irreplaceable source packages:
 
@@ -104,9 +110,10 @@ Do not run `npm test`, `npm run typecheck`, `npm run build`, `dotnet test`, `dot
 
 Studio owns its database and migrations. Reset a development database after the August 2026 server reorganization and `l2-studio` database rename because Studio uses the consolidated `InitialStudioContent` migration baseline.
 
-The per-file import migration is also a clean baseline: reset existing Studio
-development databases instead of attempting to retain the retired polling-job
-rows. Generated URLs now use immutable `{kind}/{source}/{sha256}` locations.
+The per-file import and generated-artifact migrations are a clean baseline:
+reset existing Studio development databases instead of attempting to retain
+retired import or catalog rows. Generated URLs use immutable
+`versions/{version}/{kind}/{source}/{build-fingerprint}` locations.
 
 ## Configuration and safety
 

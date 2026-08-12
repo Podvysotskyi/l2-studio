@@ -12,6 +12,7 @@ public sealed class AssetImportWorkItem
     public required string NormalizedSourceKey { get; set; }
     public required string SourcePath { get; set; }
     public string? SourceHash { get; set; }
+    public string? ArtifactFingerprint { get; set; }
     public required string Status { get; set; }
     public int AttemptCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -23,6 +24,7 @@ public sealed class AssetImportWorkItem
     public int WarningCount { get; set; }
     public string? Error { get; set; }
     public DateTimeOffset? UnpublishedAt { get; set; }
+    public DateTimeOffset? LastHeartbeatAt { get; set; }
     public AssetImportRun Run { get; set; } = null!;
     public ICollection<AssetImportDiagnostic> Diagnostics { get; set; } = [];
 

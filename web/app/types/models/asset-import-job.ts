@@ -8,12 +8,13 @@ export type AssetImportStatus =
   | 'succeeded_with_warnings'
   | 'failed'
 
-export type AssetImportTriggerType = 'full_scan' | 'single_file'
+export type AssetImportTriggerType = 'full_scan' | 'single_file' | 'stale_rebuild'
 export type AssetImportWorkItemStatus =
   | 'queued'
   | 'running'
   | 'succeeded'
   | 'succeeded_with_warnings'
+  | 'reused'
   | 'failed'
 
 export interface AssetImportRun {
@@ -31,6 +32,7 @@ export interface AssetImportRun {
   succeededFileCount: number
   warningFileCount: number
   failedFileCount: number
+  reusedFileCount: number
   error: string | null
 }
 
@@ -41,8 +43,8 @@ export interface AssetImportWorkItem {
   runId: string
   importKind: AssetImportKind
   sourceKey: string
-  sourcePath: string
   sourceHash: string | null
+  artifactFingerprint: string | null
   status: AssetImportWorkItemStatus
   attemptCount: number
   createdAt: string
@@ -54,6 +56,13 @@ export interface AssetImportWorkItem {
   warningCount: number
   error: string | null
   unpublishedAt: string | null
+}
+
+export interface StaleAssetSource {
+  sourceKey: string
+  resourceNames: string[]
+  staleAt: string
+  reasons: string[]
 }
 
 export interface AssetImportDiagnostic {

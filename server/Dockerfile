@@ -36,5 +36,6 @@ WORKDIR /app
 ENV DOTNET_ENVIRONMENT=Production
 COPY --from=publish-worker --chown=$APP_UID:$APP_UID /app/publish .
 COPY --chmod=755 server/docker/worker-entrypoint.sh /usr/local/bin/l2-studio-worker
-RUN mkdir -p /workspace/assets && chown $APP_UID:$APP_UID /workspace/assets
+RUN mkdir -p /workspace/assets/public /workspace/assets/work /workspace/import-work && \
+    chown -R $APP_UID:$APP_UID /workspace/assets /workspace/import-work
 ENTRYPOINT ["l2-studio-worker"]

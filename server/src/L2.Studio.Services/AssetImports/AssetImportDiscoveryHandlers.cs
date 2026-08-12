@@ -44,8 +44,11 @@ public sealed class AssetImportDiscoveryHandlers(
             run.Status = AssetImportJobValues.Discovering;
             gameVersion = run.GameVersion;
             run.StartedAt ??= timeProvider.GetUtcNow();
+            run.LastHeartbeatAt = run.StartedAt;
             await claimContext.SaveChangesAsync(cancellationToken);
         }
+        await using var heartbeat = AssetImportHeartbeatLease.Start(
+            contextFactory, timeProvider, runId, null, cancellationToken);
 
         IReadOnlyList<DiscoveredSource> sources;
         try
@@ -72,9 +75,24 @@ public sealed class AssetImportDiscoveryHandlers(
             return;
         }
         var now = timeProvider.GetUtcNow();
+        var published = await context.AssetCatalogSources.AsNoTracking().Include(source => source.Dependencies)
+            .Where(source => source.Catalog.GameVersion == current.GameVersion && source.Catalog.Kind == kind && source.Catalog.IsActive)
+            .ToDictionaryAsync(source => source.NormalizedSourceKey, StringComparer.Ordinal, cancellationToken);
         outbox.Enroll(context);
         foreach (var source in sources)
         {
+            var normalizedSourceKey = NormalizeSourceKey(source.SourceKey);
+            published.TryGetValue(normalizedSourceKey, out var previous);
+            var fingerprint = source.SourceHash is null ? null : AssetArtifactFingerprint.Compute(
+                kind,
+                source.SourceHash,
+                previous?.Dependencies.Select(dependency => (
+                    dependency.Kind,
+                    dependency.DependencyKey,
+                    dependency.ArtifactFingerprint ?? "missing")) ?? []);
+            var reused = !current.Force && source.Error is null && previous is
+                { IsStale: false, ArtifactFingerprint: not null } &&
+                previous.SourceHash == source.SourceHash && previous.ArtifactFingerprint == fingerprint;
             var item = new AssetImportWorkItem
             {
                 Id = Guid.NewGuid(),
@@ -82,16 +100,21 @@ public sealed class AssetImportDiscoveryHandlers(
                 RunId = current.Id,
                 ImportKind = kind,
                 SourceKey = source.SourceKey,
-                NormalizedSourceKey = NormalizeSourceKey(source.SourceKey),
+                NormalizedSourceKey = normalizedSourceKey,
                 SourcePath = source.SourcePath,
                 SourceHash = source.SourceHash,
-                Status = source.Error is null ? AssetImportJobValues.Queued : AssetImportJobValues.Failed,
+                ArtifactFingerprint = reused ? fingerprint : null,
+                Status = reused ? AssetImportJobValues.Reused : source.Error is null ? AssetImportJobValues.Queued : AssetImportJobValues.Failed,
                 CreatedAt = now,
-                FinishedAt = source.Error is null ? null : now,
+                FinishedAt = reused || source.Error is not null ? now : null,
                 Error = source.Error
             };
             current.WorkItems.Add(item);
-            if (source.Error is null)
+            if (reused)
+            {
+                await outbox.PublishAsync(new AssetImportWorkItemCompleted(current.Id, item.Id));
+            }
+            else if (source.Error is null)
             {
                 await outbox.PublishAsync(FileCommand(kind, item.Id));
             }
@@ -113,6 +136,7 @@ public sealed class AssetImportDiscoveryHandlers(
         }
         current.DiscoveredFileCount = sources.Count;
         current.DiscoveryFinishedAt = now;
+        current.LastHeartbeatAt = now;
         current.Status = AssetImportJobValues.Running;
         if (sources.Count == 0) await outbox.PublishAsync(new FinalizeAssetImportRun(current.Id));
         await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
@@ -123,10 +147,10 @@ public sealed class AssetImportDiscoveryHandlers(
         string kind,
         CancellationToken cancellationToken)
     {
-        var root = Path.GetFullPath(SourceRoot(gameVersion, kind));
+        var root = Path.GetFullPath(VersionRoot(gameVersion, kind));
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"The configured source directory does not exist: {root}");
         var extension = ExpectedExtension(kind);
-        var paths = Directory.EnumerateFiles(root)
+        var paths = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
             .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
             .Where(path => kind switch
             {
@@ -134,9 +158,9 @@ public sealed class AssetImportDiscoveryHandlers(
                 AssetImportJobValues.Scenes => UnrealPackageKindClassifier.IsScene(path),
                 _ => true
             })
-            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => RelativeSourceKey(root, path), StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var duplicate = paths.GroupBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
+        var duplicate = paths.GroupBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
         if (duplicate is not null) throw new InvalidDataException($"Source filename '{duplicate.Key}' is duplicated ignoring case.");
         var result = new List<DiscoveredSource>(paths.Length);
         foreach (var path in paths)
@@ -144,14 +168,14 @@ public sealed class AssetImportDiscoveryHandlers(
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                if (new FileInfo(path).LinkTarget is not null)
+                if (HasSymbolicLink(root, RelativeSourceKey(root, path)))
                     throw new InvalidDataException("Symbolic-link sources are not supported.");
                 var hash = await AssetImportSourceHash.FileAsync(path, cancellationToken);
-                result.Add(new DiscoveredSource(Path.GetFileName(path), Path.GetFullPath(path), hash, null));
+                result.Add(new DiscoveredSource(RelativeSourceKey(root, path), Path.GetFullPath(path), hash, null));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                result.Add(new DiscoveredSource(Path.GetFileName(path), Path.GetFullPath(path), null, exception.Message));
+                result.Add(new DiscoveredSource(RelativeSourceKey(root, path), Path.GetFullPath(path), null, exception.Message));
             }
         }
         return result;
@@ -161,30 +185,26 @@ public sealed class AssetImportDiscoveryHandlers(
         string gameVersion,
         CancellationToken cancellationToken)
     {
-        var sources = new List<(string Folder, string Path)>();
-        foreach (var folder in new[] { "systextures", "textures" })
-        {
-            var root = Path.GetFullPath(Path.Combine(options.Value.SourceRootPath, SourceFolder(gameVersion), folder));
-            if (!Directory.Exists(root))
-                throw new DirectoryNotFoundException($"The configured texture source directory does not exist: {root}");
-            sources.AddRange(Directory.EnumerateFiles(root)
-                .Where(path => string.Equals(Path.GetExtension(path), ".utx", StringComparison.OrdinalIgnoreCase))
-                .Select(path => (folder, Path.GetFullPath(path))));
-        }
+        var root = Path.GetFullPath(VersionRoot(gameVersion, AssetImportJobValues.Textures));
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"The configured source directory does not exist: {root}");
+        var sources = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(path => string.Equals(Path.GetExtension(path), ".utx", StringComparison.OrdinalIgnoreCase))
+            .Select(path => (Folder: Path.GetDirectoryName(RelativeSourceKey(root, path))?.Replace('\\', '/') ?? string.Empty, Path: Path.GetFullPath(path)))
+            .ToArray();
 
         var duplicatePackage = sources.GroupBy(source => Path.GetFileNameWithoutExtension(source.Path), StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => group.Count() > 1);
         if (duplicatePackage is not null)
             throw new InvalidDataException($"Texture package '{duplicatePackage.Key}' is duplicated across texture source folders.");
 
-        var result = new List<DiscoveredSource>(sources.Count);
+        var result = new List<DiscoveredSource>(sources.Length);
         foreach (var source in sources.OrderBy(item => item.Folder, StringComparer.Ordinal).ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var sourceKey = $"{source.Folder}/{Path.GetFileName(source.Path)}";
+            var sourceKey = RelativeSourceKey(root, source.Path);
             try
             {
-                if (new FileInfo(source.Path).LinkTarget is not null)
+                if (HasSymbolicLink(root, sourceKey))
                     throw new InvalidDataException("Symbolic-link sources are not supported.");
                 result.Add(new DiscoveredSource(sourceKey, source.Path,
                     await AssetImportSourceHash.FileAsync(source.Path, cancellationToken), null));
@@ -208,7 +228,7 @@ public sealed class AssetImportDiscoveryHandlers(
             .OrderBy(source => source.SourceKey)
             .Select(source => new { source.SourceKey, source.SourceHash })
             .ToListAsync(cancellationToken);
-        var root = Path.GetFullPath(SourceRoot(gameVersion, AssetImportJobValues.Maps));
+        var root = Path.GetFullPath(VersionRoot(gameVersion, AssetImportJobValues.Maps));
         return sources.Select(source => new DiscoveredSource(
             source.SourceKey,
             Path.Combine(root, source.SourceKey),
@@ -238,14 +258,10 @@ public sealed class AssetImportDiscoveryHandlers(
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private string SourceRoot(string gameVersion, string kind) => Path.Combine(
+    private string VersionRoot(string gameVersion, string kind) => Path.Combine(
         options.Value.SourceRootPath,
         SourceFolder(gameVersion),
-        kind switch
-    {
-        AssetImportJobValues.Maps or AssetImportJobValues.Scenes => "maps",
-        var value => value
-    });
+        AssetImportJobProcessor.SourceKindFolder(kind));
 
     private static string SourceFolder(string gameVersion) => gameVersion switch
     {
@@ -284,5 +300,24 @@ public sealed class AssetImportDiscoveryHandlers(
         exception is not DbUpdateException &&
         exception.InnerException is not DbException;
     private static string NormalizeSourceKey(string value) => value.Trim().ToLowerInvariant();
+    private static string RelativeSourceKey(string root, string path) =>
+        Path.GetRelativePath(root, path).Replace('\\', '/');
+    private static bool HasSymbolicLink(string root, string relativePath)
+    {
+        var current = Path.GetFullPath(root);
+        foreach (var segment in relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if (File.Exists(current))
+            {
+                if (new FileInfo(current).LinkTarget is not null) return true;
+            }
+            else if (Directory.Exists(current) && new DirectoryInfo(current).LinkTarget is not null)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     private sealed record DiscoveredSource(string SourceKey, string SourcePath, string? SourceHash, string? Error);
 }

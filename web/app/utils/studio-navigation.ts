@@ -104,6 +104,16 @@ export const studioNavigation: NavigationMenuItem[] = [
     to: '/storage'
   },
   {
+    label: 'Artifact registry',
+    icon: 'i-lucide-library-big',
+    to: '/assets/artifacts'
+  },
+  {
+    label: 'Releases',
+    icon: 'i-lucide-rocket',
+    to: '/releases'
+  },
+  {
     label: 'Background jobs',
     icon: 'i-lucide-activity',
     defaultOpen: true,
@@ -138,6 +148,8 @@ export function studioRouteTitle(path: string) {
   if (path === '/assets/scenes') return 'Scenes'
   if (path.startsWith('/assets/scenes/')) return 'Client scene'
   if (path === '/assets/jobs') return 'Asset import jobs'
+  if (path === '/assets/artifacts') return 'Generated-asset registry'
+  if (path === '/releases') return 'Asset releases'
   if (path === '/storage') return 'File storage'
   return 'Studio'
 }

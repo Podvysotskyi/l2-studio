@@ -24,10 +24,43 @@ onMounted(() => {
   void systemStore.load().catch(() => undefined)
   void gameVersionStore.load().catch(() => undefined)
 })
+
+function retryGameVersions() {
+  void gameVersionStore.load().catch(() => undefined)
+}
+
+function reloadPage() {
+  window.location.reload()
+}
 </script>
 
 <template>
-  <UDashboardGroup unit="rem" class="min-h-screen">
+  <div
+    v-if="gameVersionStore.error"
+    class="flex min-h-screen items-center justify-center p-6"
+  >
+    <UCard class="w-full max-w-md">
+      <div class="space-y-4 text-center">
+        <UIcon name="i-lucide-circle-alert" class="mx-auto size-8 text-error" />
+        <div class="space-y-1">
+          <h1 class="text-lg font-semibold text-highlighted">Game versions unavailable</h1>
+          <p class="text-sm text-muted">
+            Studio could not load the available game versions. Check the connection and try again.
+          </p>
+        </div>
+        <div class="flex justify-center gap-3">
+          <UButton icon="i-lucide-refresh-cw" @click="retryGameVersions">
+            Retry
+          </UButton>
+          <UButton color="neutral" variant="outline" @click="reloadPage">
+            Reload
+          </UButton>
+        </div>
+      </div>
+    </UCard>
+  </div>
+
+  <UDashboardGroup v-else unit="rem" class="min-h-screen">
     <StudioSidebar />
 
     <UDashboardPanel id="studio-panel">
@@ -35,9 +68,9 @@ onMounted(() => {
         <UDashboardNavbar :title="routeTitle" icon="i-lucide-database">
           <template #right>
             <USelect
+              v-if="!gameVersionStore.loading"
               :model-value="gameVersionStore.selected"
               :items="gameVersionStore.options"
-              :loading="gameVersionStore.loading"
               aria-label="Game version"
               class="w-40"
               @update:model-value="value => gameVersionStore.select(value as string)"

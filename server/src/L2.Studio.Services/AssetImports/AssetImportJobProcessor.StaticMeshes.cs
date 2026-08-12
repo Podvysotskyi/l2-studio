@@ -68,6 +68,7 @@ public sealed partial class AssetImportJobProcessor
             materialReferences,
             embeddedMaterials,
             cancellationToken);
+        await TrackTextureDependenciesAsync(context, job.GameVersion, materialReferences, cancellationToken);
         var materialResolver = materialCatalog.Resolver;
 
         Directory.CreateDirectory(assetRootPath);

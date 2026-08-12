@@ -18,7 +18,21 @@ services:
 
   storage-init:
     image: alpine:3.22
-    command: ['chown', '1000:1000', '/workspace/resources']
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p
+        /workspace/resources/C1/textures /workspace/resources/C1/staticmeshes
+        /workspace/resources/C1/sounds /workspace/resources/C1/music
+        /workspace/resources/C1/maps /workspace/resources/C1/scenes
+        /workspace/resources/C4/textures /workspace/resources/C4/staticmeshes
+        /workspace/resources/C4/sounds /workspace/resources/C4/music
+        /workspace/resources/C4/maps /workspace/resources/C4/scenes
+        /workspace/resources/Interlude/textures /workspace/resources/Interlude/staticmeshes
+        /workspace/resources/Interlude/sounds /workspace/resources/Interlude/music
+        /workspace/resources/Interlude/maps /workspace/resources/Interlude/scenes;
+        chown -R 1000:1000 /workspace/resources
     volumes:
       - resources-data:/workspace/resources
     restart: 'no'
@@ -84,6 +98,7 @@ services:
     volumes:
       - assets-data:/workspace/assets
       - resources-data:/workspace/sources:ro
+      - import-work:/workspace/import-work
     depends_on:
       puppeteer:
         condition: service_healthy
@@ -133,5 +148,6 @@ services:
 
 volumes:
   assets-data:
+  import-work:
   postgres-data:
   resources-data:

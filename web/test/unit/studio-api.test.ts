@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getAssetImportDiagnostics,
+  getAssetArtifact,
+  getAssetArtifacts,
   getAssetImportJobs,
+  getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
   getStudioServiceInfo,
   startAssetFileImport,
-  startAssetImport
+  startAssetResourceImport,
+  startAssetImport,
+  rebuildStaleAssetSources,
+  verifyAssetArtifact
 } from '../../app/services/studio-api'
 
 describe('Studio API service', () => {
@@ -42,7 +48,7 @@ describe('Studio API service', () => {
     await startAssetImport('textures')
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/textures/imports', {
       method: 'POST',
-      query: undefined
+      body: {}
     })
   })
 
@@ -90,6 +96,55 @@ describe('Studio API service', () => {
     await startAssetFileImport('textures', 'systextures/Lineage Effects.utx')
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/assets/textures/imports/files/systextures%2FLineage%20Effects.utx',
+      { method: 'POST', query: { force: false } }
+    )
+  })
+
+  it('starts resource re-imports through the import API', async () => {
+    fetchMock.mockResolvedValue({})
+    await startAssetResourceImport('textures', 'Texture', 'Package')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/textures/imports/resources',
+      { method: 'POST', body: { resourceName: 'Texture', packageName: 'Package', force: false } }
+    )
+  })
+
+  it('supports forced and stale rebuild controls', async () => {
+    fetchMock.mockResolvedValue([])
+    await startAssetImport('maps', { force: true })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/maps/imports', {
+      method: 'POST',
+      body: { force: true }
+    })
+
+    await getStaleAssetSources('maps')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/maps/imports/stale')
+    await rebuildStaleAssetSources('maps')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/maps/imports/stale', {
+      method: 'POST'
+    })
+  })
+
+  it('loads and verifies generated artifacts through version-scoped APIs', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 })
+    await getAssetArtifacts({ kind: 'maps', current: true, integrityStatus: 'healthy' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/artifacts', {
+      query: {
+        kind: 'maps',
+        current: true,
+        integrityStatus: 'healthy',
+        page: 1,
+        pageSize: 50
+      }
+    })
+
+    await getAssetArtifact('artifact id')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/artifacts/artifact%20id'
+    )
+    await verifyAssetArtifact('artifact id')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/artifacts/artifact%20id/verify',
       { method: 'POST' }
     )
   })

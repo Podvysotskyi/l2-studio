@@ -72,6 +72,55 @@ public sealed class GameContentModelTests
         Assert.Null(workItem.FindProperty(nameof(AssetImportWorkItem.WarningsJson)));
     }
 
+    [Fact]
+    public void ModelsImmutableArtifactInventoryAndPublicationPointers()
+    {
+        using var context = CreateContext();
+
+        var artifact = Entity<AssetArtifact>(context);
+        var file = Entity<AssetArtifactFile>(context);
+        var dependency = Entity<AssetArtifactDependency>(context);
+        var publication = Entity<AssetCatalogSource>(context);
+
+        Assert.Equal("asset_artifacts", artifact.GetTableName());
+        Assert.Contains(artifact.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(AssetArtifact.GameVersion), nameof(AssetArtifact.Kind),
+                nameof(AssetArtifact.NormalizedSourceKey), nameof(AssetArtifact.BuildFingerprint)
+            ]));
+        Assert.Contains(file.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(AssetArtifactFile.ArtifactId), nameof(AssetArtifactFile.RelativePath)
+            ]));
+        Assert.Contains(dependency.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(AssetArtifact));
+        Assert.Contains(publication.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(AssetArtifact) &&
+            key.DeleteBehavior == DeleteBehavior.Restrict);
+    }
+
+    [Fact]
+    public void ModelsImmutableReleaseSnapshotsAndLivePointers()
+    {
+        using var context = CreateContext();
+
+        var release = Entity<AssetRelease>(context);
+        var artifact = Entity<AssetReleaseArtifact>(context);
+        var pointer = Entity<AssetReleasePointer>(context);
+
+        Assert.Equal("asset_releases", release.GetTableName());
+        Assert.Contains(release.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(AssetRelease.GameVersion), nameof(AssetRelease.Name)
+            ]));
+        Assert.Equal([nameof(AssetReleaseArtifact.ReleaseId), nameof(AssetReleaseArtifact.ArtifactId)],
+            artifact.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Contains(artifact.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(AssetArtifact) &&
+            key.DeleteBehavior == DeleteBehavior.Restrict);
+        Assert.Equal(nameof(AssetReleasePointer.GameVersion), Assert.Single(pointer.FindPrimaryKey()!.Properties).Name);
+        Assert.Equal(2, pointer.GetForeignKeys().Count(key => key.PrincipalEntityType.ClrType == typeof(AssetRelease)));
+    }
+
     private static GameContentDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<GameContentDbContext>()

@@ -9,7 +9,8 @@ import { computed, onBeforeUnmount } from 'vue'
 import {
   getAssetCatalog,
   getAssetImportJobs,
-  startAssetImport
+  startAssetImport,
+  startAssetResourceImport
 } from '../../../services/studio-api'
 import { buildMapWorldGrid } from '../../../utils/map-world-grid'
 
@@ -22,6 +23,7 @@ const queueingPreviews = ref(false)
 const queueingPreviewName = ref<string>()
 const jobsError = ref<string>()
 const catalogError = ref<string>()
+const reimportingMap = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -106,6 +108,19 @@ async function queueImport() {
     jobsError.value = 'The map import could not be queued.'
   } finally {
     queueing.value = false
+  }
+}
+
+async function reimportMap(map: MapCatalogEntry) {
+  reimportingMap.value = map.name
+  jobsError.value = undefined
+  try {
+    await startAssetResourceImport('maps', map.name)
+    await loadJobs()
+  } catch {
+    jobsError.value = `The map re-import for ${map.name} could not be queued.`
+  } finally {
+    reimportingMap.value = undefined
   }
 }
 
@@ -232,7 +247,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         :previews="previews"
         :preview-job-active="Boolean(activePreviewJob || queueingPreviews)"
         :queueing-preview-name="queueingPreviewName"
+        :reimporting-map-name="reimportingMap"
         @generate-preview="queuePreviews"
+        @reimport="reimportMap"
       />
     </UCard>
 
@@ -241,9 +258,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         <h2 class="font-semibold text-highlighted">Other maps</h2>
       </template>
       <div class="flex flex-wrap gap-2">
+        <div v-for="map in worldGrid.unpositioned" :key="map.name" class="flex items-center gap-1">
         <UButton
-          v-for="map in worldGrid.unpositioned"
-          :key="map.name"
           :label="map.name"
           color="neutral"
           variant="outline"
@@ -254,6 +270,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               : undefined
           "
         />
+        <UButton icon="i-lucide-rotate-cw" color="neutral" variant="ghost" size="xs" aria-label="Re-import map" :loading="reimportingMap === map.name" @click="reimportMap(map)" />
+        </div>
       </div>
     </UCard>
     <UCard v-if="!worldGrid.cells.length && !catalogError">

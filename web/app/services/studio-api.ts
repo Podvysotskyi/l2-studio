@@ -1,13 +1,16 @@
 import type {
   AssetCatalogPage,
   AssetCatalogSummary,
+  AssetArtifactDetail,
+  AssetArtifactPage,
   AssetImportKind
 } from '../types/models/asset-catalog'
 import type {
   AssetImportDiagnostic,
   AssetImportJob,
   AssetImportPage,
-  AssetImportWorkItem
+  AssetImportWorkItem,
+  StaleAssetSource
 } from '../types/models/asset-import-job'
 import type {
   LookupKind,
@@ -21,6 +24,12 @@ import type {
 } from '../types/responses/content-directory-response'
 import type { StudioServiceInfo } from '../types/responses/studio-service-info'
 import type { GameVersionSummary } from '../types/models/game-version'
+import type {
+  AssetReleaseDetail,
+  AssetReleasePage,
+  AssetReleaseResourcePage,
+  AssetReleaseStatus
+} from '../types/models/asset-release'
 import { selectedGameVersionKey } from '../utils/game-version'
 
 function versionPath(path: string) {
@@ -61,6 +70,129 @@ export function getPlayerClasses(): Promise<PlayerClassRecord[]> {
 
 export function getAssetCatalogs(): Promise<AssetCatalogSummary[]> {
   return $fetch<AssetCatalogSummary[]>(versionPath('/assets/catalogs'))
+}
+
+export function getAssetArtifacts(request: {
+  kind?: AssetImportKind
+  sourceKey?: string
+  current?: boolean
+  integrityStatus?: 'healthy' | 'missing' | 'corrupt'
+  page?: number
+  pageSize?: number
+} = {}): Promise<AssetArtifactPage> {
+  return $fetch<AssetArtifactPage>(versionPath('/assets/artifacts'), {
+    query: {
+      ...(request.kind ? { kind: request.kind } : {}),
+      ...(request.sourceKey ? { sourceKey: request.sourceKey } : {}),
+      ...(request.current === undefined ? {} : { current: request.current }),
+      ...(request.integrityStatus
+        ? { integrityStatus: request.integrityStatus }
+        : {}),
+      page: request.page ?? 1,
+      pageSize: request.pageSize ?? 50
+    }
+  })
+}
+
+export function getAssetArtifact(id: string): Promise<AssetArtifactDetail> {
+  return $fetch<AssetArtifactDetail>(
+    versionPath(`/assets/artifacts/${encodeURIComponent(id)}`)
+  )
+}
+
+export function verifyAssetArtifact(id: string): Promise<AssetArtifactDetail> {
+  return $fetch<AssetArtifactDetail>(
+    versionPath(`/assets/artifacts/${encodeURIComponent(id)}/verify`),
+    { method: 'POST' }
+  )
+}
+
+export function getAssetReleases(request: {
+  status?: AssetReleaseStatus
+  page?: number
+  pageSize?: number
+} = {}): Promise<AssetReleasePage> {
+  return $fetch<AssetReleasePage>(versionPath('/asset-releases'), {
+    query: {
+      ...(request.status ? { status: request.status } : {}),
+      page: request.page ?? 1,
+      pageSize: request.pageSize ?? 25
+    }
+  })
+}
+
+export function getAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return $fetch<AssetReleaseDetail>(versionPath(`/asset-releases/${id}`))
+}
+
+export function createAssetRelease(body: {
+  name: string
+  notes?: string
+}): Promise<AssetReleaseDetail> {
+  return $fetch<AssetReleaseDetail>(versionPath('/asset-releases'), {
+    method: 'POST',
+    body
+  })
+}
+
+export function cloneAssetRelease(id: string, body: {
+  name: string
+  notes?: string
+}): Promise<AssetReleaseDetail> {
+  return $fetch<AssetReleaseDetail>(versionPath(`/asset-releases/${id}/clone`), {
+    method: 'POST',
+    body
+  })
+}
+
+export function updateAssetRelease(
+  id: string,
+  body: Record<string, string | number | null | undefined>
+): Promise<AssetReleaseDetail> {
+  return $fetch<AssetReleaseDetail>(versionPath(`/asset-releases/${id}`), {
+    method: 'PATCH',
+    body
+  })
+}
+
+export function refreshAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return releaseAction(id, 'refresh')
+}
+
+export function validateAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return releaseAction(id, 'validate')
+}
+
+export function publishAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return releaseAction(id, 'publish')
+}
+
+export function activateAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return releaseAction(id, 'activate')
+}
+
+export function retireAssetRelease(id: string): Promise<AssetReleaseDetail> {
+  return releaseAction(id, 'retire')
+}
+
+export function deleteAssetRelease(id: string): Promise<void> {
+  return $fetch<void>(versionPath(`/asset-releases/${id}`), { method: 'DELETE' })
+}
+
+export function getAssetReleaseResources(
+  id: string,
+  type: 'scene' | 'audio' | 'image',
+  query = ''
+): Promise<AssetReleaseResourcePage> {
+  return $fetch<AssetReleaseResourcePage>(versionPath(`/asset-releases/${id}/resources`), {
+    query: { type, query, page: 1, pageSize: 100 }
+  })
+}
+
+function releaseAction(id: string, action: string): Promise<AssetReleaseDetail> {
+  return $fetch<AssetReleaseDetail>(versionPath(`/asset-releases/${id}/${action}`), {
+    method: 'POST'
+  })
 }
 
 export function getAssetCatalog<T, TPackage = never>(
@@ -108,22 +240,49 @@ export function getAssetImportJobs(
 
 export function startAssetImport(
   kind: AssetImportKind,
-  query?: Record<string, string>
+  request: { force?: boolean, mapName?: string } = {}
 ): Promise<AssetImportJob> {
   return $fetch<AssetImportJob>(versionPath(`/assets/${kind}/imports`), {
     method: 'POST',
-    query
+    body: request
   })
 }
 
 export function startAssetFileImport(
   kind: AssetImportKind,
-  fileName: string
+  fileName: string,
+  force = false
 ): Promise<AssetImportJob> {
   return $fetch<AssetImportJob>(
     versionPath(`/assets/${kind}/imports/files/${encodeURIComponent(fileName)}`),
-    { method: 'POST' }
+    { method: 'POST', query: { force } }
   )
+}
+
+export function startAssetResourceImport(
+  kind: 'textures' | 'staticmeshes' | 'maps',
+  resourceName: string,
+  packageName?: string,
+  force = false
+): Promise<AssetImportJob> {
+  return $fetch<AssetImportJob>(versionPath(`/assets/${kind}/imports/resources`), {
+    method: 'POST',
+    body: { resourceName, packageName, force }
+  })
+}
+
+export function getStaleAssetSources(
+  kind: AssetImportKind
+): Promise<StaleAssetSource[]> {
+  return $fetch<StaleAssetSource[]>(versionPath(`/assets/${kind}/imports/stale`))
+}
+
+export function rebuildStaleAssetSources(
+  kind: AssetImportKind
+): Promise<AssetImportJob> {
+  return $fetch<AssetImportJob>(versionPath(`/assets/${kind}/imports/stale`), {
+    method: 'POST'
+  })
 }
 
 export function getAssetImportWorkItems(

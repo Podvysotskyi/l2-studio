@@ -9,6 +9,7 @@ using L2.Studio.Repositories.Interfaces.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Wolverine.EntityFrameworkCore;
+using Wolverine.Runtime;
 
 namespace L2.Studio.Repositories;
 
@@ -24,6 +25,7 @@ public sealed partial class AssetImportRepository(
     public async Task<AssetImportRunSummary?> QueueFullScanAsync(
         string gameVersion,
         string kind,
+        bool force,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -38,6 +40,7 @@ public sealed partial class AssetImportRepository(
             Kind = kind,
             TriggerType = AssetImportJobValues.FullScan,
             Status = AssetImportJobValues.Queued,
+            Force = force,
             RequestedAt = timeProvider.GetUtcNow()
         };
         context.AssetImportRuns.Add(run);
@@ -51,6 +54,7 @@ public sealed partial class AssetImportRepository(
         string gameVersion,
         string kind,
         string fileName,
+        bool force,
         CancellationToken cancellationToken)
     {
         var source = await ValidateSingleFileAsync(gameVersion, kind, fileName, cancellationToken);
@@ -61,13 +65,22 @@ public sealed partial class AssetImportRepository(
         if (await HasConflictingRunAsync(context, gameVersion, kind, normalized, cancellationToken)) return null;
 
         var now = timeProvider.GetUtcNow();
+        var previous = await context.AssetCatalogSources.AsNoTracking().Include(item => item.Dependencies)
+            .SingleOrDefaultAsync(item => item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind &&
+                item.Catalog.IsActive && item.NormalizedSourceKey == normalized, cancellationToken);
+        var fingerprint = AssetArtifactFingerprint.Compute(kind, source.SourceHash,
+            previous?.Dependencies.Select(dependency => (
+                dependency.Kind, dependency.DependencyKey, dependency.ArtifactFingerprint ?? "missing")) ?? []);
+        var reused = !force && previous is { IsStale: false, ArtifactFingerprint: not null } &&
+            previous.SourceHash == source.SourceHash && previous.ArtifactFingerprint == fingerprint;
         var run = new AssetImportRun
         {
             Id = Guid.NewGuid(),
             GameVersion = gameVersion,
             Kind = kind,
             TriggerType = AssetImportJobValues.SingleFile,
-            Status = AssetImportJobValues.Queued,
+            Status = reused ? AssetImportJobValues.Running : AssetImportJobValues.Queued,
+            Force = force,
             RequestedSourceKey = source.FileName,
             NormalizedRequestedSourceKey = normalized,
             RequestedAt = now,
@@ -84,14 +97,109 @@ public sealed partial class AssetImportRepository(
             NormalizedSourceKey = normalized,
             SourcePath = source.FullPath,
             SourceHash = source.SourceHash,
-            Status = AssetImportJobValues.Queued,
-            CreatedAt = now
+            ArtifactFingerprint = reused ? fingerprint : null,
+            Status = reused ? AssetImportJobValues.Reused : AssetImportJobValues.Queued,
+            CreatedAt = now,
+            FinishedAt = reused ? now : null
         };
         run.WorkItems.Add(item);
         context.AssetImportRuns.Add(run);
         outbox.Enroll(context);
-        await outbox.PublishAsync(FileCommand(kind, item.Id));
+        await outbox.PublishAsync(reused
+            ? new AssetImportWorkItemCompleted(run.Id, item.Id)
+            : FileCommand(kind, item.Id));
         await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        return ToSummary(run);
+    }
+
+    public async Task<AssetImportRunSummary?> QueueResourceAsync(
+        string gameVersion,
+        string kind,
+        string resourceName,
+        string? packageName,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(resourceName)) throw new ArgumentException("A resource name is required.", nameof(resourceName));
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var items = context.AssetCatalogItems.AsNoTracking().Where(item =>
+            item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind && item.Catalog.IsActive &&
+            item.Name == resourceName.Trim());
+        if (kind is AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes)
+            items = items.Where(item => item.GroupName == packageName!.Trim());
+        var sourceKeys = await items.Select(item => item.Source.SourceKey).Distinct().Take(2).ToArrayAsync(cancellationToken);
+        if (sourceKeys.Length == 0)
+            throw new AssetImportTargetNotFoundException(resourceName);
+        if (sourceKeys.Length > 1)
+            throw new ArgumentException("The resource name is ambiguous; select a package-qualified resource.", nameof(resourceName));
+        return await QueueSingleFileAsync(gameVersion, kind, sourceKeys[0], force, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<StaleAssetSourceSummary>> GetStaleAsync(
+        string gameVersion,
+        string kind,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var sources = await context.AssetCatalogSources.AsNoTracking()
+            .Where(source => source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == kind &&
+                source.Catalog.IsActive && source.IsStale)
+            .OrderBy(source => source.SourceKey)
+            .Select(source => new
+            {
+                source.SourceKey,
+                source.StaleAt,
+                source.StaleReasonsJson,
+                Names = source.Items.Select(item => item.GroupName == null
+                    ? item.Name
+                    : item.GroupName + "/" + item.Name).ToArray()
+            }).ToListAsync(cancellationToken);
+        return sources.Select(source => new StaleAssetSourceSummary(
+            source.SourceKey,
+            source.Names,
+            source.StaleAt ?? DateTimeOffset.MinValue,
+            System.Text.Json.JsonSerializer.Deserialize<string[]>(source.StaleReasonsJson) ?? [])).ToArray();
+    }
+
+    public async Task<AssetImportRunSummary?> QueueStaleAsync(
+        string gameVersion,
+        string kind,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await AcquireKindLockAsync(context, gameVersion, kind, cancellationToken);
+        if (await HasConflictingRunAsync(context, gameVersion, kind, null, cancellationToken)) return null;
+        var sources = await context.AssetCatalogSources.AsNoTracking()
+            .Where(source => source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == kind &&
+                source.Catalog.IsActive && source.IsStale)
+            .OrderBy(source => source.SourceKey)
+            .Select(source => new { source.SourceKey, source.NormalizedSourceKey })
+            .ToArrayAsync(cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        var run = new AssetImportRun
+        {
+            Id = Guid.NewGuid(), GameVersion = gameVersion, Kind = kind,
+            TriggerType = AssetImportJobValues.StaleRebuild, Status = AssetImportJobValues.Queued,
+            RequestedAt = now, DiscoveryFinishedAt = now, DiscoveredFileCount = sources.Length
+        };
+        foreach (var source in sources)
+        {
+            var validated = await ValidateSingleFileAsync(gameVersion, kind, source.SourceKey, cancellationToken);
+            var item = new AssetImportWorkItem
+            {
+                Id = Guid.NewGuid(), GameVersion = gameVersion, RunId = run.Id, ImportKind = kind,
+                SourceKey = validated.FileName, NormalizedSourceKey = source.NormalizedSourceKey,
+                SourcePath = validated.FullPath, SourceHash = validated.SourceHash,
+                Status = AssetImportJobValues.Queued, CreatedAt = now
+            };
+            run.WorkItems.Add(item);
+        }
+        context.AssetImportRuns.Add(run);
+        outbox.Enroll(context);
+        foreach (var item in run.WorkItems) await outbox.PublishAsync(FileCommand(kind, item.Id));
+        if (sources.Length == 0) await outbox.PublishAsync(new FinalizeAssetImportRun(run.Id));
+        await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
         return ToSummary(run);
     }
 
@@ -144,7 +252,7 @@ public sealed partial class AssetImportRepository(
         var items = await query.OrderBy(item => item.SourceKey)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(item => new AssetImportWorkItemSummary(
-                item.Id, item.RunId, item.ImportKind, item.SourceKey, item.SourcePath, item.SourceHash,
+                item.Id, item.RunId, item.ImportKind, item.SourceKey, item.SourceHash, item.ArtifactFingerprint,
                 item.Status, item.AttemptCount, item.CreatedAt, item.StartedAt, item.FinishedAt,
                 item.TotalResourceCount, item.ProcessedResourceCount, item.SkippedResourceCount,
                 item.WarningCount, item.Error, item.UnpublishedAt))
@@ -217,15 +325,7 @@ public sealed partial class AssetImportRepository(
         if (kind == AssetImportJobValues.Scenes && WorldMapNamePattern().IsMatch(stem))
             throw new ArgumentException("The file is a world map, not a client scene.", nameof(fileName));
 
-        var root = Path.GetFullPath(SourceRoot(gameVersion, kind));
-        if (kind == AssetImportJobValues.Textures)
-        {
-            var segments = normalizedFileName.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length != 2 || segments[0] is not "systextures" and not "textures")
-                throw new ArgumentException("Texture imports require a folder-qualified source key such as 'systextures/Interface.utx'.", nameof(fileName));
-            root = Path.Combine(Path.GetFullPath(options.Value.SourceRootPath), SourceFolder(gameVersion), segments[0]);
-            normalizedFileName = segments[1];
-        }
+        var root = Path.GetFullPath(VersionRoot(gameVersion, kind));
         string fullPath;
         try
         {
@@ -240,7 +340,7 @@ public sealed partial class AssetImportRepository(
         if (kind == AssetImportJobValues.MapPreviews)
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var normalized = NormalizeSourceKey(Path.GetFileName(fullPath));
+            var normalized = NormalizeSourceKey(RelativeSourceKey(root, fullPath));
             var mapSourceHash = await context.AssetCatalogSources.AsNoTracking().Where(source =>
                 source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == AssetImportJobValues.Maps && source.Catalog.IsActive &&
                 source.NormalizedSourceKey == normalized)
@@ -253,20 +353,25 @@ public sealed partial class AssetImportRepository(
         {
             sourceHash = await AssetImportSourceHash.FileAsync(fullPath, cancellationToken);
         }
-        var sourceKey = kind == AssetImportJobValues.Textures
-            ? $"{fileName.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)[0]}/{Path.GetFileName(fullPath)}"
-            : Path.GetFileName(fullPath);
+        var sourceKey = RelativeSourceKey(root, fullPath);
         return new ValidatedSource(sourceKey, fullPath, sourceHash);
     }
 
-    private string SourceRoot(string gameVersion, string kind) => Path.Combine(
+    private string VersionRoot(string gameVersion, string kind) => Path.Combine(
         options.Value.SourceRootPath,
         SourceFolder(gameVersion),
-        kind switch
+        SourceKindFolder(kind));
+
+    private static string SourceKindFolder(string kind) => kind switch
     {
-        AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews or AssetImportJobValues.Scenes => "maps",
-        var value => value
-    });
+        AssetImportJobValues.Textures => "textures",
+        AssetImportJobValues.StaticMeshes => "staticmeshes",
+        AssetImportJobValues.Sounds => "sounds",
+        AssetImportJobValues.Music => "music",
+        AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews => "maps",
+        AssetImportJobValues.Scenes => "scenes",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
 
     private static string SourceFolder(string gameVersion) => gameVersion switch
     {
@@ -299,6 +404,7 @@ public sealed partial class AssetImportRepository(
                 run.NormalizedRequestedSourceKey == normalizedSourceKey), token);
 
     public static string NormalizeSourceKey(string sourceKey) => sourceKey.Trim().ToLowerInvariant();
+    private static string RelativeSourceKey(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');
 
     private static object DiscoveryCommand(string kind, Guid runId) => kind switch
     {
@@ -328,7 +434,7 @@ public sealed partial class AssetImportRepository(
         run.Id, run.Kind, run.TriggerType, run.Status, run.RequestedSourceKey, run.RequestedAt,
         run.StartedAt, run.DiscoveryFinishedAt, run.FinishedAt, run.DiscoveredFileCount,
         run.CompletedFileCount, run.SucceededFileCount, run.WarningFileCount,
-        run.FailedFileCount, run.Error);
+        run.FailedFileCount, run.ReusedFileCount, run.Error);
 
     private static string EscapeLike(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
