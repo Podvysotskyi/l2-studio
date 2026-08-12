@@ -154,7 +154,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           icon="i-lucide-history"
           color="neutral"
           variant="outline"
-          to="/assets/jobs"
+          to="/pipeline/imports"
         />
         <UButton
           label="Import maps"
@@ -266,7 +266,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           :disabled="!map.manifestUrl"
           :to="
             map.manifestUrl
-              ? { name: 'assets-maps-name', params: { name: map.name } }
+              ? { name: 'library-maps-name', params: { name: map.name } }
               : undefined
           "
         />

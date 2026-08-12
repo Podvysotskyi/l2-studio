@@ -132,7 +132,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             :disabled="!scene.manifestUrl"
             :to="
               scene.manifestUrl
-                ? { name: 'assets-scenes-name', params: { name: scene.name } }
+                ? { name: 'library-scenes-name', params: { name: scene.name } }
                 : undefined
             "
           />

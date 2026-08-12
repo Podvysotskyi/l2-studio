@@ -68,7 +68,7 @@ function selectFolder(item: TextureTreeItem | undefined) {
   if (!item?.folder || !item.packageName) return
   selectedTexture.value = undefined
   void router.push({
-    path: '/assets/textures',
+    path: '/library/textures',
     query: { folder: item.folder, package: item.packageName }
   })
 }
@@ -152,7 +152,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
   <div class="space-y-6">
     <StudioPageHeader eyebrow="Asset pipeline" title="Textures" description="Browse generated textures by their original client path." icon="i-lucide-images">
       <template #actions>
-        <UButton label="Import jobs" icon="i-lucide-history" color="neutral" variant="outline" to="/assets/jobs" />
+        <UButton label="Import jobs" icon="i-lucide-history" color="neutral" variant="outline" to="/pipeline/imports" />
         <UButton label="Import textures" icon="i-lucide-play" :loading="queueing" :disabled="Boolean(activeJob)" @click="queueImport" />
       </template>
     </StudioPageHeader>

@@ -386,7 +386,7 @@ onBeforeUnmount(stop)
           icon="i-lucide-arrow-left"
           color="neutral"
           variant="outline"
-          to="/assets/scenes"
+          to="/library/scenes"
         />
       </template>
     </StudioPageHeader>

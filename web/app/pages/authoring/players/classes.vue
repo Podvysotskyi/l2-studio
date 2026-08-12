@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { usePlayerClassDirectoryStore } from '../../stores/player-class-directory'
+import { usePlayerClassDirectoryStore } from '~/stores/player-class-directory'
 
 const store = usePlayerClassDirectoryStore()
 const { records, loading, error } = storeToRefs(store)

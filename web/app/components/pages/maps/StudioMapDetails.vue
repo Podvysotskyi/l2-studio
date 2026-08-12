@@ -323,7 +323,7 @@ async function loadMap() {
           icon="i-lucide-arrow-left"
           color="neutral"
           variant="outline"
-          to="/assets/maps"
+          to="/library/maps"
         />
       </template>
     </StudioPageHeader>

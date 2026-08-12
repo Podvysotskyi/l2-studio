@@ -1,5 +1,16 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 
+export const studioNavigationGroups = {
+  players: 'players',
+  npcs: 'npcs',
+  skills: 'skills',
+  library: 'library',
+  pipeline: 'pipeline'
+} as const
+
+export type StudioNavigationGroup =
+  typeof studioNavigationGroups[keyof typeof studioNavigationGroups]
+
 export const studioNavigation: NavigationMenuItem[] = [
   {
     label: 'Overview',
@@ -12,144 +23,178 @@ export const studioNavigation: NavigationMenuItem[] = [
     exact: true
   },
   {
-    label: 'Content',
+    label: 'Authoring',
     type: 'label'
   },
   {
     label: 'Players',
+    value: studioNavigationGroups.players,
     icon: 'i-lucide-user-round',
-    defaultOpen: true,
     children: [
       {
         label: 'Classes',
         icon: 'i-lucide-git-branch',
-        to: '/content/player-classes'
+        to: '/authoring/players/classes'
       },
-      { label: 'Races', icon: 'i-lucide-orbit', to: '/content/player-races' },
-      { label: 'Sexes', icon: 'i-lucide-tags', to: '/content/player-sexes' }
+      {
+        label: 'Races',
+        icon: 'i-lucide-orbit',
+        to: '/authoring/players/races'
+      },
+      {
+        label: 'Sexes',
+        icon: 'i-lucide-tags',
+        to: '/authoring/players/sexes'
+      }
     ]
   },
   {
     label: 'NPCs',
+    value: studioNavigationGroups.npcs,
     icon: 'i-lucide-users-round',
-    defaultOpen: true,
     children: [
-      { label: 'Definitions', icon: 'i-lucide-list', to: '/content/npcs' },
-      { label: 'Races', icon: 'i-lucide-orbit', to: '/content/races' },
-      { label: 'Sexes', icon: 'i-lucide-tags', to: '/content/sexes' },
-      { label: 'Types', icon: 'i-lucide-workflow', to: '/content/types' }
+      {
+        label: 'Definitions',
+        icon: 'i-lucide-list',
+        to: '/authoring/npcs'
+      },
+      {
+        label: 'Races',
+        icon: 'i-lucide-orbit',
+        to: '/authoring/npcs/races'
+      },
+      {
+        label: 'Sexes',
+        icon: 'i-lucide-tags',
+        to: '/authoring/npcs/sexes'
+      },
+      {
+        label: 'Types',
+        icon: 'i-lucide-workflow',
+        to: '/authoring/npcs/types'
+      }
     ]
   },
   {
     label: 'Skills',
+    value: studioNavigationGroups.skills,
     icon: 'i-lucide-sparkles',
-    defaultOpen: true,
     children: [
-      { label: 'Definitions', icon: 'i-lucide-list', to: '/content/skills' },
+      {
+        label: 'Definitions',
+        icon: 'i-lucide-list',
+        to: '/authoring/skills'
+      },
       {
         label: 'Operate types',
         icon: 'i-lucide-play',
-        to: '/content/skill-operate-types'
+        to: '/authoring/skills/operate-types'
       },
       {
         label: 'Target types',
         icon: 'i-lucide-crosshair',
-        to: '/content/skill-target-types'
+        to: '/authoring/skills/target-types'
       }
     ]
   },
   {
-    label: 'Assets',
+    label: 'Delivery',
     type: 'label'
   },
   {
     label: 'Asset library',
-    icon: 'i-lucide-package-open',
-    defaultOpen: true,
+    value: studioNavigationGroups.library,
+    icon: 'i-lucide-library',
     children: [
       {
         label: 'Textures',
         icon: 'i-lucide-images',
-        to: '/assets/textures'
+        to: '/library/textures'
       },
       {
         label: 'Music',
         icon: 'i-lucide-music-2',
-        to: '/assets/music'
+        to: '/library/music'
       },
       {
         label: 'Static meshes',
         icon: 'i-lucide-box',
-        to: '/assets/staticmeshes'
+        to: '/library/static-meshes'
       },
       {
         label: 'Maps',
         icon: 'i-lucide-map',
-        to: '/assets/maps'
+        to: '/library/maps'
       },
       {
         label: 'Scenes',
         icon: 'i-lucide-clapperboard',
-        to: '/assets/scenes'
+        to: '/library/scenes'
       }
     ]
   },
   {
-    label: 'Operations',
-    type: 'label'
-  },
-  {
-    label: 'File storage',
-    icon: 'i-lucide-hard-drive',
-    to: '/storage'
-  },
-  {
-    label: 'Artifact registry',
-    icon: 'i-lucide-library-big',
-    to: '/assets/artifacts'
-  },
-  {
-    label: 'Releases',
-    icon: 'i-lucide-rocket',
-    to: '/releases'
-  },
-  {
-    label: 'Background jobs',
-    icon: 'i-lucide-activity',
-    defaultOpen: true,
+    label: 'Pipeline',
+    value: studioNavigationGroups.pipeline,
+    icon: 'i-lucide-workflow',
     children: [
+      {
+        label: 'File storage',
+        icon: 'i-lucide-hard-drive',
+        to: '/pipeline/storage'
+      },
       {
         label: 'Import jobs',
         icon: 'i-lucide-history',
-        to: '/assets/jobs'
+        to: '/pipeline/imports'
+      },
+      {
+        label: 'Artifact registry',
+        icon: 'i-lucide-library-big',
+        to: '/pipeline/artifacts'
+      },
+      {
+        label: 'Releases',
+        icon: 'i-lucide-rocket',
+        to: '/pipeline/releases'
       }
     ]
   }
 ]
 
+export function studioRouteGroup(path: string): StudioNavigationGroup | undefined {
+  if (path.startsWith('/authoring/players/')) return studioNavigationGroups.players
+  if (path === '/authoring/npcs' || path.startsWith('/authoring/npcs/'))
+    return studioNavigationGroups.npcs
+  if (path === '/authoring/skills' || path.startsWith('/authoring/skills/'))
+    return studioNavigationGroups.skills
+  if (path.startsWith('/library/')) return studioNavigationGroups.library
+  if (path.startsWith('/pipeline/')) return studioNavigationGroups.pipeline
+  return undefined
+}
+
 export function studioRouteTitle(path: string) {
   if (path === '/') return 'Dashboard'
-  if (path === '/content/npcs') return 'NPC definitions'
-  if (path === '/content/races') return 'NPC races'
-  if (path === '/content/sexes') return 'NPC sexes'
-  if (path === '/content/types') return 'NPC types'
-  if (path === '/content/player-classes') return 'Player classes'
-  if (path === '/content/player-races') return 'Player races'
-  if (path === '/content/player-sexes') return 'Player sexes'
-  if (path === '/content/skills') return 'Skill definitions'
-  if (path === '/content/skill-operate-types') return 'Skill operate types'
-  if (path === '/content/skill-target-types') return 'Skill target types'
-  if (path === '/assets/imports' || path === '/assets/systextures' || path === '/assets/textures')
-    return 'Textures'
-  if (path === '/assets/music') return 'Music assets'
-  if (path === '/assets/staticmeshes') return 'Static meshes'
-  if (path === '/assets/maps') return 'Maps'
-  if (path.startsWith('/assets/maps/')) return 'Map'
-  if (path === '/assets/scenes') return 'Scenes'
-  if (path.startsWith('/assets/scenes/')) return 'Client scene'
-  if (path === '/assets/jobs') return 'Asset import jobs'
-  if (path === '/assets/artifacts') return 'Generated-asset registry'
-  if (path === '/releases') return 'Asset releases'
-  if (path === '/storage') return 'File storage'
+  if (path === '/authoring/npcs') return 'NPC definitions'
+  if (path === '/authoring/npcs/races') return 'NPC races'
+  if (path === '/authoring/npcs/sexes') return 'NPC sexes'
+  if (path === '/authoring/npcs/types') return 'NPC types'
+  if (path === '/authoring/players/classes') return 'Player classes'
+  if (path === '/authoring/players/races') return 'Player races'
+  if (path === '/authoring/players/sexes') return 'Player sexes'
+  if (path === '/authoring/skills') return 'Skill definitions'
+  if (path === '/authoring/skills/operate-types') return 'Skill operate types'
+  if (path === '/authoring/skills/target-types') return 'Skill target types'
+  if (path === '/library/textures') return 'Textures'
+  if (path === '/library/music') return 'Music assets'
+  if (path === '/library/static-meshes') return 'Static meshes'
+  if (path === '/library/maps') return 'Maps'
+  if (path.startsWith('/library/maps/')) return 'Map'
+  if (path === '/library/scenes') return 'Scenes'
+  if (path.startsWith('/library/scenes/')) return 'Client scene'
+  if (path === '/pipeline/imports') return 'Asset import jobs'
+  if (path === '/pipeline/artifacts') return 'Generated-asset registry'
+  if (path === '/pipeline/releases') return 'Asset releases'
+  if (path === '/pipeline/storage') return 'File storage'
   return 'Studio'
 }

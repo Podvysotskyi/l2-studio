@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { useDirectoryRouteSync } from '../../composables/use-directory-route-sync'
-import { useSkillDirectoryStore } from '../../stores/skill-directory'
+import { useDirectoryRouteSync } from '~/composables/use-directory-route-sync'
+import { useNpcDirectoryStore } from '~/stores/npc-directory'
 
-const store = useSkillDirectoryStore()
+const store = useNpcDirectoryStore()
 const { items, total, query, page, pageSize, loading, error } =
   storeToRefs(store)
 
-useDirectoryRouteSync('/content/skills', { query, page, pageSize }, store.load)
+useDirectoryRouteSync('/authoring/npcs', { query, page, pageSize }, store.load)
 </script>
 
 <template>
-  <SkillDirectory
+  <NpcDirectory
     v-model:query="query"
     v-model:page="page"
     v-model:page-size="pageSize"

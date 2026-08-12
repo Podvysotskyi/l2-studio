@@ -77,14 +77,14 @@ const contentCatalogs = computed(() => [
     value: counts.value.npcs,
     description: 'World actors with race, sex, and behavior classifications.',
     icon: 'i-lucide-users-round',
-    to: '/content/npcs'
+    to: '/authoring/npcs'
   },
   {
     label: 'Skill definitions',
     value: counts.value.skills,
     description: 'Skills with levels, icons, operate types, and target types.',
     icon: 'i-lucide-sparkles',
-    to: '/content/skills'
+    to: '/authoring/skills'
   },
   {
     label: 'Player classes',
@@ -92,7 +92,7 @@ const contentCatalogs = computed(() => [
     description:
       'Expandable progression from base professions to third classes.',
     icon: 'i-lucide-git-branch',
-    to: '/content/player-classes'
+    to: '/authoring/players/classes'
   }
 ])
 
@@ -100,25 +100,25 @@ const lookupCatalogs = computed(() => [
   {
     label: 'Player races',
     value: counts.value.playerRaces,
-    to: '/content/player-races'
+    to: '/authoring/players/races'
   },
   {
     label: 'Player sexes',
     value: counts.value.playerSexes,
-    to: '/content/player-sexes'
+    to: '/authoring/players/sexes'
   },
-  { label: 'NPC races', value: counts.value.npcRaces, to: '/content/races' },
-  { label: 'NPC sexes', value: counts.value.npcSexes, to: '/content/sexes' },
-  { label: 'NPC types', value: counts.value.npcTypes, to: '/content/types' },
+  { label: 'NPC races', value: counts.value.npcRaces, to: '/authoring/npcs/races' },
+  { label: 'NPC sexes', value: counts.value.npcSexes, to: '/authoring/npcs/sexes' },
+  { label: 'NPC types', value: counts.value.npcTypes, to: '/authoring/npcs/types' },
   {
     label: 'Skill operate types',
     value: counts.value.skillOperateTypes,
-    to: '/content/skill-operate-types'
+    to: '/authoring/skills/operate-types'
   },
   {
     label: 'Skill target types',
     value: counts.value.skillTargetTypes,
-    to: '/content/skill-target-types'
+    to: '/authoring/skills/target-types'
   }
 ])
 
@@ -154,7 +154,7 @@ onMounted(() => void dashboard.load())
           icon="i-lucide-history"
           color="neutral"
           variant="outline"
-          to="/assets/jobs"
+          to="/pipeline/imports"
         />
         <UButton
           label="Refresh data"
@@ -416,7 +416,7 @@ onMounted(() => void dashboard.load())
             </div>
             <UButton
               label="View all"
-              to="/assets/jobs"
+              to="/pipeline/imports"
               color="neutral"
               variant="ghost"
               size="sm"

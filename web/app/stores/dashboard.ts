@@ -179,7 +179,7 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'Textures',
       'System and world texture packages from the original client folders.',
       'i-lucide-images',
-      '/assets/textures',
+      '/library/textures',
       'packages'
     ),
     asset(
@@ -187,7 +187,7 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'Music',
       'Validated browser-playable Ogg Vorbis soundtrack assets.',
       'i-lucide-music-2',
-      '/assets/music',
+      '/library/music',
       'tracks'
     ),
     asset(
@@ -195,7 +195,7 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'Static meshes',
       'UE2 world geometry converted to interactive GLB previews.',
       'i-lucide-box',
-      '/assets/staticmeshes',
+      '/library/static-meshes',
       'packages'
     ),
     asset(
@@ -203,7 +203,7 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'Maps',
       'Coordinate-named geographic world tiles and placements.',
       'i-lucide-map',
-      '/assets/maps',
+      '/library/maps',
       'maps'
     ),
     asset(
@@ -211,7 +211,7 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'Scenes',
       'Client entry, lobby, sky, and support scene packages.',
       'i-lucide-clapperboard',
-      '/assets/scenes',
+      '/library/scenes',
       'scenes'
     )
   ]

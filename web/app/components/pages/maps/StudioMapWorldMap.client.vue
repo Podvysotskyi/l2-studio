@@ -430,7 +430,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
             :to="
               selectedMap.manifestUrl
                 ? {
-                    name: 'assets-maps-name',
+                    name: 'library-maps-name',
                     params: { name: selectedMap.name }
                   }
                 : undefined

@@ -121,7 +121,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           icon="i-lucide-history"
           color="neutral"
           variant="outline"
-          to="/assets/jobs"
+          to="/pipeline/imports"
         />
         <UButton
           label="Import music"

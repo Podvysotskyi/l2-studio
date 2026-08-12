@@ -1,10 +1,24 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSystemStore } from '../../stores/system'
-import { studioNavigation } from '../../utils/studio-navigation'
+import {
+  studioNavigation,
+  studioRouteGroup
+} from '../../utils/studio-navigation'
 
+const route = useRoute()
 const systemStore = useSystemStore()
 const { serviceState, description } = storeToRefs(systemStore)
+const expandedGroup = ref(studioRouteGroup(route.path))
+
+watch(
+  () => route.path,
+  path => {
+    expandedGroup.value = studioRouteGroup(path)
+  }
+)
 </script>
 
 <template>
@@ -30,7 +44,7 @@ const { serviceState, description } = storeToRefs(systemStore)
             Studio
           </strong>
           <small class="block truncate text-xs text-muted">
-            Content operations
+            Content workspace
           </small>
         </span>
       </NuxtLink>
@@ -38,13 +52,19 @@ const { serviceState, description } = storeToRefs(systemStore)
 
     <template #default="{ collapsed }">
       <UNavigationMenu
+        v-model="expandedGroup"
         :items="studioNavigation"
         orientation="vertical"
+        type="single"
         :collapsed="collapsed"
         :tooltip="collapsed"
         :popover="collapsed"
         highlight
         class="w-full"
+        :ui="{
+          label: 'px-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-dimmed',
+          link: 'rounded-md'
+        }"
       />
     </template>
 
