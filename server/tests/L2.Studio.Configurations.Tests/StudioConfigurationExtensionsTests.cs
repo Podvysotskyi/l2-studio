@@ -1,4 +1,5 @@
 using L2.Studio.Configurations;
+using L2.Studio.Migrations;
 using L2.Studio.Repositories;
 using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Services;
@@ -110,6 +111,23 @@ public sealed class StudioConfigurationExtensionsTests
     }
 
     [Fact]
+    public void RegistersAssetStorageReconciliationPublisherOnlyForWorkerMessagingAndBuildsWorker()
+    {
+        var apiBuilder = CreateHostBuilder();
+        apiBuilder.AddStudioApiMessaging();
+
+        Assert.DoesNotContain(apiBuilder.Services, HostedService<AssetStorageReconciliationPublisher>);
+
+        var workerBuilder = CreateHostBuilder(Environments.Development);
+        workerBuilder.AddStudioWorker("l2-studio-worker");
+        workerBuilder.AddStudioWorkerMessaging();
+        workerBuilder.Services.AddStudioWorkerApplication(workerBuilder.Configuration);
+
+        Assert.Contains(workerBuilder.Services, HostedService<AssetStorageReconciliationPublisher>);
+        using var host = workerBuilder.Build();
+    }
+
+    [Fact]
     public void RequiresAConnectionStringForStudioPersistence()
     {
         var services = new ServiceCollection();
@@ -135,8 +153,20 @@ public sealed class StudioConfigurationExtensionsTests
         Assert.Contains(services, Service<IAssetCatalogRepository, AssetCatalogRepository>);
         Assert.Contains(services, Service<IAssetImportRepository, AssetImportRepository>);
         Assert.Contains(services, Service<IAssetCatalogStore, AssetCatalogStore>);
+        Assert.Contains(services, Service<GameVersionSeeder, GameVersionSeeder>);
+        Assert.Contains(services, HostedService<GameContentInitializer>);
         using var provider = services.BuildServiceProvider();
         Assert.Same(clock, provider.GetRequiredService<TimeProvider>());
+    }
+
+    [Fact]
+    public void DoesNotRegisterGameContentInitializerForWorkerApplication()
+    {
+        var services = new ServiceCollection();
+
+        services.AddStudioWorkerApplication(Configuration());
+
+        Assert.DoesNotContain(services, HostedService<GameContentInitializer>);
     }
 
     [Fact]
@@ -147,7 +177,7 @@ public sealed class StudioConfigurationExtensionsTests
             ["ConnectionStrings:PostgreSql"] = ConnectionString,
             ["AssetImport:SourceRootPath"] = "",
             ["AssetImport:StudioBaseUrl"] = "ftp://studio.example.com",
-            ["AssetImport:LevelPreviewBrowserUrl"] = "relative"
+            ["AssetImport:MapPreviewBrowserUrl"] = "relative"
         };
         var services = new ServiceCollection();
         services.AddStudioWorkerApplication(
@@ -159,7 +189,7 @@ public sealed class StudioConfigurationExtensionsTests
 
         Assert.Contains("Asset import paths must not be empty.", exception.Failures);
         Assert.Contains("StudioBaseUrl must be an absolute HTTP URL.", exception.Failures);
-        Assert.Contains("LevelPreviewBrowserUrl must be an absolute HTTP URL.", exception.Failures);
+        Assert.Contains("MapPreviewBrowserUrl must be an absolute HTTP URL.", exception.Failures);
     }
 
     private const string ConnectionString =
@@ -172,6 +202,16 @@ public sealed class StudioConfigurationExtensionsTests
             EnvironmentName = "Testing"
         });
 
+    private static HostApplicationBuilder CreateHostBuilder(string environmentName = "Testing")
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        {
+            EnvironmentName = environmentName
+        });
+        builder.Configuration["ConnectionStrings:PostgreSql"] = ConnectionString;
+        return builder;
+    }
+
     private static IConfiguration Configuration() =>
         new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?>
@@ -181,6 +221,10 @@ public sealed class StudioConfigurationExtensionsTests
 
     private static bool Service<TService, TImplementation>(ServiceDescriptor descriptor) =>
         descriptor.ServiceType == typeof(TService) &&
+        descriptor.ImplementationType == typeof(TImplementation);
+
+    private static bool HostedService<TImplementation>(ServiceDescriptor descriptor) =>
+        descriptor.ServiceType == typeof(IHostedService) &&
         descriptor.ImplementationType == typeof(TImplementation);
 
     private sealed class FixedTimeProvider : TimeProvider;

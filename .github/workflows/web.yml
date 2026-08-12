@@ -28,7 +28,6 @@ jobs:
           context: web
           target: validate
           build-args: APP_ENV=production
-          secrets: npm_token=${{ secrets.PACKAGES_TOKEN }}
           push: false
           cache-from: type=gha,scope=l2-studio-web
           cache-to: type=gha,mode=max,scope=l2-studio-web
@@ -76,7 +75,6 @@ jobs:
           context: web
           target: production
           build-args: APP_ENV=production
-          secrets: npm_token=${{ secrets.PACKAGES_TOKEN }}
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}

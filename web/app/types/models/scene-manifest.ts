@@ -1,13 +1,13 @@
 import type {
-  LevelActorManifestEntry,
-  LevelBspMeshManifestEntry,
-  LevelEnvironmentManifestEntry,
-  LevelLightManifestEntry,
-  LevelRotation,
-  LevelTerrainManifestEntry,
-  LevelVector,
-  LevelWaterVolumeManifestEntry
-} from './level-manifest'
+  MapActorManifestEntry,
+  MapBspMeshManifestEntry,
+  MapEnvironmentManifestEntry,
+  MapLightManifestEntry,
+  MapRotation,
+  MapTerrainManifestEntry,
+  MapVector,
+  MapWaterVolumeManifestEntry
+} from './map-manifest'
 import type { ParticleEmitterManifestEntry } from './particle-manifest'
 import type { SkyBackdropManifestEntry, SkyZoneManifestEntry } from './sky-manifest'
 
@@ -27,8 +27,8 @@ export interface SceneObjectManifestEntry {
   order: number
   name: string
   className: string
-  location: LevelVector
-  rotation: LevelRotation
+  location: MapVector
+  rotation: MapRotation
   duration: number
   target: string | null
   properties: Record<string, string>
@@ -44,13 +44,13 @@ export interface SceneManifest {
   fileName: string
   sourceHash: string
   protocol: number
-  environment: LevelEnvironmentManifestEntry
-  terrains: LevelTerrainManifestEntry[]
-  actors: LevelActorManifestEntry[]
-  lights: LevelLightManifestEntry[]
-  waterVolumes: LevelWaterVolumeManifestEntry[]
+  environment: MapEnvironmentManifestEntry
+  terrains: MapTerrainManifestEntry[]
+  actors: MapActorManifestEntry[]
+  lights: MapLightManifestEntry[]
+  waterVolumes: MapWaterVolumeManifestEntry[]
   skyZones: SkyZoneManifestEntry[]
-  bspMeshes: LevelBspMeshManifestEntry[]
+  bspMeshes: MapBspMeshManifestEntry[]
   skyBackdrops: SkyBackdropManifestEntry[]
   cameras: SceneObjectManifestEntry[]
   interpolationPoints: SceneObjectManifestEntry[]

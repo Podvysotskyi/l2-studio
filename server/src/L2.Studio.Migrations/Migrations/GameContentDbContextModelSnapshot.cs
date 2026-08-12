@@ -547,29 +547,6 @@ namespace L2.Studio.Migrations.Migrations
                         .IsUnique();
 
                     b.ToTable("game_versions", "content");
-
-                    b.HasData(
-                        new
-                        {
-                            Key = "c1",
-                            DisplayName = "Chronicle 1",
-                            SortOrder = 10,
-                            SourceFolder = "C1"
-                        },
-                        new
-                        {
-                            Key = "c4",
-                            DisplayName = "Chronicle 4",
-                            SortOrder = 20,
-                            SourceFolder = "C4"
-                        },
-                        new
-                        {
-                            Key = "interlude",
-                            DisplayName = "Interlude",
-                            SortOrder = 30,
-                            SourceFolder = "Interlude"
-                        });
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>

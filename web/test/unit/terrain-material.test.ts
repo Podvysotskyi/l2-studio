@@ -1,4 +1,4 @@
-import type { LevelTerrainManifestEntry } from '~/types/studio'
+import type { MapTerrainManifestEntry } from '~/types/studio'
 import { describe, expect, it } from 'vitest'
 import {
   blendShader,
@@ -6,7 +6,7 @@ import {
   unpackTerrainControlPixels
 } from '../../app/utils/terrain-material'
 
-const terrain: LevelTerrainManifestEntry = {
+const terrain: MapTerrainManifestEntry = {
   name: 'TerrainInfo0',
   location: { x: 0, y: 0, z: 0 },
   rotation: { pitch: 0, yaw: 0, roll: 0 },
@@ -14,10 +14,10 @@ const terrain: LevelTerrainManifestEntry = {
   heightmap: 'T_17_25.Height.17_25',
   heightmapWidth: 256,
   heightmapHeight: 256,
-  meshUrl: '/levels/17_25/TerrainInfo0.glb',
+  meshUrl: '/maps/17_25/TerrainInfo0.glb',
   materialStatus: 'resolved',
   materialError: null,
-  controlMapUrls: ['/levels/17_25/control-0.webp'],
+  controlMapUrls: ['/maps/17_25/control-0.webp'],
   controlMapWidth: 512,
   controlMapHeight: 512,
   controlMapEncoding: 'webp-rgb-a-horizontal',

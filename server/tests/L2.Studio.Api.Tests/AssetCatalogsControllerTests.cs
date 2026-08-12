@@ -21,7 +21,7 @@ public sealed class AssetCatalogsControllerTests
         var result = await controller.Search(
             "interlude",
             "textures",
-            new AssetCatalogRequest("stone", "Terrain", 2, 25),
+            new AssetCatalogRequest("stone", "Terrain", "textures", 2, 25),
             cancellation.Token);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -29,6 +29,7 @@ public sealed class AssetCatalogsControllerTests
         Assert.Equal("textures", repository.SearchKind);
         Assert.Equal("stone", repository.SearchQuery);
         Assert.Equal("Terrain", repository.SearchGroupName);
+        Assert.Equal("textures", repository.SearchOriginalFolder);
         Assert.Equal(2, repository.SearchPage);
         Assert.Equal(25, repository.SearchPageSize);
         Assert.Equal(cancellation.Token, repository.SearchToken);
@@ -85,6 +86,7 @@ public sealed class AssetCatalogsControllerTests
         public string? SearchKind { get; private set; }
         public string? SearchQuery { get; private set; }
         public string? SearchGroupName { get; private set; }
+        public string? SearchOriginalFolder { get; private set; }
         public int SearchPage { get; private set; }
         public int SearchPageSize { get; private set; }
         public CancellationToken SearchToken { get; private set; }
@@ -99,6 +101,7 @@ public sealed class AssetCatalogsControllerTests
             string kind,
             string query,
             string? groupName,
+            string? originalFolder,
             int page,
             int pageSize,
             CancellationToken cancellationToken)
@@ -106,6 +109,7 @@ public sealed class AssetCatalogsControllerTests
             SearchKind = kind;
             SearchQuery = query;
             SearchGroupName = groupName;
+            SearchOriginalFolder = originalFolder;
             SearchPage = page;
             SearchPageSize = pageSize;
             SearchToken = cancellationToken;

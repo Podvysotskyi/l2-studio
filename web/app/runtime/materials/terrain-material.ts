@@ -1,6 +1,6 @@
 import type {
-  LevelTerrainLayerManifestEntry,
-  LevelTerrainManifestEntry
+  MapTerrainLayerManifestEntry,
+  MapTerrainManifestEntry
 } from '~/types/studio'
 import {
   MaterialPluginBase,
@@ -27,14 +27,14 @@ export interface TerrainMaterialController {
 
 const channelComponents = ['r', 'g', 'b', 'a'] as const
 
-export function terrainSamplerCount(terrain: LevelTerrainManifestEntry) {
+export function terrainSamplerCount(terrain: MapTerrainManifestEntry) {
   return (
     new Set(terrain.layers.map((layer) => layer.textureArrayGroup)).size + 1
   )
 }
 
 export function createTerrainMaterial(
-  terrain: LevelTerrainManifestEntry,
+  terrain: MapTerrainManifestEntry,
   scene: Scene
 ): TerrainMaterialResult {
   if (terrain.materialStatus !== 'resolved')
@@ -84,10 +84,10 @@ class TerrainLayerPlugin
   private readonly fragmentBlend: string
   readonly ready: Promise<void>
 
-  constructor(material: PBRMaterial, terrain: LevelTerrainManifestEntry) {
+  constructor(material: PBRMaterial, terrain: MapTerrainManifestEntry) {
     super(material, 'L2TerrainTextureArrays', 200)
     const scene = material.getScene()
-    const groups = new Map<number, LevelTerrainLayerManifestEntry[]>()
+    const groups = new Map<number, MapTerrainLayerManifestEntry[]>()
     for (const layer of terrain.layers) {
       const layers = groups.get(layer.textureArrayGroup) ?? []
       layers.push(layer)
@@ -405,7 +405,7 @@ export function unpackTerrainControlPixels(
   return pixels
 }
 
-export function blendShader(terrain: LevelTerrainManifestEntry) {
+export function blendShader(terrain: MapTerrainManifestEntry) {
   const lines = ['vec3 terrainColor = vec3(0.0);']
   terrain.layers.forEach((layer, index) => {
     const component = channelComponents[layer.controlMapChannel]
@@ -422,12 +422,12 @@ export function blendShader(terrain: LevelTerrainManifestEntry) {
   return lines.join('\n')
 }
 
-function layerUv(layer: LevelTerrainLayerManifestEntry) {
+function layerUv(layer: MapTerrainLayerManifestEntry) {
   const { u, v } = layer.uvTransform
   return `vec2(dot(vTerrainPosition, vec3(${glsl(u.x)}, ${glsl(u.y)}, ${glsl(u.z)})) + ${glsl(u.offset)}, dot(vTerrainPosition, vec3(${glsl(v.x)}, ${glsl(v.y)}, ${glsl(v.z)})) + ${glsl(v.offset)})`
 }
 
-function finiteUvTransform(layer: LevelTerrainLayerManifestEntry) {
+function finiteUvTransform(layer: MapTerrainLayerManifestEntry) {
   const { u, v } = layer.uvTransform ?? {}
   return Boolean(
     u &&

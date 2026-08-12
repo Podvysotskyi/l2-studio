@@ -16,11 +16,11 @@ public sealed class AssetImportSourceHashTests
                 64,
                 (await AssetImportSourceHash.FileAsync(path, CancellationToken.None)).Length);
             Assert.Equal(
-                AssetImportSourceHash.LevelPreview("abc"),
-                AssetImportSourceHash.LevelPreview("abc"));
+                AssetImportSourceHash.MapPreview("abc"),
+                AssetImportSourceHash.MapPreview("abc"));
             Assert.NotEqual(
-                AssetImportSourceHash.LevelPreview("abc"),
-                AssetImportSourceHash.LevelPreview("def"));
+                AssetImportSourceHash.MapPreview("abc"),
+                AssetImportSourceHash.MapPreview("def"));
         }
         finally
         {

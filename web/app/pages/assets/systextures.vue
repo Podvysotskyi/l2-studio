@@ -1,8 +1,3 @@
-<template>
-  <StudioTextureImportBrowser
-    kind="systextures"
-    title="System texture imports"
-    description="Decode every UTX package in the configured Interlude systextures directory and publish shared browser assets."
-    import-label="Import systextures"
-  />
-</template>
+<script setup lang="ts">
+await navigateTo('/assets/textures', { redirectCode: 301 })
+</script>

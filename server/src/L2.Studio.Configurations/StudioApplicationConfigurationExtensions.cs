@@ -1,3 +1,4 @@
+using L2.Studio.Migrations;
 using L2.Studio.Repositories;
 using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Services;
@@ -19,6 +20,7 @@ public static class StudioApplicationConfigurationExtensions
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();
         services.AddScoped<IAssetImportRepository, AssetImportRepository>();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
+        services.AddSingleton<GameVersionSeeder>();
         services.TryAddTimeProvider();
         services.AddHostedService<GameContentInitializer>();
         return services;
@@ -40,7 +42,7 @@ public static class StudioApplicationConfigurationExtensions
             .Bind(configuration.GetSection(AssetImportOptions.SectionName))
             .Validate(options => Paths(options).All(path => !string.IsNullOrWhiteSpace(path)), "Asset import paths must not be empty.")
             .Validate(options => IsAbsoluteHttpUrl(options.StudioBaseUrl), "StudioBaseUrl must be an absolute HTTP URL.")
-            .Validate(options => IsAbsoluteHttpUrl(options.LevelPreviewBrowserUrl), "LevelPreviewBrowserUrl must be an absolute HTTP URL.")
+            .Validate(options => IsAbsoluteHttpUrl(options.MapPreviewBrowserUrl), "MapPreviewBrowserUrl must be an absolute HTTP URL.")
             .ValidateOnStart();
         return services;
     }

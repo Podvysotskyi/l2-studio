@@ -14,20 +14,29 @@ public sealed class AssetImportTests
     [InlineData("17_25.unr", true)]
     [InlineData("skylevel.unr", false)]
     [InlineData("17_250.unr", false)]
-    public void RoutesUnrealPackagesByCoordinateName(string fileName, bool isLevel)
+    public void RoutesUnrealPackagesByCoordinateName(string fileName, bool isMap)
     {
-        Assert.Equal(isLevel, UnrealPackageKindClassifier.IsWorldLevel(fileName));
-        Assert.Equal(!isLevel, UnrealPackageKindClassifier.IsScene(fileName));
+        Assert.Equal(isMap, UnrealPackageKindClassifier.IsWorldMap(fileName));
+        Assert.Equal(!isMap, UnrealPackageKindClassifier.IsScene(fileName));
     }
 
     [Fact]
     public void DefinesTypedDiscoveryAndFileCommandsForEverySupportedKind()
     {
         var assembly = typeof(DiscoverTextures).Assembly;
-        Assert.Equal(8, assembly.GetTypes().Count(type =>
+        Assert.Equal(7, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportDiscoveryCommand).IsAssignableFrom(type)));
-        Assert.Equal(8, assembly.GetTypes().Count(type =>
+        Assert.Equal(7, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportFileCommand).IsAssignableFrom(type)));
+    }
+
+    [Fact]
+    public void UsesMapAssetKinds()
+    {
+        Assert.Contains("maps", AssetImportJobValues.SupportedKinds);
+        Assert.Contains("mappreviews", AssetImportJobValues.SupportedKinds);
+        Assert.DoesNotContain("levels", AssetImportJobValues.SupportedKinds);
+        Assert.DoesNotContain("levelpreviews", AssetImportJobValues.SupportedKinds);
     }
 
     [Fact]

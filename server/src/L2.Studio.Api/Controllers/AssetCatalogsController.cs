@@ -19,7 +19,7 @@ public sealed class AssetCatalogsController(IAssetCatalogRepository repository) 
     public async Task<ActionResult<AssetCatalogPage>> Search(string gameVersion, string kind, [FromQuery] AssetCatalogRequest request, CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        var result = await repository.SearchAsync(gameVersion, kind, request.Query, request.PackageName, request.Page, request.PageSize, token);
+        var result = await repository.SearchAsync(gameVersion, kind, request.Query, request.PackageName, request.OriginalFolder, request.Page, request.PageSize, token);
         return result is null ? NotFound() : Ok(result);
     }
 

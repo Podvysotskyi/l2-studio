@@ -1,11 +1,11 @@
-export type TextureImportKind = 'systextures' | 'textures'
+export type TextureImportKind = 'textures'
 export type AssetImportKind =
   | TextureImportKind
   | 'music'
   | 'sounds'
   | 'staticmeshes'
-  | 'levels'
-  | 'levelpreviews'
+  | 'maps'
+  | 'mappreviews'
   | 'scenes'
 
 export interface AssetCatalogSummary {
@@ -36,6 +36,8 @@ export interface TexturePackage {
   sha256: string
   textureCount: number
   materialCount: number
+  originalFolder: 'systextures' | 'textures'
+  path: string
 }
 
 export interface TextureMaterialReference {
@@ -115,6 +117,8 @@ export interface TextureManifestEntry {
   gpuCompressed: boolean
   mipCount: number
   animation: TextureAnimationManifestEntry | null
+  originalFolder: 'systextures' | 'textures'
+  path: string
 }
 
 export interface TextureAnimationManifestEntry {

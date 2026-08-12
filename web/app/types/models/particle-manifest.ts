@@ -1,4 +1,4 @@
-import type { LevelVector } from './level-manifest'
+import type { MapVector } from './map-manifest'
 
 export interface ParticleNumberRange {
   min: number
@@ -6,8 +6,8 @@ export interface ParticleNumberRange {
 }
 
 export interface ParticleVectorRange {
-  min: LevelVector
-  max: LevelVector
+  min: MapVector
+  max: MapVector
 }
 
 export interface ParticleColorCurveKey {
@@ -33,12 +33,12 @@ export interface ParticleEmitterManifestBase {
   startSize: ParticleVectorRange
   startVelocity: ParticleVectorRange
   startLocation: ParticleVectorRange
-  startLocationOffset: LevelVector
-  acceleration: LevelVector
+  startLocationOffset: MapVector
+  acceleration: MapVector
   particlesPerSecond: number
   spinParticles: boolean
   spin: ParticleNumberRange
-  spinDirection: LevelVector
+  spinDirection: MapVector
   textureSubdivisions: { u: number; v: number; random: boolean }
   sizeCurve: ParticleSizeCurveKey[]
   colorCurve: ParticleColorCurveKey[]

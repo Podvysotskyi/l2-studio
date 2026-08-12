@@ -17,13 +17,8 @@ public sealed class AssetCatalogMetadataAggregatorTests
     [Fact]
     public void MergesTextureMaterialsInSourceOrder()
     {
-        foreach (var kind in new[]
-                 {
-                     AssetImportJobValues.SystemTextures,
-                     AssetImportJobValues.Textures
-                 })
         {
-            var result = AssetCatalogMetadataAggregator.Aggregate(kind,
+            var result = AssetCatalogMetadataAggregator.Aggregate(AssetImportJobValues.Textures,
             [
                 "{\"materials\":[{\"objectName\":\"A\"}]}",
                 "{}",
@@ -59,10 +54,10 @@ public sealed class AssetCatalogMetadataAggregatorTests
     }
 
     [Fact]
-    public void UsesOldestRendererVersionAcrossLevelPreviews()
+    public void UsesOldestRendererVersionAcrossMapPreviews()
     {
         var result = AssetCatalogMetadataAggregator.Aggregate(
-            AssetImportJobValues.LevelPreviews,
+            AssetImportJobValues.MapPreviews,
         [
             "{\"rendererVersion\":5}",
             "{\"rendererVersion\":3}",

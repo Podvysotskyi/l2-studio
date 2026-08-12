@@ -11,7 +11,7 @@ public static class AssetCatalogMetadataAggregator
     {
         var metadata = sourceMetadata.Select(value => JsonNode.Parse(value)).OfType<JsonObject>().ToArray();
         if (metadata.Length == 0) return "{}";
-        if (kind is AssetImportJobValues.SystemTextures or AssetImportJobValues.Textures)
+        if (kind == AssetImportJobValues.Textures)
         {
             var materials = metadata.SelectMany(item => item["materials"]?.AsArray() ?? [])
                 .Select(item => item?.DeepClone()).ToArray();
@@ -27,7 +27,7 @@ public static class AssetCatalogMetadataAggregator
                 .ToArray();
             return JsonSerializer.Serialize(new { gpuTextureFormats = formats }, JsonOptions);
         }
-        if (kind == AssetImportJobValues.LevelPreviews)
+        if (kind == AssetImportJobValues.MapPreviews)
         {
             var rendererVersion = metadata.Select(item => item["rendererVersion"]?.GetValue<int>() ?? 0).Min();
             return JsonSerializer.Serialize(new { rendererVersion }, JsonOptions);

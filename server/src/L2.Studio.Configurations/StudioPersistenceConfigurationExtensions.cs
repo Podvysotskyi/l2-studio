@@ -16,9 +16,6 @@ public static class StudioPersistenceConfigurationExtensions
     {
         var connectionString = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        services.AddOptions<GameContentOptions>()
-            .Bind(configuration.GetSection(GameContentOptions.SectionName))
-            .ValidateOnStart();
         services.AddPooledDbContextFactory<GameContentDbContext>(options => options.UseNpgsql(
             connectionString,
             postgres =>

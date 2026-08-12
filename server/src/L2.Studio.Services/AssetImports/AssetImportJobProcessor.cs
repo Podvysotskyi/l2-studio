@@ -33,7 +33,7 @@ public sealed partial class AssetImportJobProcessor(
     TimeProvider timeProvider,
     ILogger<AssetImportJobProcessor> logger) : IAssetImportWorkItemProcessor
 {
-    internal const int LevelSchemaVersion = 12;
+    internal const int MapSchemaVersion = 12;
     internal const int SceneSchemaVersion = 11;
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new(JsonSerializerDefaults.Web)
@@ -83,7 +83,7 @@ public sealed partial class AssetImportJobProcessor(
         try
         {
             if (Directory.Exists(outputStagingPath)) Directory.Delete(outputStagingPath, recursive: true);
-            if (item.ImportKind != AssetImportJobValues.LevelPreviews)
+            if (item.ImportKind != AssetImportJobValues.MapPreviews)
             {
                 ResetDirectory(sourceStagingPath);
                 var snapshotPath = Path.Combine(sourceStagingPath, item.SourceKey);
@@ -101,10 +101,10 @@ public sealed partial class AssetImportJobProcessor(
                 await ImportSoundsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.StaticMeshes)
                 await ImportStaticMeshesAsync(context, item, cancellationToken);
-            else if (item.ImportKind == AssetImportJobValues.Levels)
-                await ImportLevelsAsync(context, item, cancellationToken);
-            else if (item.ImportKind == AssetImportJobValues.LevelPreviews)
-                await ImportLevelPreviewsAsync(context, item, cancellationToken);
+            else if (item.ImportKind == AssetImportJobValues.Maps)
+                await ImportMapsAsync(context, item, cancellationToken);
+            else if (item.ImportKind == AssetImportJobValues.MapPreviews)
+                await ImportMapPreviewsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.Scenes)
                 await ImportScenesAsync(context, item, cancellationToken);
             else
@@ -214,15 +214,15 @@ public sealed partial class AssetImportJobProcessor(
 
     private static string DiagnosticCode(string kind) => kind switch
     {
-        AssetImportJobValues.Levels or AssetImportJobValues.Scenes => "level.resource_warning",
-        AssetImportJobValues.LevelPreviews => "preview.render_warning",
+        AssetImportJobValues.Maps or AssetImportJobValues.Scenes => "map.resource_warning",
+        AssetImportJobValues.MapPreviews => "preview.render_warning",
         AssetImportJobValues.StaticMeshes => "static_mesh.resource_warning",
         AssetImportJobValues.Music or AssetImportJobValues.Sounds => "audio.resource_warning",
         _ => "texture.resource_warning"
     };
 
     private static string DiagnosticStage(string kind) =>
-        kind == AssetImportJobValues.LevelPreviews ? "render" : "conversion";
+        kind == AssetImportJobValues.MapPreviews ? "render" : "conversion";
 
     private static string Truncate(string value) => value.Length <= 4000 ? value : value[..4000];
 

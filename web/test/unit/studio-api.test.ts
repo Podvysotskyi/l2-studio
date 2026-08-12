@@ -27,7 +27,7 @@ describe('Studio API service', () => {
   it('normalizes directory requests through the service boundary', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 50 })
     await getNpcDirectory({ query: ' Goblin ', page: 2, pageSize: 50 })
-    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/interlude/content/npcs', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/npcs', {
       query: { query: 'Goblin', page: 2, pageSize: 50 }
     })
   })
@@ -35,12 +35,12 @@ describe('Studio API service', () => {
   it('loads and starts import jobs through same-origin URLs', async () => {
     fetchMock.mockResolvedValue([])
     await getAssetImportJobs('textures', 100)
-    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/interlude/assets/textures/imports', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/assets/textures/imports', {
       query: { limit: 100 }
     })
 
     await startAssetImport('textures')
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/interlude/assets/textures/imports', {
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/textures/imports', {
       method: 'POST',
       query: undefined
     })
@@ -48,13 +48,13 @@ describe('Studio API service', () => {
 
   it('loads per-file progress and filtered diagnostics', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
-    await getAssetImportWorkItems('levels', 'run-id', {
+    await getAssetImportWorkItems('maps', 'run-id', {
       sourceKey: '17_25.unr',
       status: 'failed',
       pageSize: 25
     })
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/interlude/assets/levels/imports/run-id/work-items',
+      '/api/game-versions/c1/assets/maps/imports/run-id/work-items',
       {
         query: {
           sourceKey: '17_25.unr',
@@ -65,14 +65,14 @@ describe('Studio API service', () => {
       }
     )
 
-    await getAssetImportDiagnostics('levels', 'run-id', {
+    await getAssetImportDiagnostics('maps', 'run-id', {
       severity: 'error',
       code: 'conversion.failed',
       query: 'terrain',
       page: 2
     })
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/interlude/assets/levels/imports/run-id/diagnostics',
+      '/api/game-versions/c1/assets/maps/imports/run-id/diagnostics',
       {
         query: {
           severity: 'error',
@@ -87,9 +87,9 @@ describe('Studio API service', () => {
 
   it('encodes single-file re-import filenames', async () => {
     fetchMock.mockResolvedValue({})
-    await startAssetFileImport('textures', 'Lineage Effects.utx')
+    await startAssetFileImport('textures', 'systextures/Lineage Effects.utx')
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/interlude/assets/textures/imports/files/Lineage%20Effects.utx',
+      '/api/game-versions/c1/assets/textures/imports/files/systextures%2FLineage%20Effects.utx',
       { method: 'POST' }
     )
   })

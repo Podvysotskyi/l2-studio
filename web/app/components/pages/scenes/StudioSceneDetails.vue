@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type {
-  LevelActorManifestEntry,
-  LevelBspMeshManifestEntry,
-  LevelLightManifestEntry,
-  LevelRotation,
-  LevelVector,
-  LevelWaterVolumeManifestEntry,
+  MapActorManifestEntry,
+  MapBspMeshManifestEntry,
+  MapLightManifestEntry,
+  MapRotation,
+  MapVector,
+  MapWaterVolumeManifestEntry,
   SceneCatalogEntry,
   SceneManifest,
   SceneObjectManifestEntry
@@ -17,15 +17,15 @@ import { getPublishedManifest } from '../../../services/published-assets'
 import {
   createTerrainLayerStates,
   enableAllTerrainLayers,
-  filterLevelLights,
-  filterLevelWaterVolumes,
-  levelEnvironmentColor,
-  levelLightColor,
+  filterMapLights,
+  filterMapWaterVolumes,
+  mapEnvironmentColor,
+  mapLightColor,
   setTerrainLayerEnabled,
   toggleSoloTerrainLayer,
   type TerrainLayerStates
-} from '../../../utils/level-inspector'
-import { filterLevelActors } from '../../../utils/level-map'
+} from '../../../utils/map-inspector'
+import { filterMapActors } from '../../../utils/map-actors'
 import {
   interpolateScenePose,
   sceneManagerLabel,
@@ -41,11 +41,11 @@ interface ScenePreviewApi {
   focusActor(name: string): void
   focusBsp(name: string): void
   focusLight(name: string): void
-  focusPosition(location: LevelVector, radius?: number): void
+  focusPosition(location: MapVector, radius?: number): void
   focusWater(name: string): void
   focusWaterSurface(name: string): void
   frameMap(): void
-  setCameraPose(location: LevelVector, rotation: LevelRotation): void
+  setCameraPose(location: MapVector, rotation: MapRotation): void
 }
 
 type InspectorTab =
@@ -151,16 +151,16 @@ const bspTotals = computed(() =>
   )
 )
 const filteredActors = computed(() =>
-  filterLevelActors(manifest.value?.actors ?? [], actorQuery.value)
+  filterMapActors(manifest.value?.actors ?? [], actorQuery.value)
 )
 const visibleActors = computed(() =>
   paginate(filteredActors.value, actorPage.value, actorPageSize.value)
 )
 const filteredLights = computed(() =>
-  filterLevelLights(manifest.value?.lights ?? [], lightQuery.value)
+  filterMapLights(manifest.value?.lights ?? [], lightQuery.value)
 )
 const filteredWaterVolumes = computed(() =>
-  filterLevelWaterVolumes(manifest.value?.waterVolumes ?? [], waterQuery.value)
+  filterMapWaterVolumes(manifest.value?.waterVolumes ?? [], waterQuery.value)
 )
 const filteredWaterSurfaces = computed(() => {
   const normalized = waterQuery.value.trim().toLocaleLowerCase()
@@ -267,35 +267,35 @@ function soloLayer(terrainName: string, index: number) {
     terrainLayerStates.value[terrainName] = toggleSoloTerrainLayer(state, index)
 }
 
-async function focusActor(actor: LevelActorManifestEntry) {
+async function focusActor(actor: MapActorManifestEntry) {
   if (!actor.meshUrl || !actorsVisible.value) return
   selectedActorName.value = actor.name
   await nextTick()
   preview.value?.focusActor(actor.name)
 }
 
-async function focusBsp(bsp: LevelBspMeshManifestEntry) {
+async function focusBsp(bsp: MapBspMeshManifestEntry) {
   if (!bsp.meshUrl) return
   selectedBspName.value = bsp.name
   await nextTick()
   preview.value?.focusBsp(bsp.name)
 }
 
-async function focusLight(light: LevelLightManifestEntry) {
+async function focusLight(light: MapLightManifestEntry) {
   selectedLightName.value = light.name
   lightHelpersVisible.value = true
   await nextTick()
   preview.value?.focusLight(light.name)
 }
 
-async function focusWater(volume: LevelWaterVolumeManifestEntry) {
+async function focusWater(volume: MapWaterVolumeManifestEntry) {
   if (volume.status !== 'resolved' || !waterVolumesVisible.value) return
   selectedWaterName.value = volume.name
   await nextTick()
   preview.value?.focusWater(volume.name)
 }
 
-async function focusWaterSurface(surface: LevelBspMeshManifestEntry) {
+async function focusWaterSurface(surface: MapBspMeshManifestEntry) {
   if (!surface.meshUrl || !waterSurfacesVisible.value) return
   selectedWaterSurfaceName.value = surface.name
   await nextTick()
@@ -462,7 +462,7 @@ onBeforeUnmount(stop)
         class="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(24rem,1fr)]"
       >
         <UCard :ui="{ body: 'p-2 sm:p-2' }">
-          <StudioLevelPreview
+          <StudioMapPreview
             ref="preview"
             :manifest="manifest"
             :selected-actor-name="selectedActorName"
@@ -793,7 +793,7 @@ onBeforeUnmount(stop)
                 >
                   <span
                     class="inline-block size-3 rounded-full"
-                    :style="{ backgroundColor: levelLightColor(light) }"
+                    :style="{ backgroundColor: mapLightColor(light) }"
                   />
                   <span class="ml-2 text-sm font-medium">{{ light.name }}</span>
                   <span class="mt-1 block text-xs text-muted">
@@ -1209,7 +1209,7 @@ onBeforeUnmount(stop)
                     <p class="text-xs text-muted">
                       Ambient
                       {{
-                        levelEnvironmentColor(manifest.environment.ambientColor)
+                        mapEnvironmentColor(manifest.environment.ambientColor)
                           .label
                       }}
                     </p>

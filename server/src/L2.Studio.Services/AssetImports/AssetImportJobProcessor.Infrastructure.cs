@@ -101,9 +101,13 @@ public sealed partial class AssetImportJobProcessor
         AssetImportJob job)
     {
         var sourceStem = Path.GetFileNameWithoutExtension(job.SourceKey);
+        var sourceDirectory = Path.GetDirectoryName(job.SourceKey);
         RequireSafeSegment(sourceStem, "source filename");
+        if (!string.IsNullOrEmpty(sourceDirectory)) RequireSafeSegment(sourceDirectory, "source folder");
         if (string.IsNullOrWhiteSpace(job.SourceHash)) throw new InvalidOperationException("The source hash is unavailable.");
-        var relative = Path.Combine(job.Kind, sourceStem, job.SourceHash);
+        var relative = string.IsNullOrEmpty(sourceDirectory)
+            ? Path.Combine(job.Kind, sourceStem, job.SourceHash)
+            : Path.Combine(job.Kind, sourceDirectory, sourceStem, job.SourceHash);
         return (
             Path.Combine(assetRootPath, relative),
             Path.Combine(assetRootPath, ".staging", job.Id.ToString("N")),
@@ -134,7 +138,7 @@ public sealed partial class AssetImportJobProcessor
             "interlude" => "Interlude",
             _ => throw new InvalidOperationException($"Unknown game version '{job.GameVersion}'.")
         },
-        kind is AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews or AssetImportJobValues.Scenes
+        kind is AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews or AssetImportJobValues.Scenes
             ? "maps"
             : kind);
 
@@ -158,7 +162,8 @@ public sealed partial class AssetImportJobProcessor
         string FileName,
         string Sha256,
         int TextureCount,
-        int MaterialCount);
+        int MaterialCount,
+        string OriginalFolder);
 
     private sealed record MusicSource(string Path, string FileName, string Sha256);
 
@@ -169,10 +174,10 @@ public sealed partial class AssetImportJobProcessor
         string Sha256,
         int MeshCount);
 
-    private sealed record LevelSource(string Path, string Name, string FileName, string Sha256);
+    private sealed record MapSource(string Path, string Name, string FileName, string Sha256);
 
     private sealed record TerrainMaterialBuild(
-        IReadOnlyList<LevelTerrainLayerManifestEntry> Layers,
+        IReadOnlyList<MapTerrainLayerManifestEntry> Layers,
         IReadOnlyList<string> ControlMapUrls,
         int ControlMapWidth,
         int ControlMapHeight,
@@ -183,7 +188,7 @@ public sealed partial class AssetImportJobProcessor
 
     private sealed record StaticMeshCatalogMetadata(IReadOnlyList<string> GpuTextureFormats);
 
-    private sealed record LevelPreviewCatalogMetadata(int RendererVersion);
+    private sealed record MapPreviewCatalogMetadata(int RendererVersion);
 
     private sealed record StaticMeshLookup(
         IReadOnlyDictionary<string, PublishedStaticMesh> Meshes,

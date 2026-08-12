@@ -2,13 +2,12 @@ namespace L2.Studio.Repositories.Interfaces.Models;
 
 public static class AssetImportJobValues
 {
-    public const string SystemTextures = "systextures";
     public const string Textures = "textures";
     public const string Music = "music";
     public const string Sounds = "sounds";
     public const string StaticMeshes = "staticmeshes";
-    public const string Levels = "levels";
-    public const string LevelPreviews = "levelpreviews";
+    public const string Maps = "maps";
+    public const string MapPreviews = "mappreviews";
     public const string Scenes = "scenes";
     public const string Queued = "queued";
     public const string Discovering = "discovering";
@@ -23,6 +22,6 @@ public static class AssetImportJobValues
     public static readonly string[] TerminalStatuses = [Succeeded, SucceededWithWarnings, Failed];
     public static readonly HashSet<string> SupportedKinds =
     [
-        SystemTextures, Textures, Music, Sounds, StaticMeshes, Levels, LevelPreviews, Scenes
+        Textures, Music, Sounds, StaticMeshes, Maps, MapPreviews, Scenes
     ];
 }

@@ -10,13 +10,13 @@ import {
 
 export const SKY_PORTAL_RENDERING_GROUP_ID = 0
 export const SKY_ZONE_RENDERING_GROUP_ID = 1
-export const LEVEL_GEOMETRY_RENDERING_GROUP_ID = 2
+export const MAP_GEOMETRY_RENDERING_GROUP_ID = 2
 export const SKY_PORTAL_STENCIL_REFERENCE = 1
 
 export function configureManifestRenderingPipeline(scene: Scene) {
   scene.setRenderingAutoClearDepthStencil(SKY_ZONE_RENDERING_GROUP_ID, false)
   scene.setRenderingAutoClearDepthStencil(
-    LEVEL_GEOMETRY_RENDERING_GROUP_ID,
+    MAP_GEOMETRY_RENDERING_GROUP_ID,
     true,
     true,
     false
@@ -79,11 +79,11 @@ export function configurePortalMesh(mesh: AbstractMesh, material: Material) {
 }
 
 export function configureWorldMesh(mesh: AbstractMesh) {
-  mesh.renderingGroupId = LEVEL_GEOMETRY_RENDERING_GROUP_ID
+  mesh.renderingGroupId = MAP_GEOMETRY_RENDERING_GROUP_ID
 }
 
 export function configureWorldParticles(system: ParticleSystem) {
-  system.renderingGroupId = LEVEL_GEOMETRY_RENDERING_GROUP_ID
+  system.renderingGroupId = MAP_GEOMETRY_RENDERING_GROUP_ID
 }
 
 export function configurePortalLensFlare(system: LensFlareSystem) {

@@ -7,5 +7,5 @@ public sealed class AssetImportOptions
     public string SourceRootPath { get; init; } = "../../sources";
     public string AssetRootPath { get; init; } = "../../assets";
     public string StudioBaseUrl { get; init; } = "http://localhost:3001";
-    public string LevelPreviewBrowserUrl { get; init; } = "http://localhost:9222";
+    public string MapPreviewBrowserUrl { get; init; } = "http://localhost:9222";
 }

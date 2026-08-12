@@ -68,13 +68,8 @@ export const studioNavigation: NavigationMenuItem[] = [
     defaultOpen: true,
     children: [
       {
-        label: 'System textures',
-        icon: 'i-lucide-panels-top-left',
-        to: '/assets/systextures'
-      },
-      {
-        label: 'World textures',
-        icon: 'i-lucide-mountain',
+        label: 'Textures',
+        icon: 'i-lucide-images',
         to: '/assets/textures'
       },
       {
@@ -88,9 +83,9 @@ export const studioNavigation: NavigationMenuItem[] = [
         to: '/assets/staticmeshes'
       },
       {
-        label: 'Levels',
+        label: 'Maps',
         icon: 'i-lucide-map',
-        to: '/assets/levels'
+        to: '/assets/maps'
       },
       {
         label: 'Scenes',
@@ -102,6 +97,11 @@ export const studioNavigation: NavigationMenuItem[] = [
   {
     label: 'Operations',
     type: 'label'
+  },
+  {
+    label: 'File storage',
+    icon: 'i-lucide-hard-drive',
+    to: '/storage'
   },
   {
     label: 'Background jobs',
@@ -129,15 +129,15 @@ export function studioRouteTitle(path: string) {
   if (path === '/content/skills') return 'Skill definitions'
   if (path === '/content/skill-operate-types') return 'Skill operate types'
   if (path === '/content/skill-target-types') return 'Skill target types'
-  if (path === '/assets/imports' || path === '/assets/systextures')
-    return 'System texture imports'
-  if (path === '/assets/textures') return 'World texture imports'
+  if (path === '/assets/imports' || path === '/assets/systextures' || path === '/assets/textures')
+    return 'Textures'
   if (path === '/assets/music') return 'Music assets'
   if (path === '/assets/staticmeshes') return 'Static meshes'
-  if (path === '/assets/levels') return 'Levels'
-  if (path.startsWith('/assets/levels/')) return 'Level map'
+  if (path === '/assets/maps') return 'Maps'
+  if (path.startsWith('/assets/maps/')) return 'Map'
   if (path === '/assets/scenes') return 'Scenes'
   if (path.startsWith('/assets/scenes/')) return 'Client scene'
   if (path === '/assets/jobs') return 'Asset import jobs'
+  if (path === '/storage') return 'File storage'
   return 'Studio'
 }

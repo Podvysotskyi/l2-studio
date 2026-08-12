@@ -68,6 +68,7 @@ export function getAssetCatalog<T, TPackage = never>(
   request: {
     query?: string
     packageName?: string
+    originalFolder?: string
     page?: number
     pageSize?: number
   } = {}
@@ -79,6 +80,7 @@ export function getAssetCatalog<T, TPackage = never>(
       query: {
         ...(query ? { query } : {}),
         ...(request.packageName ? { packageName: request.packageName } : {}),
+        ...(request.originalFolder ? { originalFolder: request.originalFolder } : {}),
         page: request.page ?? 1,
         pageSize: request.pageSize ?? 50
       }
@@ -87,10 +89,12 @@ export function getAssetCatalog<T, TPackage = never>(
 }
 
 export function getAssetCatalogEntry<T>(
-  kind: 'levels' | 'scenes',
+  kind: 'maps' | 'scenes',
   name: string
 ): Promise<T> {
-  return $fetch<T>(versionPath(`/assets/${kind}/catalog/${encodeURIComponent(name)}`))
+  return $fetch<T>(
+    versionPath(`/assets/${kind}/catalog/${encodeURIComponent(name)}`)
+  ) as Promise<T>
 }
 
 export function getAssetImportJobs(

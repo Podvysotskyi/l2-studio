@@ -17,7 +17,7 @@ public sealed class GameVersionRepository(IDbContextFactory<GameContentDbContext
                 version.DisplayName,
                 version.SourceFolder,
                 version.SortOrder,
-                version.Key == "interlude"))
+                version.Key == "c1"))
             .ToListAsync(cancellationToken);
     }
 

@@ -1,0 +1,3 @@
+<template>
+  <StudioFileManager />
+</template>

@@ -104,11 +104,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
   async function loadJobs() {
     try {
       const kinds = [
-        'systextures',
         'textures',
         'music',
         'staticmeshes',
-        'levels',
+        'maps',
         'scenes'
       ] as const
       jobs.value = (
@@ -176,18 +175,10 @@ function applyAssetCatalogs(
 function createEmptyAssetSummaries(): DashboardAssetSummary[] {
   return [
     asset(
-      'systextures',
-      'System textures',
-      'Interface, icons, effects, and shared presentation textures.',
-      'i-lucide-panels-top-left',
-      '/assets/systextures',
-      'packages'
-    ),
-    asset(
       'textures',
-      'World textures',
-      'Terrain, architecture, environment, and world presentation.',
-      'i-lucide-mountain',
+      'Textures',
+      'System and world texture packages from the original client folders.',
+      'i-lucide-images',
       '/assets/textures',
       'packages'
     ),
@@ -208,11 +199,11 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'packages'
     ),
     asset(
-      'levels',
-      'Levels',
+      'maps',
+      'Maps',
       'Coordinate-named geographic world tiles and placements.',
       'i-lucide-map',
-      '/assets/levels',
+      '/assets/maps',
       'maps'
     ),
     asset(

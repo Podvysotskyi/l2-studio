@@ -19,7 +19,7 @@ public sealed partial class AssetImportRepository(
     TimeProvider timeProvider) : IAssetImportRepository
 {
     [GeneratedRegex("^[0-9]{2}_[0-9]{2}$", RegexOptions.CultureInvariant)]
-    private static partial Regex WorldLevelNamePattern();
+    private static partial Regex WorldMapNamePattern();
 
     public async Task<AssetImportRunSummary?> QueueFullScanAsync(
         string gameVersion,
@@ -199,28 +199,37 @@ public sealed partial class AssetImportRepository(
         string fileName,
         CancellationToken cancellationToken)
     {
-        var extension = Path.GetExtension(fileName);
+        var normalizedFileName = fileName.Replace('\\', '/');
+        var extension = Path.GetExtension(normalizedFileName);
         var expected = kind == AssetImportJobValues.Music ? ".ogg" : kind switch
         {
-            AssetImportJobValues.SystemTextures or AssetImportJobValues.Textures => ".utx",
+            AssetImportJobValues.Textures => ".utx",
             AssetImportJobValues.StaticMeshes => ".usx",
             AssetImportJobValues.Sounds => ".uax",
-            AssetImportJobValues.Levels or AssetImportJobValues.Scenes or AssetImportJobValues.LevelPreviews => ".unr",
+            AssetImportJobValues.Maps or AssetImportJobValues.Scenes or AssetImportJobValues.MapPreviews => ".unr",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         if (!string.Equals(extension, expected, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"The '{kind}' import requires a {expected} file.", nameof(fileName));
         var stem = Path.GetFileNameWithoutExtension(fileName);
-        if (kind is AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews && !WorldLevelNamePattern().IsMatch(stem))
-            throw new ArgumentException("The file is not a coordinate-named world level.", nameof(fileName));
-        if (kind == AssetImportJobValues.Scenes && WorldLevelNamePattern().IsMatch(stem))
-            throw new ArgumentException("The file is a world level, not a client scene.", nameof(fileName));
+        if (kind is AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews && !WorldMapNamePattern().IsMatch(stem))
+            throw new ArgumentException("The file is not a coordinate-named world map.", nameof(fileName));
+        if (kind == AssetImportJobValues.Scenes && WorldMapNamePattern().IsMatch(stem))
+            throw new ArgumentException("The file is a world map, not a client scene.", nameof(fileName));
 
         var root = Path.GetFullPath(SourceRoot(gameVersion, kind));
+        if (kind == AssetImportJobValues.Textures)
+        {
+            var segments = normalizedFileName.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length != 2 || segments[0] is not "systextures" and not "textures")
+                throw new ArgumentException("Texture imports require a folder-qualified source key such as 'systextures/Interface.utx'.", nameof(fileName));
+            root = Path.Combine(Path.GetFullPath(options.Value.SourceRootPath), SourceFolder(gameVersion), segments[0]);
+            normalizedFileName = segments[1];
+        }
         string fullPath;
         try
         {
-            fullPath = AssetImportPathValidator.ResolveContainedFile(root, fileName, expected);
+            fullPath = AssetImportPathValidator.ResolveContainedFile(root, normalizedFileName, expected);
         }
         catch (FileNotFoundException)
         {
@@ -228,23 +237,26 @@ public sealed partial class AssetImportRepository(
         }
 
         string sourceHash;
-        if (kind == AssetImportJobValues.LevelPreviews)
+        if (kind == AssetImportJobValues.MapPreviews)
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var normalized = NormalizeSourceKey(Path.GetFileName(fullPath));
-            var levelSourceHash = await context.AssetCatalogSources.AsNoTracking().Where(source =>
-                source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive &&
+            var mapSourceHash = await context.AssetCatalogSources.AsNoTracking().Where(source =>
+                source.Catalog.GameVersion == gameVersion && source.Catalog.Kind == AssetImportJobValues.Maps && source.Catalog.IsActive &&
                 source.NormalizedSourceKey == normalized)
                 .Select(source => source.SourceHash)
                 .SingleOrDefaultAsync(cancellationToken);
-            if (levelSourceHash is null) throw new AssetImportTargetNotFoundException(fileName);
-            sourceHash = AssetImportSourceHash.LevelPreview(levelSourceHash);
+            if (mapSourceHash is null) throw new AssetImportTargetNotFoundException(fileName);
+            sourceHash = AssetImportSourceHash.MapPreview(mapSourceHash);
         }
         else
         {
             sourceHash = await AssetImportSourceHash.FileAsync(fullPath, cancellationToken);
         }
-        return new ValidatedSource(Path.GetFileName(fullPath), fullPath, sourceHash);
+        var sourceKey = kind == AssetImportJobValues.Textures
+            ? $"{fileName.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries)[0]}/{Path.GetFileName(fullPath)}"
+            : Path.GetFileName(fullPath);
+        return new ValidatedSource(sourceKey, fullPath, sourceHash);
     }
 
     private string SourceRoot(string gameVersion, string kind) => Path.Combine(
@@ -252,7 +264,7 @@ public sealed partial class AssetImportRepository(
         SourceFolder(gameVersion),
         kind switch
     {
-        AssetImportJobValues.Levels or AssetImportJobValues.LevelPreviews or AssetImportJobValues.Scenes => "maps",
+        AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews or AssetImportJobValues.Scenes => "maps",
         var value => value
     });
 
@@ -290,27 +302,25 @@ public sealed partial class AssetImportRepository(
 
     private static object DiscoveryCommand(string kind, Guid runId) => kind switch
     {
-        AssetImportJobValues.SystemTextures => new DiscoverSystemTextures(runId),
         AssetImportJobValues.Textures => new DiscoverTextures(runId),
         AssetImportJobValues.StaticMeshes => new DiscoverStaticMeshes(runId),
         AssetImportJobValues.Sounds => new DiscoverSounds(runId),
         AssetImportJobValues.Music => new DiscoverMusic(runId),
-        AssetImportJobValues.Levels => new DiscoverLevels(runId),
+        AssetImportJobValues.Maps => new DiscoverMaps(runId),
         AssetImportJobValues.Scenes => new DiscoverScenes(runId),
-        AssetImportJobValues.LevelPreviews => new DiscoverLevelPreviews(runId),
+        AssetImportJobValues.MapPreviews => new DiscoverMapPreviews(runId),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
     private static object FileCommand(string kind, Guid workItemId) => kind switch
     {
-        AssetImportJobValues.SystemTextures => new ImportSystemTextureFile(workItemId),
         AssetImportJobValues.Textures => new ImportTextureFile(workItemId),
         AssetImportJobValues.StaticMeshes => new ImportStaticMeshFile(workItemId),
         AssetImportJobValues.Sounds => new ImportSoundFile(workItemId),
         AssetImportJobValues.Music => new ImportMusicFile(workItemId),
-        AssetImportJobValues.Levels => new ImportLevelFile(workItemId),
+        AssetImportJobValues.Maps => new ImportMapFile(workItemId),
         AssetImportJobValues.Scenes => new ImportSceneFile(workItemId),
-        AssetImportJobValues.LevelPreviews => new GenerateLevelPreview(workItemId),
+        AssetImportJobValues.MapPreviews => new GenerateMapPreview(workItemId),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 

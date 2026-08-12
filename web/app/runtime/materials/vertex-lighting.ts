@@ -1,4 +1,4 @@
-import type { LevelVertexLightingReference } from '~/types/studio'
+import type { MapVertexLightingReference } from '~/types/studio'
 import {
   MaterialPluginBase,
   InstancedMesh,
@@ -12,7 +12,7 @@ import { browserDecodedTextureUrl } from '../core/texture-url.js'
 
 export function applyVertexLighting(
   mesh: AbstractMesh,
-  reference: LevelVertexLightingReference
+  reference: MapVertexLightingReference
 ) {
   if (mesh.getTotalVertices() !== reference.vertexCount) return null
   if (!(mesh.material instanceof PBRMaterial)) return null
@@ -31,7 +31,7 @@ export function applyVertexLighting(
 
 const sharedPlugins = new WeakMap<PBRMaterial, VertexLightingPlugin>()
 
-function pluginFor(material: unknown, reference: LevelVertexLightingReference) {
+function pluginFor(material: unknown, reference: MapVertexLightingReference) {
   if (!(material instanceof PBRMaterial)) return null
   const existing = sharedPlugins.get(material)
   if (existing) return existing.accepts(reference) ? existing : null
@@ -50,7 +50,7 @@ class VertexLightingPlugin extends MaterialPluginBase {
   private readonly vertexCode: string
   private readonly textureWidth: number
 
-  constructor(material: PBRMaterial, reference: LevelVertexLightingReference) {
+  constructor(material: PBRMaterial, reference: MapVertexLightingReference) {
     super(material, 'L2VertexLighting', 190)
     this.texture = new Texture(
       browserDecodedTextureUrl(reference.url),
@@ -67,7 +67,7 @@ class VertexLightingPlugin extends MaterialPluginBase {
     this._enable(true)
   }
 
-  accepts(reference: LevelVertexLightingReference) {
+  accepts(reference: MapVertexLightingReference) {
     return reference.url === this.textureUrl
   }
 

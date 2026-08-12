@@ -35,7 +35,7 @@ Web tests are organized under `web/test/unit`, `web/test/nuxt`, and `web/test/e2
 ## Prerequisites
 
 - Docker Engine with Docker Compose
-- An L2 game-source directory, mounted through `L2_SOURCE_PATH` when it is not adjacent to this repository
+- Enough Docker storage for original game resources and generated assets
 
 ## Local development
 
@@ -55,7 +55,18 @@ Studio has a standalone development stack containing PostgreSQL, the Studio API 
 docker compose up --build
 ```
 
-Set `L2_SOURCE_PATH` when the game source directory is not adjacent to this repository. Generated assets persist in the shared `l2-studio_assets-data` Docker volume; the worker writes to it while the API and asset server read from it.
+Original game resources persist in the `l2-studio_resources-data` Docker volume and generated assets persist in `l2-studio_assets-data`. The Studio web application writes resources through its server-side file manager, while the API and Worker mount them read-only. The Worker writes generated assets; Studio and the asset server mount those files read-only.
+
+Open **Operations → File storage** to upload files or complete folders. Storage is scoped by the global game-version selector. Original resources are stored beneath the version's source folder (`C1`, `C4`, or `Interlude`); generated assets are shown from `versions/{version-key}`. The generated-assets browser is intentionally read-only because published files are indexed by the Studio catalog and must be changed through asset imports.
+
+Uploads stream directly into the resources volume and are promoted atomically after completion. Deletes are permanent, so back up the Docker volume before removing irreplaceable source packages:
+
+```sh
+docker run --rm \
+  --volume l2-studio_resources-data:/data:ro \
+  --volume "$PWD:/backup" \
+  alpine:3.22 tar -czf /backup/l2-studio-resources.tar.gz -C /data .
+```
 
 Asset imports use Wolverine 6.25.2 with PostgreSQL only. API envelopes live in
 `l2_messaging_api`, Worker envelopes in `l2_messaging_worker`, and the durable
@@ -99,6 +110,6 @@ rows. Generated URLs now use immutable `{kind}/{source}/{sha256}` locations.
 
 ## Configuration and safety
 
-The API uses `server/src/L2.Studio.Api/appsettings.<Environment>.json`; deployment environment variables may override settings through standard ASP.NET Core configuration. The standalone Compose model keeps Studio’s PostgreSQL and generated-asset volume local to this product.
+The API uses `server/src/L2.Studio.Api/appsettings.<Environment>.json`; deployment environment variables may override settings through standard ASP.NET Core configuration. The standalone Compose model keeps Studio’s PostgreSQL, original-resource volume, and generated-asset volume local to this product.
 
 Do not commit production credentials, tokens, original game packages, or generated private assets.

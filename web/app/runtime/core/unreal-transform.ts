@@ -1,4 +1,4 @@
-import type { LevelRotation, LevelVector } from '~/types/studio'
+import type { MapRotation, MapVector } from '~/types/studio'
 import { Matrix, Quaternion, Vector3, type Scene } from '@babylonjs/core'
 
 const unrealRotationUnit = (Math.PI * 2) / 65536
@@ -16,11 +16,11 @@ export function configureUnrealScene(scene: Scene) {
   scene.useRightHandedSystem = true
 }
 
-export function unrealVector(value: LevelVector) {
+export function unrealVector(value: MapVector) {
   return new Vector3(value.x, value.z, value.y)
 }
 
-export function unrealRotationQuaternion(value: LevelRotation) {
+export function unrealRotationQuaternion(value: MapRotation) {
   const pitch = value.pitch * unrealRotationUnit
   const yaw = value.yaw * unrealRotationUnit
   const roll = value.roll * unrealRotationUnit
@@ -46,7 +46,7 @@ export function unrealRotationQuaternion(value: LevelRotation) {
   ).normalize()
 }
 
-export function unrealForward(value: LevelRotation) {
+export function unrealForward(value: MapRotation) {
   return Vector3.Right().rotateByQuaternionToRef(
     unrealRotationQuaternion(value),
     new Vector3()
@@ -54,11 +54,11 @@ export function unrealForward(value: LevelRotation) {
 }
 
 export function unrealNodeTransform(
-  location: LevelVector,
-  rotation: LevelRotation,
+  location: MapVector,
+  rotation: MapRotation,
   drawScale: number,
-  drawScale3D: LevelVector,
-  prePivot: LevelVector
+  drawScale3D: MapVector,
+  prePivot: MapVector
 ): UnrealNodeTransform {
   const quaternion = unrealRotationQuaternion(rotation)
   const scaling = unrealVector(drawScale3D).scale(drawScale)

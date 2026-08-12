@@ -1,4 +1,4 @@
-import type { LevelEnvironmentManifestEntry } from '~/types/studio'
+import type { MapEnvironmentManifestEntry } from '~/types/studio'
 import {
   Camera,
   Color3,
@@ -28,9 +28,9 @@ export function applyCoverCameraFraming(camera: TargetCamera, aspect: number) {
   camera.fov = framing.fov
 }
 
-export function applyLevelEnvironment(
+export function applyMapEnvironment(
   scene: Scene,
-  environment: LevelEnvironmentManifestEntry
+  environment: MapEnvironmentManifestEntry
 ) {
   const ambient = color(environment.ambientColor).toLinearSpace()
   scene.ambientColor = ambient.scale(environment.ambientBrightness)

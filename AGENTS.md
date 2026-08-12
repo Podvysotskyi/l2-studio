@@ -16,7 +16,7 @@ docker compose config
 docker compose build
 ```
 
-`compose.yaml` owns the standalone Studio stack. Browser code calls the same-origin `/api` proxy. Keep `NUXT_STUDIO_API_BASE` private to Nuxt and use `NUXT_PUBLIC_ASSET_BASE_URL` only for browser-readable generated assets. Do not run host-installed Node.js, npm, or .NET commands for normal product validation.
+`compose.yaml` owns the standalone Studio stack. Browser code calls the same-origin `/api` proxy, while Nuxt owns `/storage-api` for version-scoped volume management. Keep `NUXT_STUDIO_API_BASE` private to Nuxt and use `NUXT_PUBLIC_ASSET_BASE_URL` only for browser-readable generated assets. Do not run host-installed Node.js, npm, or .NET commands for normal product validation.
 
 ## Server Architecture
 
@@ -33,6 +33,7 @@ docker compose build
 - Keep Nuxt source in `web/app`, browser API calls in `web/app/services`, and state in Pinia setup stores.
 - Pages own route synchronization, loading, and store composition; reusable shell components live under `components/app`, while substantial page sections live under `components/pages`.
 - Browser code calls only the Nuxt `/api` proxy through the service layer. Do not call the upstream Studio API from pages or components.
+- Keep file storage routes in Nuxt `/storage-api`; permit mutations only in the original-resource volume and keep generated assets read-only so catalog state remains authoritative.
 - Organize tests under `web/test/unit`, `web/test/nuxt`, and `web/test/e2e`. Keep store, service, and pure utility tests in `unit`.
 
 ## Configuration

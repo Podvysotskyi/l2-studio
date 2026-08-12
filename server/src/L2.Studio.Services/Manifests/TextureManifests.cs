@@ -15,7 +15,9 @@ internal sealed record TextureManifestPackage(
     string FileName,
     string Sha256,
     int TextureCount,
-    int MaterialCount);
+    int MaterialCount,
+    string OriginalFolder = "",
+    string Path = "");
 
 internal sealed record TextureManifestEntry(
     string PackageName,
@@ -31,7 +33,9 @@ internal sealed record TextureManifestEntry(
     string? GpuSha256 = null,
     bool GpuCompressed = false,
     int MipCount = 0,
-    TextureAnimationManifestEntry? Animation = null);
+    TextureAnimationManifestEntry? Animation = null,
+    string OriginalFolder = "",
+    string Path = "");
 
 internal sealed record TextureAnimationManifestEntry(
     IReadOnlyList<string> FrameUrls,

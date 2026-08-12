@@ -1,10 +1,10 @@
 import '@babylonjs/loaders/glTF/index.js'
 import type {
-  LevelActorManifestEntry,
-  LevelLightManifestEntry,
-  LevelManifest,
-  LevelRotation,
-  LevelVector,
+  MapActorManifestEntry,
+  MapLightManifestEntry,
+  MapManifest,
+  MapRotation,
+  MapVector,
   SceneManifest,
   SceneObjectManifestEntry
 } from '~/types/studio'
@@ -33,7 +33,7 @@ import {
   type TerrainMaterialController
 } from '../materials/terrain-material.js'
 import { applyVertexLighting } from '../materials/vertex-lighting.js'
-import { applyLevelEnvironment } from './environment.js'
+import { applyMapEnvironment } from './environment.js'
 import {
   composeParticleEffects,
   type ComposedParticleEffects
@@ -54,7 +54,7 @@ import {
   createSkyPortalMaterial
 } from './rendering-pipeline.js'
 export {
-  LEVEL_GEOMETRY_RENDERING_GROUP_ID,
+  MAP_GEOMETRY_RENDERING_GROUP_ID,
   SKY_PORTAL_RENDERING_GROUP_ID,
   SKY_ZONE_RENDERING_GROUP_ID
 } from './rendering-pipeline.js'
@@ -90,8 +90,8 @@ export interface ComposedManifestScene {
 }
 
 export interface ScenePose {
-  location: LevelVector
-  rotation: LevelRotation
+  location: MapVector
+  rotation: MapRotation
 }
 
 function throwIfAborted(signal?: AbortSignal) {
@@ -114,11 +114,11 @@ function instanceMeshes(rootNodes: TransformNode[]) {
 
 function place(
   node: TransformNode,
-  location: LevelVector,
-  rotation: LevelRotation,
+  location: MapVector,
+  rotation: MapRotation,
   drawScale = 1,
-  drawScale3D: LevelVector = { x: 1, y: 1, z: 1 },
-  prePivot: LevelVector = { x: 0, y: 0, z: 0 }
+  drawScale3D: MapVector = { x: 1, y: 1, z: 1 },
+  prePivot: MapVector = { x: 0, y: 0, z: 0 }
 ) {
   const transform = unrealNodeTransform(
     location,
@@ -132,13 +132,13 @@ function place(
   node.scaling.copyFrom(transform.scaling)
 }
 
-export async function composeLevelManifest(
+export async function composeMapManifest(
   scene: Scene,
-  manifest: LevelManifest | SceneManifest,
+  manifest: MapManifest | SceneManifest,
   options: ComposeManifestOptions = {}
 ): Promise<ComposedManifestScene> {
   assertManifestSchema(manifest)
-  applyLevelEnvironment(scene, manifest.environment)
+  applyMapEnvironment(scene, manifest.environment)
   configureManifestRenderingPipeline(scene)
   const containers = new Map<string, Promise<AssetContainer>>()
   const placements: TransformNode[] = []
@@ -156,7 +156,7 @@ export async function composeLevelManifest(
   let ambientSounds: ComposedAmbientSounds | null = null
   let authoredEffects: ComposedAuthoredEffects | null = null
   const actors = manifest.actors.filter(
-    (actor): actor is LevelActorManifestEntry & { meshUrl: string } =>
+    (actor): actor is MapActorManifestEntry & { meshUrl: string } =>
       Boolean(actor.meshUrl)
   )
   const activeSkyZone = [...manifest.skyZones]
@@ -471,8 +471,8 @@ export async function composeLevelManifest(
 
 function renderableLights(
   scene: Scene,
-  lights: LevelLightManifestEntry[]
-): LevelLightManifestEntry[] {
+  lights: MapLightManifestEntry[]
+): MapLightManifestEntry[] {
   const cameraPosition = scene.activeCamera?.position
   return [...lights]
     .sort((a, b) => {
@@ -498,7 +498,7 @@ function renderableLights(
     .slice(0, 4)
 }
 
-function vertexLightingIsVisible(scene: Scene, actor: LevelActorManifestEntry) {
+function vertexLightingIsVisible(scene: Scene, actor: MapActorManifestEntry) {
   if (!scene.activeCamera || scene.fogMode === Scene.FOGMODE_NONE) return true
   const lightingDistance = Math.max((scene.fogEnd - scene.fogStart) / 2, 1)
   return (
@@ -510,12 +510,12 @@ function vertexLightingIsVisible(scene: Scene, actor: LevelActorManifestEntry) {
   )
 }
 
-function assertManifestSchema(manifest: LevelManifest | SceneManifest) {
+function assertManifestSchema(manifest: MapManifest | SceneManifest) {
   const isScene = 'cameras' in manifest
   const expected = isScene ? 11 : 12
   if (manifest.schemaVersion !== expected)
     throw new Error(
-      `${isScene ? 'Scene' : 'Level'} manifest schema ${manifest.schemaVersion} is unsupported; expected ${expected}.`
+      `${isScene ? 'Scene' : 'Map'} manifest schema ${manifest.schemaVersion} is unsupported; expected ${expected}.`
     )
 }
 

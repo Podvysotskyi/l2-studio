@@ -35,22 +35,13 @@ internal static class StaticMeshMaterialCatalogLoader
         IReadOnlyCollection<TextureMaterialManifestEntry> embeddedMaterials,
         CancellationToken cancellationToken)
     {
-        var catalogs = new List<TextureCatalogHeader>(2);
-        foreach (var kind in new[] { AssetImportJobValues.SystemTextures, AssetImportJobValues.Textures })
-        {
-            var catalog = await context.AssetCatalogs
-                .AsNoTracking()
-                .Where(item => item.GameVersion == gameVersion && item.Kind == kind && item.IsActive)
-                .Select(item => new TextureCatalogHeader(
-                    item.Id,
-                    item.Kind,
-                    item.SchemaVersion,
-                    item.MetadataJson))
-                .SingleOrDefaultAsync(cancellationToken);
-            if (catalog is not null) catalogs.Add(catalog);
-        }
+        var catalogs = await context.AssetCatalogs
+            .AsNoTracking()
+            .Where(item => item.GameVersion == gameVersion && item.Kind == AssetImportJobValues.Textures && item.IsActive)
+            .Select(item => new TextureCatalogHeader(item.Id, item.Kind, item.SchemaVersion, item.MetadataJson))
+            .ToListAsync(cancellationToken);
 
-        var gpuTextureFormats = catalogs.Count == 2 && catalogs.All(catalog => catalog.SchemaVersion >= 3)
+        var gpuTextureFormats = catalogs.Count == 1 && catalogs.All(catalog => catalog.SchemaVersion >= 3)
             ? new[] { "-dxt.ktx" }
             : [];
         if (rootReferences.Count == 0)

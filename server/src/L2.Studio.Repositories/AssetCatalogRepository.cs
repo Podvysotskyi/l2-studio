@@ -25,7 +25,7 @@ public sealed class AssetCatalogRepository(IDbContextFactory<GameContentDbContex
     }
 
     public async Task<AssetCatalogPage?> SearchAsync(
-        string gameVersion, string kind, string query, string? groupName, int page, int pageSize, CancellationToken cancellationToken)
+        string gameVersion, string kind, string query, string? groupName, string? originalFolder, int page, int pageSize, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var catalog = await context.AssetCatalogs.AsNoTracking()
@@ -36,13 +36,20 @@ public sealed class AssetCatalogRepository(IDbContextFactory<GameContentDbContex
         {
             var pattern = $"%{EscapeLikePattern(query.Trim())}%";
             items = items.Where(item => EF.Functions.ILike(item.Name, pattern, "\\") ||
-                (item.GroupName != null && EF.Functions.ILike(item.GroupName, pattern, "\\")));
+                (item.GroupName != null && EF.Functions.ILike(item.GroupName, pattern, "\\")) ||
+                EF.Functions.ILike(item.Source.SourceKey, pattern, "\\"));
         }
         if (!string.IsNullOrWhiteSpace(groupName)) items = items.Where(item => item.GroupName == groupName);
+        if (!string.IsNullOrWhiteSpace(originalFolder))
+        {
+            var prefix = $"{originalFolder.Trim().ToLowerInvariant()}/";
+            items = items.Where(item => item.Source.NormalizedSourceKey.StartsWith(prefix));
+        }
         var total = await items.LongCountAsync(cancellationToken);
         var json = await items.OrderBy(item => item.GroupName).ThenBy(item => item.Name)
             .Skip((page - 1) * pageSize).Take(pageSize).Select(item => item.MetadataJson).ToListAsync(cancellationToken);
-        var groups = await context.AssetCatalogGroups.AsNoTracking().Where(item => item.CatalogId == catalog.Id)
+        var groups = await context.AssetCatalogGroups.AsNoTracking().Where(item => item.CatalogId == catalog.Id &&
+                (string.IsNullOrWhiteSpace(originalFolder) || item.Source.NormalizedSourceKey.StartsWith(originalFolder.Trim().ToLowerInvariant() + "/")))
             .OrderBy(item => item.Name).Select(item => item.MetadataJson).ToListAsync(cancellationToken);
         var summary = await SummaryAsync(context, catalog.Id, cancellationToken);
         return new AssetCatalogPage(summary, groups.Select(Parse).ToArray(), json.Select(Parse).ToArray(), total, page, pageSize);

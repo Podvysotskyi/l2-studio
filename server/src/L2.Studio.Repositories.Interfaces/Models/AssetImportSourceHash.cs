@@ -5,7 +5,7 @@ namespace L2.Studio.Repositories.Interfaces.Models;
 
 public static class AssetImportSourceHash
 {
-    public const int LevelPreviewRendererVersion = 3;
+    public const int MapPreviewRendererVersion = 3;
 
     public static async Task<string> FileAsync(string path, CancellationToken cancellationToken)
     {
@@ -14,7 +14,7 @@ public static class AssetImportSourceHash
         return Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellationToken));
     }
 
-    public static string LevelPreview(string levelSourceHash) =>
+    public static string MapPreview(string mapSourceHash) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
-            $"{levelSourceHash}\n{LevelPreviewRendererVersion}")));
+            $"{mapSourceHash}\n{MapPreviewRendererVersion}")));
 }

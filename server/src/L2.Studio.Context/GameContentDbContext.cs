@@ -42,11 +42,6 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         gameVersion.Property(entity => entity.SourceFolder).HasColumnName("source_folder").HasMaxLength(64);
         gameVersion.Property(entity => entity.SortOrder).HasColumnName("sort_order");
         gameVersion.HasIndex(entity => entity.DisplayName).IsUnique();
-        gameVersion.HasData(
-            new GameVersion { Key = "c1", DisplayName = "Chronicle 1", SourceFolder = "C1", SortOrder = 10 },
-            new GameVersion { Key = "c4", DisplayName = "Chronicle 4", SourceFolder = "C4", SortOrder = 20 },
-            new GameVersion { Key = "interlude", DisplayName = "Interlude", SourceFolder = "Interlude", SortOrder = 30 });
-
         var playerRace = modelBuilder.Entity<PlayerRace>();
         playerRace.ToTable("player_races");
         playerRace.HasKey(entity => new { entity.GameVersion, entity.Id });

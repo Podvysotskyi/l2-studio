@@ -18,7 +18,7 @@ public sealed partial class AssetCatalogStore(
     IDbContextOutbox outbox,
     TimeProvider timeProvider) : IAssetCatalogStore
 {
-    [GeneratedRegex("/(?:systextures|textures|music|sounds|staticmeshes|levels|levelpreviews|scenes)/[^/]+/[0-9a-f]{64}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("/(?:textures/(?:systextures|textures)|music|sounds|staticmeshes|maps|mappreviews|scenes)/[^/]+/[0-9a-f]{64}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex VersionRootPattern();
 
     public async Task PublishAsync(AssetCatalogPublication publication, CancellationToken cancellationToken)

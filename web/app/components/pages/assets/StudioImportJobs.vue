@@ -28,13 +28,12 @@ const reimporting = ref<string>()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const importKinds: AssetImportKind[] = [
-  'systextures',
   'textures',
   'music',
   'sounds',
   'staticmeshes',
-  'levels',
-  'levelpreviews',
+  'maps',
+  'mappreviews',
   'scenes'
 ]
 const jobs = computed(() =>
@@ -59,13 +58,12 @@ const expandedRun = computed(() =>
 )
 const kindOptions = [
   { label: 'All collections', value: 'all' },
-  { label: 'System textures', value: 'systextures' },
-  { label: 'World textures', value: 'textures' },
+  { label: 'Textures', value: 'textures' },
   { label: 'Music', value: 'music' },
   { label: 'Sounds', value: 'sounds' },
   { label: 'Static meshes', value: 'staticmeshes' },
-  { label: 'Levels', value: 'levels' },
-  { label: 'Level previews', value: 'levelpreviews' },
+  { label: 'Maps', value: 'maps' },
+  { label: 'Map previews', value: 'mappreviews' },
   { label: 'Scenes', value: 'scenes' }
 ]
 
@@ -81,13 +79,12 @@ function statusColor(status: AssetImportJob['status']) {
 }
 
 function kindLabel(kind: AssetImportKind) {
-  if (kind === 'systextures') return 'System textures'
-  if (kind === 'textures') return 'World textures'
+  if (kind === 'textures') return 'Textures'
   if (kind === 'music') return 'Music'
   if (kind === 'sounds') return 'Sounds'
   if (kind === 'staticmeshes') return 'Static meshes'
-  if (kind === 'levels') return 'Levels'
-  return kind === 'levelpreviews' ? 'Level previews' : 'Scenes'
+  if (kind === 'maps') return 'Maps'
+  return kind === 'mappreviews' ? 'Map previews' : 'Scenes'
 }
 
 function formatDate(value: string | null) {

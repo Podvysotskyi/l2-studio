@@ -16,10 +16,10 @@ using Wolverine.Runtime;
 
 namespace L2.Studio.Services;
 
-public sealed class AssetStorageReconciliationPublisher(IMessageBus bus) : IHostedService
+public sealed class AssetStorageReconciliationPublisher(IWolverineRuntime runtime) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken) =>
-        await bus.PublishAsync(new ReconcileAssetStorage());
+        await new MessageBus(runtime).PublishAsync(new ReconcileAssetStorage());
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
@@ -27,14 +27,13 @@ public sealed class AssetStorageReconciliationPublisher(IMessageBus bus) : IHost
 [WolverineHandler]
 public sealed class AssetImportFileHandlers(IAssetImportWorkItemProcessor processor)
 {
-    public Task Handle(ImportSystemTextureFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportTextureFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportStaticMeshFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportSoundFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportMusicFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
-    public Task Handle(ImportLevelFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
+    public Task Handle(ImportMapFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportSceneFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
-    public Task Handle(GenerateLevelPreview message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
+    public Task Handle(GenerateMapPreview message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
 }
 
 [WolverineHandler]

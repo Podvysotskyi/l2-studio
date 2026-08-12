@@ -19,8 +19,6 @@ public sealed class AssetImportDiscoveryHandlers(
     IOptions<AssetImportOptions> options,
     TimeProvider timeProvider)
 {
-    public Task Handle(DiscoverSystemTextures message, CancellationToken token) =>
-        DiscoverAsync(message.RunId, AssetImportJobValues.SystemTextures, token);
     public Task Handle(DiscoverTextures message, CancellationToken token) =>
         DiscoverAsync(message.RunId, AssetImportJobValues.Textures, token);
     public Task Handle(DiscoverStaticMeshes message, CancellationToken token) =>
@@ -29,12 +27,12 @@ public sealed class AssetImportDiscoveryHandlers(
         DiscoverAsync(message.RunId, AssetImportJobValues.Sounds, token);
     public Task Handle(DiscoverMusic message, CancellationToken token) =>
         DiscoverAsync(message.RunId, AssetImportJobValues.Music, token);
-    public Task Handle(DiscoverLevels message, CancellationToken token) =>
-        DiscoverAsync(message.RunId, AssetImportJobValues.Levels, token);
+    public Task Handle(DiscoverMaps message, CancellationToken token) =>
+        DiscoverAsync(message.RunId, AssetImportJobValues.Maps, token);
     public Task Handle(DiscoverScenes message, CancellationToken token) =>
         DiscoverAsync(message.RunId, AssetImportJobValues.Scenes, token);
-    public Task Handle(DiscoverLevelPreviews message, CancellationToken token) =>
-        DiscoverAsync(message.RunId, AssetImportJobValues.LevelPreviews, token);
+    public Task Handle(DiscoverMapPreviews message, CancellationToken token) =>
+        DiscoverAsync(message.RunId, AssetImportJobValues.MapPreviews, token);
 
     private async Task DiscoverAsync(Guid runId, string kind, CancellationToken cancellationToken)
     {
@@ -52,8 +50,10 @@ public sealed class AssetImportDiscoveryHandlers(
         IReadOnlyList<DiscoveredSource> sources;
         try
         {
-            sources = kind == AssetImportJobValues.LevelPreviews
+            sources = kind == AssetImportJobValues.MapPreviews
                 ? await DiscoverPreviewSourcesAsync(gameVersion, cancellationToken)
+                : kind == AssetImportJobValues.Textures
+                    ? await DiscoverTextureSourcesAsync(gameVersion, cancellationToken)
                 : await DiscoverFileSourcesAsync(gameVersion, kind, cancellationToken);
         }
         catch (Exception exception) when (IsDiscoveryFailure(exception))
@@ -130,7 +130,7 @@ public sealed class AssetImportDiscoveryHandlers(
             .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
             .Where(path => kind switch
             {
-                AssetImportJobValues.Levels => UnrealPackageKindClassifier.IsWorldLevel(path),
+                AssetImportJobValues.Maps => UnrealPackageKindClassifier.IsWorldMap(path),
                 AssetImportJobValues.Scenes => UnrealPackageKindClassifier.IsScene(path),
                 _ => true
             })
@@ -157,6 +157,46 @@ public sealed class AssetImportDiscoveryHandlers(
         return result;
     }
 
+    private async Task<IReadOnlyList<DiscoveredSource>> DiscoverTextureSourcesAsync(
+        string gameVersion,
+        CancellationToken cancellationToken)
+    {
+        var sources = new List<(string Folder, string Path)>();
+        foreach (var folder in new[] { "systextures", "textures" })
+        {
+            var root = Path.GetFullPath(Path.Combine(options.Value.SourceRootPath, SourceFolder(gameVersion), folder));
+            if (!Directory.Exists(root))
+                throw new DirectoryNotFoundException($"The configured texture source directory does not exist: {root}");
+            sources.AddRange(Directory.EnumerateFiles(root)
+                .Where(path => string.Equals(Path.GetExtension(path), ".utx", StringComparison.OrdinalIgnoreCase))
+                .Select(path => (folder, Path.GetFullPath(path))));
+        }
+
+        var duplicatePackage = sources.GroupBy(source => Path.GetFileNameWithoutExtension(source.Path), StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicatePackage is not null)
+            throw new InvalidDataException($"Texture package '{duplicatePackage.Key}' is duplicated across texture source folders.");
+
+        var result = new List<DiscoveredSource>(sources.Count);
+        foreach (var source in sources.OrderBy(item => item.Folder, StringComparer.Ordinal).ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var sourceKey = $"{source.Folder}/{Path.GetFileName(source.Path)}";
+            try
+            {
+                if (new FileInfo(source.Path).LinkTarget is not null)
+                    throw new InvalidDataException("Symbolic-link sources are not supported.");
+                result.Add(new DiscoveredSource(sourceKey, source.Path,
+                    await AssetImportSourceHash.FileAsync(source.Path, cancellationToken), null));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                result.Add(new DiscoveredSource(sourceKey, source.Path, null, exception.Message));
+            }
+        }
+        return result;
+    }
+
     private async Task<IReadOnlyList<DiscoveredSource>> DiscoverPreviewSourcesAsync(
         string gameVersion,
         CancellationToken cancellationToken)
@@ -164,15 +204,15 @@ public sealed class AssetImportDiscoveryHandlers(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var sources = await context.AssetCatalogSources.AsNoTracking()
             .Where(source => source.Catalog.GameVersion == gameVersion &&
-                source.Catalog.Kind == AssetImportJobValues.Levels && source.Catalog.IsActive)
+                source.Catalog.Kind == AssetImportJobValues.Maps && source.Catalog.IsActive)
             .OrderBy(source => source.SourceKey)
             .Select(source => new { source.SourceKey, source.SourceHash })
             .ToListAsync(cancellationToken);
-        var root = Path.GetFullPath(SourceRoot(gameVersion, AssetImportJobValues.Levels));
+        var root = Path.GetFullPath(SourceRoot(gameVersion, AssetImportJobValues.Maps));
         return sources.Select(source => new DiscoveredSource(
             source.SourceKey,
             Path.Combine(root, source.SourceKey),
-            LevelPreviewGeneration.ComputeSourceHash(source.SourceHash),
+            MapPreviewGeneration.ComputeSourceHash(source.SourceHash),
             null)).ToArray();
     }
 
@@ -203,7 +243,7 @@ public sealed class AssetImportDiscoveryHandlers(
         SourceFolder(gameVersion),
         kind switch
     {
-        AssetImportJobValues.Levels or AssetImportJobValues.Scenes => "maps",
+        AssetImportJobValues.Maps or AssetImportJobValues.Scenes => "maps",
         var value => value
     });
 
@@ -217,24 +257,23 @@ public sealed class AssetImportDiscoveryHandlers(
 
     private static string ExpectedExtension(string kind) => kind switch
     {
-        AssetImportJobValues.SystemTextures or AssetImportJobValues.Textures => ".utx",
+        AssetImportJobValues.Textures => ".utx",
         AssetImportJobValues.StaticMeshes => ".usx",
         AssetImportJobValues.Sounds => ".uax",
         AssetImportJobValues.Music => ".ogg",
-        AssetImportJobValues.Levels or AssetImportJobValues.Scenes => ".unr",
+        AssetImportJobValues.Maps or AssetImportJobValues.Scenes => ".unr",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
     private static object FileCommand(string kind, Guid id) => kind switch
     {
-        AssetImportJobValues.SystemTextures => new ImportSystemTextureFile(id),
         AssetImportJobValues.Textures => new ImportTextureFile(id),
         AssetImportJobValues.StaticMeshes => new ImportStaticMeshFile(id),
         AssetImportJobValues.Sounds => new ImportSoundFile(id),
         AssetImportJobValues.Music => new ImportMusicFile(id),
-        AssetImportJobValues.Levels => new ImportLevelFile(id),
+        AssetImportJobValues.Maps => new ImportMapFile(id),
         AssetImportJobValues.Scenes => new ImportSceneFile(id),
-        AssetImportJobValues.LevelPreviews => new GenerateLevelPreview(id),
+        AssetImportJobValues.MapPreviews => new GenerateMapPreview(id),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 

@@ -9,6 +9,14 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   devtools: { enabled: true },
   icon: {
+    clientBundle: {
+      scan: {
+        globInclude: [
+          '**/*.{vue,js,jsx,ts,tsx,md,mdc,mdx,yml,yaml}'
+        ]
+      }
+    },
+    localApiEndpoint: '/_nuxt_icon',
     serverBundle: {
       collections: ['lucide']
     }
@@ -21,6 +29,11 @@ export default defineNuxtConfig({
     }
   },
   runtimeConfig: {
+    studioApiBase,
+    storageResourcesRoot:
+      process.env.NUXT_STORAGE_RESOURCES_ROOT ?? '/workspace/resources',
+    storageAssetsRoot:
+      process.env.NUXT_STORAGE_ASSETS_ROOT ?? '/workspace/assets',
     public: {
       apiBase: '',
       assetBaseUrl:

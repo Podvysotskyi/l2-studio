@@ -26,6 +26,8 @@ public sealed partial class AssetImportJobProcessor
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
+        var originalFolder = Path.GetDirectoryName(job.SourceKey)?.Replace('\\', '/') ?? string.Empty;
+        RequireSafeSegment(originalFolder, "texture source folder");
         var assetRootPath = AssetRoot(job);
         var packagePaths = SourceFiles(sourcePath, ".utx", "texture");
         if (packagePaths.Length == 0)
@@ -56,7 +58,8 @@ public sealed partial class AssetImportJobProcessor
                 fileName,
                 fileHash,
                 exports.Count,
-                materials.Count));
+                materials.Count,
+                originalFolder));
             job.TotalCount += exports.Count;
         }
 
@@ -146,7 +149,9 @@ public sealed partial class AssetImportJobProcessor
                                         result.VersionHash!),
                                 result.GpuImageHash,
                                 result.GpuImage is not null,
-                                texture.MipLevels.Count));
+                                texture.MipLevels.Count,
+                                OriginalFolder: package.OriginalFolder,
+                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}"));
                         }
                         else
                         {
@@ -164,7 +169,9 @@ public sealed partial class AssetImportJobProcessor
                                 null,
                                 "skipped",
                                 result.Error,
-                                MipCount: export.MipCount));
+                                MipCount: export.MipCount,
+                                OriginalFolder: package.OriginalFolder,
+                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}"));
                             job.SkippedCount++;
                         }
 
@@ -184,7 +191,9 @@ public sealed partial class AssetImportJobProcessor
                     package.FileName,
                     package.Sha256,
                     package.TextureCount,
-                    package.MaterialCount)).ToArray();
+                    package.MaterialCount,
+                    package.OriginalFolder,
+                    $"/{package.OriginalFolder}/{package.Name}")).ToArray();
 
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);

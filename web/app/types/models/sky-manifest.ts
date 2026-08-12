@@ -1,4 +1,4 @@
-import type { LevelVector } from './level-manifest'
+import type { MapVector } from './map-manifest'
 
 export interface SkyBackdropManifestEntry {
   name: string
@@ -22,7 +22,7 @@ export interface SkyZoneLensFlareManifestEntry {
 export interface SkyZoneManifestEntry {
   order: number
   name: string
-  location: LevelVector
+  location: MapVector
   drawScale: number
   texUPanSpeed: number
   texVPanSpeed: number

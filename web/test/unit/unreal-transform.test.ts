@@ -21,8 +21,8 @@ function rotatedForward(pitch: number, yaw: number, roll: number) {
   )
 }
 
-describe('Unreal level transforms', () => {
-  it('configures composed level scenes to use the glTF coordinate system', () => {
+describe('Unreal map transforms', () => {
+  it('configures composed map scenes to use the glTF coordinate system', () => {
     const engine = new NullEngine()
     const scene = new Scene(engine)
 

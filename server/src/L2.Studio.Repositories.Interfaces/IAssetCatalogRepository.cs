@@ -6,6 +6,6 @@ namespace L2.Studio.Repositories.Interfaces;
 public interface IAssetCatalogRepository
 {
     Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(string gameVersion, CancellationToken cancellationToken);
-    Task<AssetCatalogPage?> SearchAsync(string gameVersion, string kind, string query, string? groupName, int page, int pageSize, CancellationToken cancellationToken);
+    Task<AssetCatalogPage?> SearchAsync(string gameVersion, string kind, string query, string? groupName, string? originalFolder, int page, int pageSize, CancellationToken cancellationToken);
     Task<JsonElement?> GetAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken);
 }

@@ -4,6 +4,7 @@ import { getGameVersions } from '../services/studio-api'
 import type { GameVersionSummary } from '../types/models/game-version'
 import {
   gameVersionStorageKey,
+  resolveSelectedGameVersionKey,
   selectedGameVersionKey
 } from '../utils/game-version'
 
@@ -22,13 +23,11 @@ export const useGameVersionStore = defineStore('game-version', () => {
     loading.value = true
     try {
       versions.value = await getGameVersions()
-      if (!versions.value.some(version => version.key === selected.value)) {
-        selected.value =
-          versions.value.find(version => version.isDefault)?.key ??
-          versions.value[0]?.key ??
-          'interlude'
-        persist()
-      }
+      selected.value = resolveSelectedGameVersionKey(
+        versions.value,
+        selectedGameVersionKey()
+      )
+      persist()
     } finally {
       loading.value = false
     }

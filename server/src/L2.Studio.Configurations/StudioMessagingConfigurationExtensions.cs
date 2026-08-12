@@ -59,14 +59,13 @@ public static class StudioMessagingConfigurationExtensions
 
     private static void RouteControlMessages(WolverineOptions options)
     {
-        options.PublishMessage<DiscoverSystemTextures>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverTextures>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverStaticMeshes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverSounds>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverMusic>().ToPostgresqlQueue(ControlQueue);
-        options.PublishMessage<DiscoverLevels>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<DiscoverMaps>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverScenes>().ToPostgresqlQueue(ControlQueue);
-        options.PublishMessage<DiscoverLevelPreviews>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<DiscoverMapPreviews>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<AssetImportWorkItemCompleted>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<FinalizeAssetImportRun>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DeleteAssetVersion>().ToPostgresqlQueue(ControlQueue);
@@ -74,14 +73,13 @@ public static class StudioMessagingConfigurationExtensions
 
     private static void RouteFileMessages(WolverineOptions options)
     {
-        options.PublishMessage<ImportSystemTextureFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportTextureFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportStaticMeshFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportSoundFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportMusicFile>().ToPostgresqlQueue(FileQueue);
-        options.PublishMessage<ImportLevelFile>().ToPostgresqlQueue(FileQueue);
+        options.PublishMessage<ImportMapFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportSceneFile>().ToPostgresqlQueue(FileQueue);
-        options.PublishMessage<GenerateLevelPreview>().ToPostgresqlQueue(FileQueue);
+        options.PublishMessage<GenerateMapPreview>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ReconcileAssetStorage>().ToPostgresqlQueue(FileQueue);
     }
 }

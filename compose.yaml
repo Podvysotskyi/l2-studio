@@ -16,6 +16,13 @@ services:
       retries: 30
     restart: unless-stopped
 
+  storage-init:
+    image: alpine:3.22
+    command: ['chown', '1000:1000', '/workspace/resources']
+    volumes:
+      - resources-data:/workspace/resources
+    restart: 'no'
+
   studio-api:
     image: ${L2_STUDIO_API_IMAGE:-l2-studio-api:dev}
     build:
@@ -26,7 +33,7 @@ services:
       DOTNET_ENVIRONMENT: Development
     volumes:
       - assets-data:/workspace/assets:ro
-      - ${L2_SOURCE_PATH:-../sources}:/workspace/sources:ro
+      - resources-data:/workspace/sources:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,7 +83,7 @@ services:
       DOTNET_ENVIRONMENT: Development
     volumes:
       - assets-data:/workspace/assets
-      - ${L2_SOURCE_PATH:-../sources}:/workspace/sources:ro
+      - resources-data:/workspace/sources:ro
     depends_on:
       puppeteer:
         condition: service_healthy
@@ -94,7 +101,7 @@ services:
       - assets-data:/srv/assets:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost/health/live']
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1/health/live']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -112,7 +119,12 @@ services:
     init: true
     ports:
       - '127.0.0.1:${STUDIO_WEB_PORT:-3001}:3001'
+    volumes:
+      - resources-data:/workspace/resources
+      - assets-data:/workspace/assets:ro
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       studio-api:
         condition: service_healthy
       asset-server:
@@ -122,3 +134,4 @@ services:
 volumes:
   assets-data:
   postgres-data:
+  resources-data:

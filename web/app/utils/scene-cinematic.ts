@@ -1,13 +1,13 @@
 import type {
-  LevelRotation,
-  LevelVector,
+  MapRotation,
+  MapVector,
   SceneManifest,
   SceneObjectManifestEntry
 } from '~/types/studio'
 
 export interface ScenePose {
-  location: LevelVector
-  rotation: LevelRotation
+  location: MapVector
+  rotation: MapRotation
 }
 
 export function scenePlaybackFrames(
