@@ -50,7 +50,7 @@ onMounted(async () => {
       skyZoneChunks: {},
       worldBase: false,
       waterSurfaces: true,
-      waterVolumes: false,
+      waterVolumes: true,
       lightHelpers: false
     })
     await preview.renderTopDown()

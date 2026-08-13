@@ -29,4 +29,6 @@ public sealed record StaticMeshMaterialBinding(
     string? SelfIlluminationMaskUrl = null,
     string? SpecularUrl = null,
     string? SpecularityMaskUrl = null,
-    bool PerformLightingOnSpecularPass = false);
+    bool PerformLightingOnSpecularPass = false,
+    bool ClampU = false,
+    bool ClampV = false);

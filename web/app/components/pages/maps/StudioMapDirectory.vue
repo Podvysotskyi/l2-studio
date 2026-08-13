@@ -100,6 +100,10 @@ function mapMenuItems(map: MapCatalogEntry) {
   ]]
 }
 
+function refreshPage() {
+  window.location.reload()
+}
+
 async function loadCatalog() {
   try {
     catalog.value = await getAssetCatalog<MapCatalogEntry>('maps', {
@@ -215,7 +219,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="flex min-h-0 flex-1 flex-col gap-6">
     <StudioPageHeader
       eyebrow="Asset pipeline"
       title="Maps"
@@ -238,13 +242,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             :disabled="Boolean(activePreviewJob || activeJob)"
           />
         </UDropdownMenu>
-        <UButton
-          label="Import jobs"
-          icon="i-lucide-history"
-          color="neutral"
-          variant="outline"
-          to="/pipeline/imports"
-        />
         <UDropdownMenu :items="mapImportMenuItems" :content="{ align: 'end' }">
           <UButton
             label="Import maps"
@@ -254,6 +251,13 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             :disabled="Boolean(activeJob || activePreviewJob)"
           />
         </UDropdownMenu>
+        <UButton
+          label="Refresh"
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="outline"
+          @click="refreshPage"
+        />
       </template>
     </StudioPageHeader>
 
@@ -264,7 +268,11 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Map imports unavailable"
       :description="jobsError"
     />
-    <UCard v-if="worldGrid.cells.length" :ui="{ body: 'p-0 sm:p-0' }">
+    <UCard
+      v-if="worldGrid.cells.length"
+      class="flex min-h-0 flex-1 flex-col"
+      :ui="{ body: 'flex min-h-0 flex-1 flex-col p-0 sm:p-0' }"
+    >
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -291,6 +299,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         :preview-job-active="Boolean(activePreviewJob || queueingPreviews || activeJob || queueing)"
         :queueing-preview-name="queueingPreviewName"
         :reimporting-map-name="reimportingMap"
+        :import-drawer-open="importDrawerOpen"
         @generate-preview="queuePreviews"
         @force-generate-preview="map => queuePreviews(map, true)"
         @reimport="reimportMap"

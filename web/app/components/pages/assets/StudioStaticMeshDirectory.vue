@@ -19,8 +19,8 @@ const catalog =
   ref<AssetCatalogPage<StaticMeshManifestEntry, StaticMeshPackage>>()
 const selectedPackage = ref<string>('all')
 const selectedMesh = ref<StaticMeshManifestEntry>()
-const previewOpen = ref(false)
 const previewError = ref<string>()
+const previewMaterialWarning = ref<string>()
 const query = ref('')
 const page = ref(1)
 const pageSize = ref(50)
@@ -102,7 +102,13 @@ function showPreview(mesh: StaticMeshManifestEntry) {
   if (!mesh.url) return
   selectedMesh.value = mesh
   previewError.value = undefined
-  previewOpen.value = true
+  previewMaterialWarning.value = undefined
+}
+
+function closePreview() {
+  selectedMesh.value = undefined
+  previewError.value = undefined
+  previewMaterialWarning.value = undefined
 }
 
 async function loadCatalog() {
@@ -368,15 +374,16 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </div>
     </UCard>
 
-    <UModal
-      v-model:open="previewOpen"
+    <USlideover
+      :open="Boolean(selectedMesh)"
       :title="selectedMesh?.objectName"
       :description="
         selectedMesh
           ? `${selectedMesh.packageName} · ${selectedMesh.vertexCount.toLocaleString()} vertices · ${selectedMesh.triangleCount.toLocaleString()} triangles`
           : undefined
       "
-      :ui="{ content: 'max-w-[min(96vw,90rem)]' }"
+      :ui="{ content: 'w-[min(96vw,72rem)] max-w-none' }"
+      @update:open="open => { if (!open) closePreview() }"
     >
       <template #body>
         <UAlert
@@ -387,16 +394,25 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           title="Preview unavailable"
           :description="previewError"
         />
+        <UAlert
+          v-if="previewMaterialWarning"
+          class="mb-3"
+          color="warning"
+          variant="subtle"
+          title="Material fallback"
+          :description="previewMaterialWarning"
+        />
         <StudioStaticMeshPreview
           v-if="selectedMesh?.url"
           :url="selectedMesh.url"
           @error="previewError = $event"
+          @material-warning="previewMaterialWarning = $event"
         />
         <p class="mt-2 text-center text-xs text-muted">
           Drag to orbit · scroll to zoom · right-drag to pan
         </p>
       </template>
-    </UModal>
+    </USlideover>
 
     <StudioImportProgressDrawer
       v-model:open="importDrawerOpen"

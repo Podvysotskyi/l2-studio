@@ -21,6 +21,7 @@ const props = defineProps<{
   previewJobActive: boolean
   queueingPreviewName?: string
   reimportingMapName?: string
+  importDrawerOpen: boolean
 }>()
 const emit = defineEmits<{
   generatePreview: [map: MapCatalogEntry]
@@ -156,6 +157,17 @@ function selectCell(cell: MapWorldCell) {
   if (cell.map) selectedMap.value = cell.map
 }
 
+function closeSelection() {
+  selectedMap.value = undefined
+}
+
+watch(
+  () => props.importDrawerOpen,
+  open => {
+    if (open) closeSelection()
+  }
+)
+
 function mapImportMenuItems(map: MapCatalogEntry) {
   return [[
     {
@@ -225,11 +237,11 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
-  <div class="grid overflow-hidden lg:grid-cols-[minmax(0,1fr)_18rem]">
-    <section class="relative min-w-0 bg-[#09120f]">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <section class="relative min-h-0 min-w-0 flex-1 bg-[#09120f]">
       <div
         ref="viewport"
-        class="map-world-viewport relative h-[clamp(32rem,68vh,52rem)] touch-none overflow-hidden outline-none select-none focus-visible:ring-2 focus-visible:ring-primary lg:h-[clamp(40rem,calc(100dvh-20rem),64rem)]"
+        class="map-world-viewport relative h-full touch-none overflow-hidden outline-none select-none focus-visible:ring-2 focus-visible:ring-primary"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         tabindex="0"
         role="region"
@@ -358,11 +370,15 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
       </div>
     </section>
 
-    <aside
-      class="border-t border-default bg-elevated/60 p-4 lg:border-t-0 lg:border-l"
-      aria-label="Selected map details"
+    <USlideover
+      :open="Boolean(selectedMap)"
+      :title="selectedMap?.name"
+      :description="selectedMap?.fileName"
+      :ui="{ content: 'max-w-lg' }"
+      @update:open="open => { if (!open) closeSelection() }"
     >
-      <template v-if="selectedMap">
+      <template #body>
+        <template v-if="selectedMap">
         <div
           class="overflow-hidden rounded-lg border border-default bg-default"
         >
@@ -475,22 +491,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
             "
           />
         </div>
+        </template>
       </template>
-      <div
-        v-else
-        class="flex min-h-56 flex-col items-center justify-center px-4 text-center lg:min-h-full"
-      >
-        <span
-          class="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary"
-        >
-          <UIcon name="i-lucide-map-pin" class="size-5" />
-        </span>
-        <p class="mt-3 text-sm font-medium text-highlighted">Select a map</p>
-        <p class="mt-1 text-xs leading-5 text-muted">
-          Choose a tile to inspect its preview and import details.
-        </p>
-      </div>
-    </aside>
+    </USlideover>
   </div>
 </template>
 

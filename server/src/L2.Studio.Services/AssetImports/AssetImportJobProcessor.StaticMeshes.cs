@@ -151,7 +151,7 @@ public sealed partial class AssetImportJobProcessor
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 9, 111, catalogGroups, entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 10, 111, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new StaticMeshCatalogMetadata(materialCatalog.GpuTextureFormats), cancellationToken);
             job.Status = warnings.Count == 0

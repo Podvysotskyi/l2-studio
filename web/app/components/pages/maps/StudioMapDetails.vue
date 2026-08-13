@@ -18,8 +18,12 @@ import {
   enableAllTerrainLayers,
   filterMapLights,
   filterMapWaterVolumes,
+  hasMapLevelSummaryData,
+  mapSkyZonePreviewManifest,
+  mapIdealPlayerCount,
   mapEnvironmentColor,
   mapLightColor,
+  previewableMapSkyZones,
   setTerrainLayerEnabled,
   toggleSoloTerrainLayer,
   type TerrainLayerStates
@@ -37,7 +41,13 @@ interface MapPreviewApi {
 }
 
 type InspectorTab =
-  'actors' | 'bsp' | 'terrain' | 'lights' | 'water' | 'environment'
+  | 'actors'
+  | 'bsp'
+  | 'terrain'
+  | 'lights'
+  | 'water'
+  | 'summary'
+  | 'environment'
 
 const route = useRoute()
 const catalogEntry = ref<MapCatalogEntry>()
@@ -51,8 +61,6 @@ const selectedWaterSurfaceName = ref<string>()
 const inspectorTab = ref<InspectorTab>('actors')
 const actorsVisible = ref(true)
 const bspVisible = ref(true)
-const skyZoneVisible = ref(false)
-const skyZoneChunkVisibility = ref<Record<string, boolean>>({})
 const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
@@ -68,6 +76,10 @@ const sceneReady = ref(false)
 const error = ref<string>()
 const previewError = ref<string>()
 const terrainMaterialError = ref<string>()
+const diagnosticsOpen = ref(false)
+const skyZonePreviewOpen = ref(false)
+const selectedSkyZoneName = ref<string>()
+const skyZonePreviewError = ref<string>()
 
 const routeName = computed(() =>
   Array.isArray(route.params.name)
@@ -103,6 +115,17 @@ const waterSurfaceMeshes = computed(() =>
 )
 const skyZoneBspMeshes = computed(() =>
   (manifest.value?.bspMeshes ?? []).filter((mesh) => mesh.role === 'sky-zone')
+)
+const previewableSkyZones = computed(() =>
+  manifest.value ? previewableMapSkyZones(manifest.value) : []
+)
+const skyZonePreviewOptions = computed(() =>
+  previewableSkyZones.value.map((zone) => zone.name)
+)
+const skyZonePreviewManifest = computed(() =>
+  manifest.value
+    ? mapSkyZonePreviewManifest(manifest.value, selectedSkyZoneName.value)
+    : undefined
 )
 const worldBaseBspMeshes = computed(() =>
   (manifest.value?.bspMeshes ?? []).filter((mesh) => mesh.role === 'world-base')
@@ -146,12 +169,6 @@ const filteredWaterSurfaces = computed(() => {
       )
   )
 })
-const enabledSkyZoneChunkCount = computed(
-  () =>
-    skyZoneBspMeshes.value.filter(
-      (mesh) => skyZoneChunkVisibility.value[mesh.name] !== false
-    ).length
-)
 const terrainLayerVisibility = computed(() =>
   Object.fromEntries(
     Object.entries(terrainLayerStates.value).map(([name, state]) => [
@@ -160,9 +177,15 @@ const terrainLayerVisibility = computed(() =>
     ])
   )
 )
+const levelSummary = computed(() => manifest.value?.summary ?? null)
+const idealPlayerCount = computed(() => mapIdealPlayerCount(levelSummary.value))
+const levelSummaryHasData = computed(() =>
+  levelSummary.value ? hasMapLevelSummaryData(levelSummary.value) : false
+)
 
 watch([query, pageSize], () => (page.value = 1))
 watch([routeName, routeSourceKey], () => void loadMap(), { immediate: true })
+watch(selectedSkyZoneName, () => (skyZonePreviewError.value = undefined))
 
 function selectActor(actor: MapActorManifestEntry) {
   selectedActorName.value = actor.name
@@ -251,11 +274,11 @@ async function focusWaterSurface(surface: MapBspMeshManifestEntry) {
   preview.value?.focusWaterSurface(surface.name)
 }
 
-function setSkyZoneChunkVisible(name: string, visible: boolean) {
-  skyZoneChunkVisibility.value = {
-    ...skyZoneChunkVisibility.value,
-    [name]: visible
-  }
+function openSkyZonePreview() {
+  if (!skyZonePreviewOptions.value.includes(selectedSkyZoneName.value ?? ''))
+    selectedSkyZoneName.value = skyZonePreviewOptions.value[0]
+  if (!selectedSkyZoneName.value) return
+  skyZonePreviewOpen.value = true
 }
 
 async function loadMap() {
@@ -264,6 +287,10 @@ async function loadMap() {
   error.value = undefined
   previewError.value = undefined
   terrainMaterialError.value = undefined
+  diagnosticsOpen.value = false
+  skyZonePreviewOpen.value = false
+  selectedSkyZoneName.value = undefined
+  skyZonePreviewError.value = undefined
   catalogEntry.value = undefined
   manifest.value = undefined
   selectedActorName.value = undefined
@@ -274,8 +301,6 @@ async function loadMap() {
   inspectorTab.value = 'actors'
   actorsVisible.value = true
   bspVisible.value = true
-  skyZoneVisible.value = false
-  skyZoneChunkVisibility.value = {}
   worldBaseVisible.value = false
   lightHelpersVisible.value = false
   waterVolumesVisible.value = true
@@ -297,11 +322,6 @@ async function loadMap() {
       return
     }
     manifest.value = await getPublishedManifest<MapManifest>(entry.manifestUrl)
-    skyZoneChunkVisibility.value = Object.fromEntries(
-      manifest.value.bspMeshes
-        .filter((mesh) => mesh.role === 'sky-zone')
-        .map((mesh) => [mesh.name, true])
-    )
     terrainLayerStates.value = createTerrainLayerStates(manifest.value.terrains)
   } catch {
     error.value = 'Map “' + routeName.value + '” could not be loaded.'
@@ -320,6 +340,14 @@ async function loadMap() {
       icon="i-lucide-map-pinned"
     >
       <template #actions>
+        <UButton
+          label="Diagnostics"
+          icon="i-lucide-message-square-warning"
+          color="neutral"
+          variant="outline"
+          :disabled="!catalogEntry"
+          @click="diagnosticsOpen = true"
+        />
         <UButton
           label="All maps"
           icon="i-lucide-arrow-left"
@@ -408,7 +436,7 @@ async function loadMap() {
         v-if="terrainMaterialError"
         color="warning"
         variant="subtle"
-        title="Terrain material fallback"
+        title="Material fallback"
         :description="terrainMaterialError"
       />
 
@@ -423,8 +451,6 @@ async function loadMap() {
             :selected-bsp-name="selectedBspName"
             :actors-visible="actorsVisible"
             :bsp-visible="bspVisible"
-            :sky-zone-visible="skyZoneVisible"
-            :sky-zone-chunk-visibility="skyZoneChunkVisibility"
             :world-base-visible="worldBaseVisible"
             :terrain-layer-visibility="terrainLayerVisibility"
             :light-helpers-visible="lightHelpersVisible"
@@ -451,7 +477,7 @@ async function loadMap() {
         >
           <template #header>
             <div
-              class="grid grid-cols-3 gap-1 sm:grid-cols-6 xl:grid-cols-3 2xl:grid-cols-6"
+              class="grid grid-cols-3 gap-1 sm:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-4"
               role="tablist"
               aria-label="Map inspector"
             >
@@ -504,6 +530,16 @@ async function loadMap() {
                 :aria-selected="inspectorTab === 'water'"
                 class="justify-center"
                 @click="inspectorTab = 'water'"
+              />
+              <UButton
+                label="Summary"
+                icon="i-lucide-notebook-tabs"
+                color="neutral"
+                :variant="inspectorTab === 'summary' ? 'soft' : 'ghost'"
+                role="tab"
+                :aria-selected="inspectorTab === 'summary'"
+                class="justify-center"
+                @click="inspectorTab = 'summary'"
               />
               <UButton
                 label="Environment"
@@ -1099,6 +1135,104 @@ async function loadMap() {
             </div>
           </template>
 
+          <template v-else-if="inspectorTab === 'summary'">
+            <div class="border-b border-default p-4">
+              <h2 class="text-sm font-semibold text-highlighted">
+                Level summary
+              </h2>
+              <p class="text-xs text-muted">
+                Authored UE2 map-browser metadata
+              </p>
+            </div>
+            <div
+              v-if="levelSummary"
+              class="max-h-[58vh] space-y-4 overflow-y-auto p-4"
+            >
+              <div v-if="levelSummary.title">
+                <p class="text-xs text-muted">Title</p>
+                <p class="text-base font-semibold text-highlighted">
+                  {{ levelSummary.title }}
+                </p>
+              </div>
+
+              <dl class="space-y-3 text-sm">
+                <div v-if="levelSummary.author">
+                  <dt class="text-muted">Author</dt>
+                  <dd class="mt-1 text-highlighted">
+                    {{ levelSummary.author }}
+                  </dd>
+                </div>
+                <div v-if="idealPlayerCount">
+                  <dt class="text-muted">Ideal player count</dt>
+                  <dd class="mt-1 text-highlighted">
+                    {{ idealPlayerCount }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.singlePlayerTeamSize !== null">
+                  <dt class="text-muted">Single-player team size</dt>
+                  <dd class="mt-1 text-highlighted">
+                    {{ levelSummary.singlePlayerTeamSize }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.hideFromMenus !== null">
+                  <dt class="text-muted">Menu visibility</dt>
+                  <dd class="mt-1">
+                    <UBadge
+                      :color="levelSummary.hideFromMenus ? 'warning' : 'success'"
+                      variant="subtle"
+                      size="sm"
+                    >
+                      {{ levelSummary.hideFromMenus ? 'Hidden' : 'Visible' }}
+                    </UBadge>
+                  </dd>
+                </div>
+                <div v-if="levelSummary.description">
+                  <dt class="text-muted">Description</dt>
+                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                    {{ levelSummary.description }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.levelEnterText">
+                  <dt class="text-muted">Level entry text</dt>
+                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                    {{ levelSummary.levelEnterText }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.extraInfo">
+                  <dt class="text-muted">Extra info</dt>
+                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                    {{ levelSummary.extraInfo }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.decoTextName">
+                  <dt class="text-muted">Deco text name</dt>
+                  <dd class="mt-1 text-highlighted">
+                    {{ levelSummary.decoTextName }}
+                  </dd>
+                </div>
+                <div v-if="levelSummary.screenshot">
+                  <dt class="text-muted">Screenshot material</dt>
+                  <dd class="mt-1 break-all font-mono text-xs text-highlighted">
+                    {{ levelSummary.screenshot }}
+                  </dd>
+                </div>
+              </dl>
+
+              <p
+                v-if="!levelSummaryHasData"
+                class="text-sm text-muted"
+              >
+                This LevelSummary contains no authored metadata.
+              </p>
+            </div>
+            <div
+              v-else
+              class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted"
+            >
+              This map has no readable LevelSummary metadata.
+            </div>
+          </template>
+
           <template v-else-if="inspectorTab === 'environment'">
             <div class="border-b border-default p-4">
               <div>
@@ -1224,48 +1358,25 @@ async function loadMap() {
                       Sky Zones
                     </p>
                     <p class="text-xs text-muted">
-                      {{ enabledSkyZoneChunkCount }} of
-                      {{ skyZoneBspMeshes.length }} chunks enabled
+                      {{ previewableSkyZones.length }} published zones ·
+                      {{ skyZoneBspMeshes.length }} chunks
                     </p>
                   </div>
-                  <USwitch
-                    v-model="skyZoneVisible"
-                    label="Show group"
-                    aria-label="Show sky zones group"
+                  <UButton
+                    label="Preview Sky Zone"
+                    icon="i-lucide-eye"
+                    color="neutral"
+                    variant="outline"
+                    :disabled="skyZonePreviewOptions.length === 0"
+                    @click="openSkyZonePreview"
                   />
                 </div>
-                <div class="divide-y divide-default">
-                  <div
-                    v-for="bsp in skyZoneBspMeshes"
-                    :key="bsp.name"
-                    class="flex items-center gap-3 p-3"
-                    :class="selectedBspName === bsp.name ? 'bg-primary/10' : ''"
-                  >
-                    <button
-                      type="button"
-                      class="min-w-0 flex-1 text-left"
-                      @click="selectBsp(bsp)"
-                    >
-                      <span
-                        class="block truncate text-sm font-medium text-highlighted"
-                      >
-                        {{ bsp.name }}
-                      </span>
-                      <span class="mt-1 block text-xs text-muted">
-                        {{ bsp.surfaceCount }} surfaces ·
-                        {{ bsp.triangleCount }} triangles · {{ bsp.skyZone }}
-                      </span>
-                    </button>
-                    <USwitch
-                      :model-value="skyZoneChunkVisibility[bsp.name] !== false"
-                      label="Show"
-                      :aria-label="'Show ' + bsp.name"
-                      @update:model-value="
-                        setSkyZoneChunkVisible(bsp.name, $event)
-                      "
-                    />
-                  </div>
-                </div>
+                <p
+                  v-if="skyZonePreviewOptions.length === 0"
+                  class="p-4 text-xs text-muted"
+                >
+                  No Sky Zone BSP chunks are currently published.
+                </p>
               </section>
               <section
                 v-if="worldBaseBspMeshes.length"
@@ -1376,5 +1487,50 @@ async function loadMap() {
         </UCard>
       </div>
     </template>
+
+    <StudioMapDiagnosticsSlideover
+      v-model:open="diagnosticsOpen"
+      :map-name="catalogEntry?.name ?? routeName"
+      :source-key="catalogEntry?.sourceKey ?? routeSourceKey"
+    />
+
+    <UModal
+      v-model:open="skyZonePreviewOpen"
+      title="Sky Zone preview"
+      :description="selectedSkyZoneName"
+      :ui="{ content: 'max-w-6xl' }"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <UFormField label="Sky Zone">
+            <USelect
+              v-model="selectedSkyZoneName"
+              :items="skyZonePreviewOptions"
+              class="w-full"
+            />
+          </UFormField>
+          <UAlert
+            v-if="skyZonePreviewError"
+            color="error"
+            variant="subtle"
+            title="Sky Zone preview unavailable"
+            :description="skyZonePreviewError"
+          />
+          <StudioMapPreview
+            v-if="skyZonePreviewManifest"
+            :key="selectedSkyZoneName"
+            :manifest="skyZonePreviewManifest"
+            :actors-visible="false"
+            :bsp-visible="false"
+            :sky-zone-visible="true"
+            :world-base-visible="false"
+            :light-helpers-visible="false"
+            :water-surfaces-visible="false"
+            :water-volumes-visible="false"
+            @error="skyZonePreviewError = $event"
+          />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

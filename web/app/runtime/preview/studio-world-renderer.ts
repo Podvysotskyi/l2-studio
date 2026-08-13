@@ -20,6 +20,7 @@ import {
   Sphere,
   SphereGeometry,
   SRGBColorSpace,
+  Timer,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -37,6 +38,11 @@ import {
   createTerrainMaterial,
   type TerrainMaterialController
 } from '../materials/terrain-material.js'
+import {
+  prepareStaticMeshMaterials,
+  publishedStaticMeshMaterial,
+  type StaticMeshMaterialPreparation
+} from '../materials/static-mesh-material.js'
 
 export interface StudioWorldRendererOptions {
   interactive?: boolean
@@ -53,6 +59,10 @@ export interface StudioWorldLoadOptions {
 
 type Manifest = MapManifest | SceneManifest
 type ObjectIndex = Map<string, Object3D[]>
+type MaterialTemplate = {
+  object: Object3D
+  materials: StaticMeshMaterialPreparation
+}
 
 const colors = {
   actor: 0xaab7c8,
@@ -82,7 +92,9 @@ export class StudioWorldRenderer {
   private readonly lightMarkers: ObjectIndex = new Map()
   private readonly terrainMeshes: Object3D[] = []
   private readonly terrainControllers = new Map<string, TerrainMaterialController>()
-  private readonly templates = new Map<string, Promise<Object3D>>()
+  private readonly templates = new Map<string, Promise<MaterialTemplate>>()
+  private readonly staticMeshMaterials = new Set<StaticMeshMaterialPreparation>()
+  private readonly timer = new Timer()
   private readonly raycaster = new Raycaster()
   private readonly pointer = new Vector2()
   private readonly materials = {
@@ -111,11 +123,14 @@ export class StudioWorldRenderer {
   private selectedLightName?: string
   private skyZoneChunkVisibility: Record<string, boolean> = {}
   private animationActive = false
+  private materialError?: (message: string) => void
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly options: StudioWorldRendererOptions = {}
   ) {
+    this.timer.connect(document)
+    this.timer.update()
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: true,
@@ -161,10 +176,17 @@ export class StudioWorldRenderer {
   start() {
     if (this.animationActive) return
     this.animationActive = true
-    this.renderer.setAnimationLoop(() => {
+    this.renderer.setAnimationLoop(timestamp => {
+      this.timer.update(timestamp)
       this.controls?.update()
+      this.updateMaterialState()
       this.renderer.render(this.scene, this.perspectiveCamera)
     })
+  }
+
+  private updateMaterialState() {
+    const elapsed = this.timer.getElapsed()
+    this.staticMeshMaterials.forEach(materials => materials.update(elapsed))
   }
 
   setInteractionEnabled(enabled: boolean) {
@@ -181,6 +203,7 @@ export class StudioWorldRenderer {
 
   async loadManifest(manifest: Manifest, options: StudioWorldLoadOptions = {}) {
     const version = ++this.loadVersion
+    this.materialError = options.onMaterialError
     this.clearContent()
     const activeSkyZone = [...manifest.skyZones]
       .filter(zone =>
@@ -208,7 +231,7 @@ export class StudioWorldRenderer {
           : entry.role === 'water-surface'
             ? this.materials.waterSurface
             : this.materials.bsp
-      assignMaterial(instance, material)
+      assignDiagnosticMaterial(instance, material)
       if (entry.role === 'sky-zone') this.skyZoneMeshes.set(entry.name, objects)
       else if (entry.role === 'world-base') this.worldBaseMeshes.set(entry.name, objects)
       else if (entry.role === 'water-surface') this.waterSurfaceMeshes.set(entry.name, objects)
@@ -260,7 +283,7 @@ export class StudioWorldRenderer {
               actor.drawScale3D,
               actor.prePivot
             )
-            assignMaterial(instance, this.materials.actor)
+            assignDiagnosticMaterial(instance, this.materials.actor)
             this.actorMeshes.set(actor.name, renderableObjects(instance))
             this.content.add(instance)
           } catch (error) {
@@ -298,15 +321,18 @@ export class StudioWorldRenderer {
   private async loadInstance(url: string, version: number) {
     let pending = this.templates.get(url)
     if (!pending) {
-      pending = loadPublishedGltf(url).then(template => {
-        replaceSourceMaterials(template, this.materials.actor)
-        return template
+      pending = loadPublishedGltf(url).then(async object => {
+        const materials = await prepareStaticMeshMaterials(object, this.materials.actor, url)
+        materials.warnings.forEach(message =>
+          this.materialError?.(`Static mesh material fallback: ${message}`))
+        this.staticMeshMaterials.add(materials)
+        return { object, materials }
       })
       this.templates.set(url, pending)
     }
     const template = await pending
     if (version !== this.loadVersion) return
-    const instance = template.clone(true)
+    const instance = template.object.clone(true)
     instance.name = url
     return instance
   }
@@ -505,7 +531,11 @@ export class StudioWorldRenderer {
     this.orthographicCamera.lookAt(center)
     this.orthographicCamera.updateProjectionMatrix()
     await this.renderer.compileAsync(this.scene, this.orthographicCamera)
+    this.timer.update()
+    this.updateMaterialState()
     this.renderer.render(this.scene, this.orthographicCamera)
+    this.timer.update()
+    this.updateMaterialState()
     this.renderer.render(this.scene, this.orthographicCamera)
   }
 
@@ -550,11 +580,16 @@ export class StudioWorldRenderer {
     this.terrainMeshes.length = 0
     this.terrainControllers.forEach(controller => controller.dispose())
     this.terrainControllers.clear()
+    this.staticMeshMaterials.clear()
     const templates = [...this.templates.values()]
     this.templates.clear()
     void Promise.allSettled(templates).then(results => {
       results.forEach(result => {
-        if (result.status === 'fulfilled') disposeObjects([result.value])
+        if (result.status === 'fulfilled') {
+          this.staticMeshMaterials.delete(result.value.materials)
+          result.value.materials.dispose()
+          disposeObjects([result.value.object])
+        }
       })
     })
   }
@@ -562,6 +597,7 @@ export class StudioWorldRenderer {
   dispose() {
     this.loadVersion++
     this.renderer.setAnimationLoop(null)
+    this.timer.dispose()
     this.canvas.removeEventListener('pointerup', this.selectLightAtPointer)
     this.controls?.dispose()
     this.clearContent()
@@ -614,6 +650,15 @@ function renderableObjects(root: Object3D) {
 function assignMaterial(root: Object3D, material: Material) {
   root.traverse(object => {
     if (object instanceof Mesh) object.material = material
+  })
+}
+
+function assignDiagnosticMaterial(root: Object3D, material: Material) {
+  root.traverse(object => {
+    if (!(object instanceof Mesh)) return
+    const source = Array.isArray(object.material) ? object.material : [object.material]
+    if (source.some(publishedStaticMeshMaterial)) return
+    object.material = material
   })
 }
 

@@ -3,15 +3,20 @@ import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { StudioStaticMeshRenderer } from '~/runtime'
 
 const props = defineProps<{ url: string }>()
-const emit = defineEmits<{ error: [message: string] }>()
+const emit = defineEmits<{
+  error: [message: string]
+  materialWarning: [message: string | undefined]
+}>()
 const canvas = ref<HTMLCanvasElement>()
 let preview: StudioStaticMeshRenderer | undefined
 let resizeObserver: ResizeObserver | undefined
 
 async function loadMesh() {
   if (!preview) return
+  emit('materialWarning', undefined)
   try {
-    await preview.load(props.url)
+    const warnings = await preview.load(props.url)
+    emit('materialWarning', warnings.length ? warnings.join(' ') : undefined)
   } catch (error) {
     emit(
       'error',

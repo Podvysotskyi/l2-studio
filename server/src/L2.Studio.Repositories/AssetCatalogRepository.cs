@@ -83,6 +83,74 @@ public sealed class AssetCatalogRepository(
         return json.Length == 0 ? null : Parse(json[0]);
     }
 
+    public async Task<AssetCatalogDiagnosticPage?> GetDiagnosticsAsync(
+        string gameVersion,
+        string kind,
+        string name,
+        string? sourceKey,
+        string? severity,
+        string? query,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var catalogItems = context.AssetCatalogItems.AsNoTracking()
+            .Where(item => item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind &&
+                item.Catalog.IsActive && item.Name == name);
+        if (!string.IsNullOrWhiteSpace(sourceKey))
+        {
+            var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+            catalogItems = catalogItems.Where(item => item.Source.NormalizedSourceKey == normalizedSourceKey);
+        }
+        var targets = await catalogItems.Select(item => new
+            {
+                item.Source.PublishingWorkItemId,
+                item.Source.SourceKey,
+                item.Source.PublishedAt
+            })
+            .Take(2)
+            .ToArrayAsync(cancellationToken);
+        if (targets.Length > 1)
+            throw new InvalidOperationException($"Catalog entry '{name}' is ambiguous; provide its source key.");
+        if (targets.Length == 0) return null;
+
+        var target = targets[0];
+        var workItem = await context.AssetImportWorkItems.AsNoTracking()
+            .Where(item => item.Id == target.PublishingWorkItemId)
+            .Select(item => new { item.Id, item.RunId, item.Status })
+            .SingleAsync(cancellationToken);
+        var diagnostics = context.AssetImportDiagnostics.AsNoTracking()
+            .Where(item => item.WorkItemId == workItem.Id);
+        if (!string.IsNullOrWhiteSpace(severity))
+            diagnostics = diagnostics.Where(item => item.Severity == severity);
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var search = query.Trim();
+            diagnostics = diagnostics.Where(item =>
+                EF.Functions.ToTsVector("simple",
+                    (item.SourceKey ?? string.Empty) + " " + (item.ObjectName ?? string.Empty) + " " + item.Message)
+                    .Matches(EF.Functions.WebSearchToTsQuery("simple", search)));
+        }
+        var total = await diagnostics.LongCountAsync(cancellationToken);
+        var items = await diagnostics.OrderByDescending(item => item.CreatedAt).ThenByDescending(item => item.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(item => new AssetImportDiagnosticSummary(
+                item.Id, item.RunId, item.WorkItemId, item.Severity, item.Code, item.Stage,
+                item.SourceKey, item.ObjectName, item.Message, item.CreatedAt))
+            .ToListAsync(cancellationToken);
+        return new AssetCatalogDiagnosticPage(
+            workItem.RunId,
+            workItem.Id,
+            target.SourceKey,
+            workItem.Status,
+            target.PublishedAt,
+            items,
+            total,
+            page,
+            pageSize);
+    }
+
     public async Task<AssetArtifactPage> GetArtifactsAsync(
         string gameVersion,
         string? kind,

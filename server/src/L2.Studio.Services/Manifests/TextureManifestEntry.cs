@@ -17,4 +17,12 @@ internal sealed record TextureManifestEntry(
     TextureAnimationManifestEntry? Animation = null,
     string OriginalFolder = "",
     string Path = "",
-    string SourceKey = "");
+    string SourceKey = "",
+    bool Masked = false,
+    bool AlphaTexture = false,
+    bool HasTransparency = false,
+    bool TwoSided = false,
+    TextureMaterialReference? Detail = null,
+    float DetailScale = 8,
+    bool ClampU = false,
+    bool ClampV = false);

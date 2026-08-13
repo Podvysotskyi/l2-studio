@@ -2,8 +2,8 @@ import { LoadingManager, type Object3D } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 
 const versionPathMarker = '/versions/'
-const transparentPixel =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+3MxZ5wAAAABJRU5ErkJggg=='
+const placeholderImage =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
 
 export function normalizePublishedGltfResourceUrl(url: string) {
   if (url.startsWith(`/${versionPathMarker}`)) return url.slice(1)
@@ -21,6 +21,15 @@ export function normalizePublishedGltfResourceUrl(url: string) {
   }
 }
 
+export function resolvePublishedGltfMaterialUrl(url: string, modelUrl: string) {
+  const normalized = normalizePublishedGltfResourceUrl(url)
+  try {
+    return normalizePublishedGltfResourceUrl(new URL(normalized, modelUrl).toString())
+  } catch {
+    return normalized
+  }
+}
+
 export function createPublishedGltfLoader() {
   const manager = new LoadingManager()
   manager.setURLModifier(resolveStudioGltfResourceUrl)
@@ -29,7 +38,7 @@ export function createPublishedGltfLoader() {
 
 export function resolveStudioGltfResourceUrl(url: string) {
   return /\.(?:png|jpe?g|webp|ktx2?)(?:[?#]|$)/i.test(url)
-    ? transparentPixel
+    ? placeholderImage
     : normalizePublishedGltfResourceUrl(url)
 }
 

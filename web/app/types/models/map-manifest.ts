@@ -122,6 +122,20 @@ export interface MapEnvironmentManifestEntry {
   } | null
 }
 
+export interface MapLevelSummaryManifestEntry {
+  title: string | null
+  author: string | null
+  description: string | null
+  levelEnterText: string | null
+  extraInfo: string | null
+  decoTextName: string | null
+  hideFromMenus: boolean | null
+  idealPlayerCountMin: number | null
+  idealPlayerCountMax: number | null
+  singlePlayerTeamSize: number | null
+  screenshot: string | null
+}
+
 export interface MapLightManifestEntry {
   name: string
   className: string
@@ -180,6 +194,7 @@ export interface MapManifest {
   fileName: string
   sourceHash: string
   protocol: number
+  summary?: MapLevelSummaryManifestEntry | null
   environment: MapEnvironmentManifestEntry
   terrains: MapTerrainManifestEntry[]
   actors: MapActorManifestEntry[]

@@ -78,6 +78,57 @@ public sealed class AssetCatalogsControllerTests
         Assert.Equal("Textures/Stone.utx", repository.ItemSourceKey);
     }
 
+    [Fact]
+    public async Task ReturnsDiagnosticsForThePublishedCatalogItem()
+    {
+        var expected = new AssetCatalogDiagnosticPage(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Maps/16_25.unr",
+            "succeeded_with_warnings",
+            DateTimeOffset.UnixEpoch,
+            [],
+            17,
+            2,
+            25);
+        var repository = new StubAssetCatalogRepository { DiagnosticResult = expected };
+        var controller = new AssetCatalogsController(repository);
+        using var cancellation = new CancellationTokenSource();
+
+        var result = await controller.GetDiagnostics(
+            "c1", "maps", "16_25", "Maps/16_25.unr", "warning", "BSP", 2, 25, cancellation.Token);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("maps", repository.DiagnosticKind);
+        Assert.Equal("16_25", repository.DiagnosticName);
+        Assert.Equal("Maps/16_25.unr", repository.DiagnosticSourceKey);
+        Assert.Equal("warning", repository.DiagnosticSeverity);
+        Assert.Equal("BSP", repository.DiagnosticQuery);
+        Assert.Equal(2, repository.DiagnosticPage);
+        Assert.Equal(25, repository.DiagnosticPageSize);
+        Assert.Equal(cancellation.Token, repository.DiagnosticToken);
+    }
+
+    [Fact]
+    public async Task ValidatesCatalogDiagnosticFilters()
+    {
+        var repository = new StubAssetCatalogRepository();
+        var controller = new AssetCatalogsController(repository);
+
+        var severity = await controller.GetDiagnostics(
+            "c1", "maps", "16_25", null, "notice", null, 1, 25, CancellationToken.None);
+        var pageSize = await controller.GetDiagnostics(
+            "c1", "maps", "16_25", null, null, null, 1, 101, CancellationToken.None);
+
+        var severityProblem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(severity.Result).Value);
+        var pageSizeProblem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(pageSize.Result).Value);
+        Assert.Equal("Severity must be warning or error.", Assert.Single(severityProblem.Errors["severity"]));
+        Assert.Equal("Page size must be between 1 and 100.", Assert.Single(pageSizeProblem.Errors["pageSize"]));
+        Assert.False(repository.DiagnosticsRequested);
+    }
+
     private static AssetCatalogSummary Summary() => new(
         "textures", "Textures", "hash", 1, 1, 10, 9, 1, 2, DateTimeOffset.UnixEpoch);
 
@@ -85,6 +136,7 @@ public sealed class AssetCatalogsControllerTests
     {
         public AssetCatalogPage? SearchResult { get; init; }
         public JsonElement? ItemResult { get; init; }
+        public AssetCatalogDiagnosticPage? DiagnosticResult { get; init; }
         public string? SearchKind { get; private set; }
         public string? SearchQuery { get; private set; }
         public string? SearchGroupName { get; private set; }
@@ -95,6 +147,15 @@ public sealed class AssetCatalogsControllerTests
         public string? ItemKind { get; private set; }
         public string? ItemName { get; private set; }
         public string? ItemSourceKey { get; private set; }
+        public bool DiagnosticsRequested { get; private set; }
+        public string? DiagnosticKind { get; private set; }
+        public string? DiagnosticName { get; private set; }
+        public string? DiagnosticSourceKey { get; private set; }
+        public string? DiagnosticSeverity { get; private set; }
+        public string? DiagnosticQuery { get; private set; }
+        public int DiagnosticPage { get; private set; }
+        public int DiagnosticPageSize { get; private set; }
+        public CancellationToken DiagnosticToken { get; private set; }
 
         public Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(string gameVersion, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<AssetCatalogSummary>>([]);
@@ -126,6 +187,29 @@ public sealed class AssetCatalogsControllerTests
             ItemName = name;
             ItemSourceKey = sourceKey;
             return Task.FromResult(ItemResult);
+        }
+
+        public Task<AssetCatalogDiagnosticPage?> GetDiagnosticsAsync(
+            string gameVersion,
+            string kind,
+            string name,
+            string? sourceKey,
+            string? severity,
+            string? query,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken)
+        {
+            DiagnosticsRequested = true;
+            DiagnosticKind = kind;
+            DiagnosticName = name;
+            DiagnosticSourceKey = sourceKey;
+            DiagnosticSeverity = severity;
+            DiagnosticQuery = query;
+            DiagnosticPage = page;
+            DiagnosticPageSize = pageSize;
+            DiagnosticToken = cancellationToken;
+            return Task.FromResult(DiagnosticResult);
         }
 
         public Task<AssetArtifactPage> GetArtifactsAsync(

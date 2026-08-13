@@ -6,6 +6,7 @@ import type {
   AssetImportKind
 } from '../types/models/asset-catalog'
 import type {
+  AssetCatalogDiagnosticPage,
   AssetImportDiagnostic,
   AssetImportJob,
   AssetImportPage,
@@ -279,6 +280,34 @@ export async function getAssetCatalogEntry<T>(
     { query: sourceKey ? { sourceKey } : undefined }
   ) as T
   return resolvePublishedAssetUrls(entry, String(useRuntimeConfig().public.assetBaseUrl))
+}
+
+export function getAssetCatalogDiagnostics(
+  kind: AssetImportKind,
+  name: string,
+  request: {
+    sourceKey?: string
+    severity?: 'warning' | 'error'
+    query?: string
+    page?: number
+    pageSize?: number
+  } = {}
+): Promise<AssetCatalogDiagnosticPage> {
+  const query = request.query?.trim()
+  return $fetch<AssetCatalogDiagnosticPage>(
+    versionPath(
+      `/assets/${kind}/catalog/${encodeURIComponent(name)}/diagnostics`
+    ),
+    {
+      query: {
+        ...(request.sourceKey ? { sourceKey: request.sourceKey } : {}),
+        ...(request.severity ? { severity: request.severity } : {}),
+        ...(query ? { query } : {}),
+        page: request.page ?? 1,
+        pageSize: request.pageSize ?? 25
+      }
+    }
+  )
 }
 
 export function getAssetImportJobs(

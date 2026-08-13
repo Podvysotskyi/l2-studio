@@ -115,12 +115,20 @@ internal sealed class StaticMeshMaterialResolver
                     texture.Url,
                     null,
                     null,
-                    StaticMeshBlendMode.Opaque,
-                    false,
+                    texture.Masked
+                        ? StaticMeshBlendMode.Masked
+                        : texture.AlphaTexture || texture.HasTransparency
+                            ? StaticMeshBlendMode.AlphaBlend
+                            : StaticMeshBlendMode.Opaque,
+                    texture.TwoSided,
                     0.5f,
                     true,
                     true,
-                    DiffuseAnimation: Animation(texture));
+                    DetailUrl: ResolveTextureUrl(texture.Detail),
+                    DetailScale: texture.DetailScale,
+                    DiffuseAnimation: Animation(texture),
+                    ClampU: texture.ClampU,
+                    ClampV: texture.ClampV);
             }
             if (!materials.TryGetValue(key, out var material))
             {
@@ -324,6 +332,14 @@ internal sealed class StaticMeshMaterialResolver
             : animation.MinFrameRate;
         return frameRate > 0
             ? new StaticMeshTextureAnimation(animation.FrameUrls, frameRate)
+            : null;
+    }
+
+    private string? ResolveTextureUrl(TextureMaterialReference? reference)
+    {
+        if (reference is null) return null;
+        return textures.TryGetValue(Key(reference.PackageName, reference.ObjectName), out var texture)
+            ? texture.Url
             : null;
     }
 

@@ -46,6 +46,14 @@ docker compose build
 
 Environment-specific API settings belong in `server/src/L2.Studio.Api/appsettings.<Environment>.json`; environment variables may override them through standard ASP.NET Core configuration. Never commit tokens, non-development credentials, original game sources, or generated private assets.
 
+## Local client fixtures
+
+For read-only investigation and local import validation, the Lineage II C1
+Harbingers of War client resources are available at
+`/home/serhii/Downloads/L2/C1_Harbingers_of_War/`; map packages are under
+`MAPS/`. Treat this directory as local source material only: never copy its
+original resources into the repository or commit them.
+
 ## Conventions
 
 Use UTF-8 and LF endings. TypeScript and Vue use two-space indentation, single quotes, no semicolons, and no trailing commas. Preserve established C# formatting and nullable-reference-type safety.

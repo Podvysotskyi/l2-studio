@@ -53,4 +53,45 @@ public sealed class UnrealModelSurfaceLayoutDecoderTests
 
         Assert.Same(preferred, exception);
     }
+
+    [Fact]
+    public void SelectsTheHigherScoringLayoutWhenBothDecode()
+    {
+        var layouts = new List<int>();
+
+        var result = UnrealModelSurfaceLayoutDecoder.DecodeBest(
+            layout =>
+            {
+                layouts.Add(layout);
+                return layout;
+            },
+            (left, right) => left == UnrealModelSurfaceLayoutDecoder.StockSurfaceBytes ? 1 : -1);
+
+        Assert.Equal(UnrealModelSurfaceLayoutDecoder.StockSurfaceBytes, result);
+        Assert.Equal(
+            [UnrealModelSurfaceLayoutDecoder.LineageSurfaceBytes, UnrealModelSurfaceLayoutDecoder.StockSurfaceBytes],
+            layouts);
+    }
+
+    [Fact]
+    public void RetainsThePreferredLayoutWhenScoresTie()
+    {
+        var result = UnrealModelSurfaceLayoutDecoder.DecodeBest(
+            layout => layout,
+            (_, _) => 0);
+
+        Assert.Equal(UnrealModelSurfaceLayoutDecoder.LineageSurfaceBytes, result);
+    }
+
+    [Fact]
+    public void SelectsTheOnlyLayoutThatDecodesDuringScoring()
+    {
+        var result = UnrealModelSurfaceLayoutDecoder.DecodeBest(
+            layout => layout == UnrealModelSurfaceLayoutDecoder.LineageSurfaceBytes
+                ? throw new InvalidDataException("extended layout does not match")
+                : layout,
+            Comparer<int>.Default.Compare);
+
+        Assert.Equal(UnrealModelSurfaceLayoutDecoder.StockSurfaceBytes, result);
+    }
 }

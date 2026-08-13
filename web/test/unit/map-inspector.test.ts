@@ -1,5 +1,6 @@
 import type {
   MapLightManifestEntry,
+  MapManifest,
   MapTerrainManifestEntry,
   MapWaterVolumeManifestEntry
 } from '~/types/studio'
@@ -9,7 +10,11 @@ import {
   enableAllTerrainLayers,
   filterMapLights,
   filterMapWaterVolumes,
+  hasMapLevelSummaryData,
+  mapSkyZonePreviewManifest,
+  mapIdealPlayerCount,
   mapEnvironmentColor,
+  previewableMapSkyZones,
   setTerrainLayerEnabled,
   toggleSoloTerrainLayer
 } from '../../app/utils/map-inspector'
@@ -31,6 +36,36 @@ describe('map inspector', () => {
       css: 'rgb(0 128 255)',
       label: 'RGB 0, 128, 255'
     })
+  })
+
+  it('formats authored level-summary player ranges and detects empty summaries', () => {
+    const empty = {
+      title: null,
+      author: null,
+      description: null,
+      levelEnterText: null,
+      extraInfo: null,
+      decoTextName: null,
+      hideFromMenus: null,
+      idealPlayerCountMin: null,
+      idealPlayerCountMax: null,
+      singlePlayerTeamSize: null,
+      screenshot: null
+    }
+
+    expect(mapIdealPlayerCount(empty)).toBeNull()
+    expect(hasMapLevelSummaryData(empty)).toBe(false)
+    expect(mapIdealPlayerCount({ ...empty, idealPlayerCountMin: 2 })).toBe('2+')
+    expect(
+      mapIdealPlayerCount({
+        ...empty,
+        idealPlayerCountMin: 2,
+        idealPlayerCountMax: 8
+      })
+    ).toBe('2–8')
+    expect(hasMapLevelSummaryData({ ...empty, hideFromMenus: false })).toBe(
+      true
+    )
   })
 
   it('initializes every imported terrain layer as enabled', () => {
@@ -80,5 +115,60 @@ describe('map inspector', () => {
     expect(filterMapWaterVolumes(volumes, 'watervolume1')).toEqual([
       volumes[1]
     ])
+  })
+
+  it('selects published Sky Zones by priority and isolates their preview manifest', () => {
+    const manifest = {
+      skyZones: [
+        { name: 'Lower', order: 1 },
+        { name: 'Higher', order: 2 },
+        { name: 'Unavailable', order: 3 }
+      ],
+      bspMeshes: [
+        {
+          name: 'Lower0',
+          role: 'sky-zone',
+          skyZone: 'Lower',
+          meshUrl: '/lower.glb'
+        },
+        {
+          name: 'Higher0',
+          role: 'sky-zone',
+          skyZone: 'Higher',
+          meshUrl: '/higher.glb'
+        },
+        {
+          name: 'Higher1',
+          role: 'sky-zone',
+          skyZone: 'Higher',
+          meshUrl: null
+        },
+        {
+          name: 'World0',
+          role: 'geometry',
+          skyZone: null,
+          meshUrl: '/world.glb'
+        }
+      ],
+      terrains: [{}],
+      actors: [{}],
+      lights: [{}],
+      waterVolumes: [{}]
+    } as MapManifest
+
+    expect(previewableMapSkyZones(manifest).map((zone) => zone.name)).toEqual([
+      'Higher',
+      'Lower'
+    ])
+
+    expect(mapSkyZonePreviewManifest(manifest, 'Higher')).toMatchObject({
+      skyZones: [{ name: 'Higher' }],
+      bspMeshes: [{ name: 'Higher0' }],
+      terrains: [],
+      actors: [],
+      lights: [],
+      waterVolumes: []
+    })
+    expect(mapSkyZonePreviewManifest(manifest, 'Unavailable')).toBeUndefined()
   })
 })

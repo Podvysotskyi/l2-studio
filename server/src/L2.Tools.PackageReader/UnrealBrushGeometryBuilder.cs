@@ -13,6 +13,7 @@ public static class UnrealBrushGeometryBuilder
         var normals = new List<Vector3>();
         var indices = new List<ushort>();
         var edges = new Dictionary<(int A, int B), int>();
+        var canonicalPoints = new Dictionary<Vector3, int>();
         foreach (var face in faces)
         {
             if (face.PointIndices.Count < 3)
@@ -23,19 +24,28 @@ public static class UnrealBrushGeometryBuilder
             var normal = face.Normal.LengthSquared() > 0 ? Vector3.Normalize(face.Normal) : Vector3.Zero;
             if (!Finite(normal) || normal == Vector3.Zero)
                 throw new InvalidDataException($"Brush model '{name}' contains an invalid face normal.");
-            foreach (var pointIndex in face.PointIndices)
+            var canonicalIndices = new int[face.PointIndices.Count];
+            for (var index = 0; index < face.PointIndices.Count; index++)
             {
+                var pointIndex = face.PointIndices[index];
                 if (pointIndex < 0 || pointIndex >= points.Count)
                     throw new InvalidDataException($"Brush model '{name}' contains an invalid point index {pointIndex}.");
-                if (!Finite(points[pointIndex]))
+                var point = points[pointIndex];
+                if (!Finite(point))
                     throw new InvalidDataException($"Brush model '{name}' contains a non-finite coordinate.");
-                positions.Add(points[pointIndex]);
+                if (!canonicalPoints.TryGetValue(point, out var canonicalIndex))
+                {
+                    canonicalIndex = canonicalPoints.Count;
+                    canonicalPoints.Add(point, canonicalIndex);
+                }
+                canonicalIndices[index] = canonicalIndex;
+                positions.Add(point);
                 normals.Add(normal);
             }
             for (var index = 0; index < face.PointIndices.Count; index++)
             {
-                var a = face.PointIndices[index];
-                var b = face.PointIndices[(index + 1) % face.PointIndices.Count];
+                var a = canonicalIndices[index];
+                var b = canonicalIndices[(index + 1) % canonicalIndices.Length];
                 if (a == b) throw new InvalidDataException($"Brush model '{name}' contains a zero-length edge.");
                 var edge = a < b ? (a, b) : (b, a);
                 edges[edge] = edges.GetValueOrDefault(edge) + 1;

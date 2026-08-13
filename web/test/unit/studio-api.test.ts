@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  getAssetCatalogDiagnostics,
   getAssetImportDiagnostics,
   getAssetArtifact,
   getAssetArtifacts,
@@ -97,6 +98,30 @@ describe('Studio API service', () => {
           scope: 'run',
           page: 2,
           pageSize: 50
+        }
+      }
+    )
+  })
+
+  it('loads diagnostics for the exact published catalog item', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 25 })
+
+    await getAssetCatalogDiagnostics('maps', '16 25', {
+      sourceKey: 'Maps/16_25.unr',
+      severity: 'warning',
+      query: ' BSP ',
+      page: 2
+    })
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/maps/catalog/16%2025/diagnostics',
+      {
+        query: {
+          sourceKey: 'Maps/16_25.unr',
+          severity: 'warning',
+          query: 'BSP',
+          page: 2,
+          pageSize: 25
         }
       }
     )

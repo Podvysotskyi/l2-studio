@@ -47,6 +47,7 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/library/maps')
     expect(routes).toContain('/pipeline/storage')
     expect(routes).toContain('/pipeline/releases')
+    expect(routes).toContain('/monitoring/stale-resources')
     expect(routes).not.toContain('/content/npcs')
     expect(routes).not.toContain('/assets/maps')
     expect(routes).not.toContain('/storage')
@@ -91,6 +92,7 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/library/maps/17_25')).toBe('Map')
     expect(studioRouteTitle('/library/scenes/lobby')).toBe('Client scene')
     expect(studioRouteTitle('/pipeline/releases')).toBe('Asset releases')
+    expect(studioRouteTitle('/monitoring/stale-resources')).toBe('Stale resources')
   })
 })
 

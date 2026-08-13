@@ -31,7 +31,7 @@ Server discovers that pointer but does not query Studio persistence. Any future
 game-content ingestion uses an explicit receiving contract owned by Server.
 Web owns a local browser representation of published manifests and resolves
 their resources through the configured asset origin. Studio owns a separate
-Three.js diagnostic renderer for geometry inspection, authored terrain layers,
+Three.js renderer for static-mesh material inspection, authored terrain layers,
 and generated map previews. It validates the same published formats without
 sharing rendering code or fidelity requirements with Web's Babylon runtime.
 

@@ -159,6 +159,15 @@ export const studioNavigation: NavigationMenuItem[] = [
         to: '/pipeline/releases'
       }
     ]
+  },
+  {
+    label: 'Monitoring',
+    type: 'label'
+  },
+  {
+    label: 'Stale resources',
+    icon: 'i-lucide-triangle-alert',
+    to: '/monitoring/stale-resources'
   }
 ]
 
@@ -207,5 +216,6 @@ export function studioRouteTitle(path: string) {
   if (path === '/pipeline/artifacts') return 'Generated-asset registry'
   if (path === '/pipeline/releases') return 'Asset releases'
   if (path === '/pipeline/storage') return 'File storage'
+  if (path === '/monitoring/stale-resources') return 'Stale resources'
   return 'Studio'
 }

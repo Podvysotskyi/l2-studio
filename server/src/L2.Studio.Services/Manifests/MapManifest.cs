@@ -6,6 +6,7 @@ internal sealed record MapManifest(
     string FileName,
     string SourceHash,
     int Protocol,
+    MapLevelSummaryManifestEntry? Summary,
     MapEnvironmentManifestEntry Environment,
     IReadOnlyList<MapTerrainManifestEntry> Terrains,
     IReadOnlyList<MapActorManifestEntry> Actors,

@@ -10,6 +10,8 @@ public sealed record UnrealLevel(
     IReadOnlyDictionary<string, int> UnrepresentedObjectClasses,
     UnrealLevelEnvironment? Environment = null,
     string? EnvironmentWarning = null,
+    UnrealLevelSummary? Summary = null,
+    string? SummaryWarning = null,
     IReadOnlyList<UnrealBspModel>? BspModelData = null,
     IReadOnlyList<UnrealSkyZoneInfo>? SkyZoneData = null)
 {

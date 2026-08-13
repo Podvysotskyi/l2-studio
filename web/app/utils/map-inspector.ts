@@ -1,6 +1,8 @@
 import type {
   MapEnvironmentManifestEntry,
+  MapLevelSummaryManifestEntry,
   MapLightManifestEntry,
+  MapManifest,
   MapTerrainManifestEntry,
   MapWaterVolumeManifestEntry
 } from '~/types/studio'
@@ -14,6 +16,34 @@ export interface TerrainLayerState {
 export type TerrainLayerStates = Record<string, TerrainLayerState>
 
 type MapEnvironmentColor = MapEnvironmentManifestEntry['ambientColor']
+
+export function mapIdealPlayerCount(
+  summary: MapLevelSummaryManifestEntry | null | undefined
+) {
+  if (!summary) return null
+  const { idealPlayerCountMin: min, idealPlayerCountMax: max } = summary
+  if (min === null && max === null) return null
+  if (min === null) return `Up to ${max}`
+  if (max === null) return `${min}+`
+  return min === max ? `${min}` : `${min}–${max}`
+}
+
+export function hasMapLevelSummaryData(
+  summary: MapLevelSummaryManifestEntry
+) {
+  return Boolean(
+    summary.title ||
+      summary.author ||
+      summary.description ||
+      summary.levelEnterText ||
+      summary.extraInfo ||
+      summary.decoTextName ||
+      summary.hideFromMenus !== null ||
+      mapIdealPlayerCount(summary) !== null ||
+      summary.singlePlayerTeamSize !== null ||
+      summary.screenshot
+  )
+}
 
 export function mapEnvironmentColor(color: MapEnvironmentColor) {
   const channels = [color.r, color.g, color.b].map((channel) =>
@@ -99,4 +129,42 @@ export function filterMapWaterVolumes(
       volume.className.toLowerCase().includes(normalized) ||
       volume.brushName?.toLowerCase().includes(normalized)
   )
+}
+
+export function previewableMapSkyZones(manifest: MapManifest) {
+  return [...manifest.skyZones]
+    .filter((zone) =>
+      manifest.bspMeshes.some(
+        (mesh) =>
+          mesh.role === 'sky-zone' &&
+          mesh.skyZone === zone.name &&
+          Boolean(mesh.meshUrl)
+      )
+    )
+    .sort((left, right) => right.order - left.order)
+}
+
+export function mapSkyZonePreviewManifest(
+  manifest: MapManifest,
+  skyZoneName: string | undefined
+) {
+  const skyZone = previewableMapSkyZones(manifest).find(
+    (zone) => zone.name === skyZoneName
+  )
+  if (!skyZone) return undefined
+
+  return {
+    ...manifest,
+    terrains: [],
+    actors: [],
+    lights: [],
+    waterVolumes: [],
+    skyZones: [skyZone],
+    bspMeshes: manifest.bspMeshes.filter(
+      (mesh) =>
+        mesh.role === 'sky-zone' &&
+        mesh.skyZone === skyZone.name &&
+        Boolean(mesh.meshUrl)
+    )
+  }
 }

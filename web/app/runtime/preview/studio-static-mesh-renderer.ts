@@ -9,6 +9,7 @@ import {
   Scene,
   Sphere,
   SRGBColorSpace,
+  Timer,
   Vector3,
   WebGLRenderer,
   type Material,
@@ -17,6 +18,10 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { loadPublishedGltf } from '../core/published-gltf.js'
+import {
+  prepareStaticMeshMaterials,
+  type StaticMeshMaterialPreparation
+} from '../materials/static-mesh-material.js'
 
 export const studioStaticMeshMaterialOptions = {
   color: 0xaab7c8,
@@ -46,10 +51,13 @@ export class StudioStaticMeshRenderer {
   private readonly camera = new PerspectiveCamera(45, 1, 0.01, 1_000_000)
   private readonly controls: OrbitControls
   private readonly material = createStudioStaticMeshMaterial()
+  private readonly timer = new Timer()
   private object?: Object3D
+  private materials?: StaticMeshMaterialPreparation
   private loadVersion = 0
 
   constructor(private readonly canvas: HTMLCanvasElement) {
+    this.timer.connect(document)
     this.renderer = new WebGLRenderer({ canvas, antialias: true })
     this.renderer.outputColorSpace = SRGBColorSpace
     this.renderer.setClearColor(0x09101d, 1)
@@ -61,8 +69,10 @@ export class StudioStaticMeshRenderer {
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
     this.controls.zoomToCursor = true
-    this.renderer.setAnimationLoop(() => {
+    this.renderer.setAnimationLoop(timestamp => {
+      this.timer.update(timestamp)
       this.controls.update()
+      this.materials?.update(this.timer.getElapsed())
       this.renderer.render(this.scene, this.camera)
     })
     this.resize()
@@ -76,22 +86,21 @@ export class StudioStaticMeshRenderer {
     this.camera.updateProjectionMatrix()
   }
 
-  async load(url: string) {
+  async load(url: string): Promise<string[]> {
     const version = ++this.loadVersion
     this.removeObject()
     const object = await loadPublishedGltf(url)
     if (version !== this.loadVersion) {
       disposeObject(object, true)
-      return
+      return []
     }
-    object.traverse(child => {
-      if (!(child instanceof Mesh)) return
-      const source = Array.isArray(child.material)
-        ? child.material
-        : [child.material]
-      source.forEach(disposeMaterial)
-      child.material = this.material
-    })
+    const materials = await prepareStaticMeshMaterials(object, this.material, url)
+    if (version !== this.loadVersion) {
+      materials.dispose()
+      disposeObject(object, true)
+      return []
+    }
+    this.materials = materials
     this.object = object
     this.scene.add(object)
     const bounds = new Box3().setFromObject(object, true)
@@ -108,11 +117,14 @@ export class StudioStaticMeshRenderer {
     this.camera.far = Math.max(distance * 20, 100)
     this.camera.updateProjectionMatrix()
     this.controls.update()
+    return materials.warnings
   }
 
   private removeObject() {
     if (!this.object) return
     this.scene.remove(this.object)
+    this.materials?.dispose()
+    this.materials = undefined
     disposeObject(this.object, false)
     this.object = undefined
   }
@@ -120,6 +132,7 @@ export class StudioStaticMeshRenderer {
   dispose() {
     this.loadVersion++
     this.renderer.setAnimationLoop(null)
+    this.timer.dispose()
     this.controls.dispose()
     this.removeObject()
     this.material.dispose()

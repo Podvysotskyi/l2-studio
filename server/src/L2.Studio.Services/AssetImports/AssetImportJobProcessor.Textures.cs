@@ -153,7 +153,15 @@ public sealed partial class AssetImportJobProcessor
                                 texture.MipLevels.Count,
                                 OriginalFolder: package.OriginalFolder,
                                 Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}",
-                                SourceKey: job.SourceKey));
+                                SourceKey: job.SourceKey,
+                                Masked: export.Masked,
+                                AlphaTexture: export.AlphaTexture,
+                                HasTransparency: result.HasTransparency,
+                                TwoSided: export.TwoSided,
+                                Detail: Reference(export.Detail, package.Name),
+                                DetailScale: export.DetailScale,
+                                ClampU: export.UClampMode != 0,
+                                ClampV: export.VClampMode != 0));
                         }
                         else
                         {
@@ -174,7 +182,14 @@ public sealed partial class AssetImportJobProcessor
                                 MipCount: export.MipCount,
                                 OriginalFolder: package.OriginalFolder,
                                 Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}",
-                                SourceKey: job.SourceKey));
+                                SourceKey: job.SourceKey,
+                                Masked: export.Masked,
+                                AlphaTexture: export.AlphaTexture,
+                                TwoSided: export.TwoSided,
+                                Detail: Reference(export.Detail, package.Name),
+                                DetailScale: export.DetailScale,
+                                ClampU: export.UClampMode != 0,
+                                ClampV: export.VClampMode != 0));
                             job.SkippedCount++;
                         }
 
@@ -202,7 +217,7 @@ public sealed partial class AssetImportJobProcessor
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 8, 121, catalogGroups, entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 9, 121, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new TextureCatalogMetadata(materialEntries), cancellationToken);
             job.Status = warnings.Count == 0
@@ -307,6 +322,15 @@ public sealed partial class AssetImportJobProcessor
         }
     }
 
+    private static TextureMaterialReference? Reference(
+        UnrealObjectReference? reference,
+        string currentPackage) => reference is null
+        ? null
+        : new TextureMaterialReference(
+            string.IsNullOrEmpty(reference.PackageName) ? currentPackage : reference.PackageName,
+            reference.ObjectName,
+            reference.ClassName);
+
     private static void EnsureUniqueMeshNames(string packageName, IReadOnlyList<UnrealStaticMesh> meshes)
     {
         var duplicate = meshes
@@ -386,7 +410,12 @@ public sealed partial class AssetImportJobProcessor
 
             var texture = export.Texture ?? throw new InvalidDataException(
                 $"Texture '{export.Name}' has no supported pixel payload.");
-            var image = await WebpTextureEncoder.EncodeLosslessAsync(texture, cancellationToken);
+            var pixels = DxtDecoder.Decode(texture);
+            var image = await WebpTextureEncoder.EncodeRgbaLosslessAsync(
+                pixels,
+                texture.Width,
+                texture.Height,
+                cancellationToken);
             var gpuImage = KtxTextureEncoder.CanEncode(texture)
                 ? KtxTextureEncoder.Encode(texture)
                 : null;
@@ -408,7 +437,8 @@ public sealed partial class AssetImportJobProcessor
                 gpuImageHash,
                 Convert.ToHexStringLower(versionHasher.GetHashAndReset()),
                 null,
-                false);
+                false,
+                pixels.Any(pixel => pixel.A < byte.MaxValue));
         }
         catch (InvalidDataException exception)
         {

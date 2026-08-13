@@ -18,6 +18,10 @@ body {
 }
 
 .studio-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
   width: 100%;
   padding: clamp(1.25rem, 3vw, 2.5rem);
 }

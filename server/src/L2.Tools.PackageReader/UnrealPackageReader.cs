@@ -198,11 +198,21 @@ public sealed class UnrealPackageReader
         var effects = new List<UnrealSceneObject>();
         var skyZones = new List<UnrealSkyZoneInfo>();
         var environmentCandidates = new List<(UnrealLevelEnvironment Environment, bool TerrainZone)>();
+        var summaryCandidates = exports.Where(export =>
+            export.PackageIndex == 0 &&
+            string.Equals(
+                ResolveClassName(export.ClassIndex, exports),
+                "LevelSummary",
+                StringComparison.OrdinalIgnoreCase)).ToArray();
         var unrepresented = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var exportIndex = 0; exportIndex < exports.Count; exportIndex++)
         {
             var export = exports[exportIndex];
             var className = ResolveClassName(export.ClassIndex, exports);
+            if (string.Equals(className, "LevelSummary", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
             var sceneCollection = SceneCollection(
                 className,
                 cameras,
@@ -425,6 +435,7 @@ public sealed class UnrealPackageReader
         var environmentWarning = terrainZones.Length == 1 || (terrainZones.Length == 0 && levelInfos.Length == 1)
             ? null
             : $"Expected one active terrain zone but found {terrainZones.Length}.";
+        var (summary, summaryWarning) = ReadLevelSummary(summaryCandidates, exports);
 
         return new UnrealScene(
             new UnrealLevel(
@@ -435,6 +446,8 @@ public sealed class UnrealPackageReader
                 unrepresented,
                 selectedEnvironment,
                 environmentWarning,
+                summary,
+                summaryWarning,
                 ReadBspModels(exports, skyZones, waterVolumes),
                 skyZones),
             skyZones,
@@ -592,8 +605,45 @@ public sealed class UnrealPackageReader
     }
 
     private static bool IsStructuralWorldClass(string className) => className is
-        "Level" or "Model" or "Polys" or "Brush" or "TerrainSector" or
+        "Level" or "LevelSummary" or "Model" or "Polys" or "Brush" or "TerrainSector" or
         "StaticMeshInstance" or "ReachSpec";
+
+    private (UnrealLevelSummary? Summary, string? Warning) ReadLevelSummary(
+        IReadOnlyList<ExportEntry> candidates,
+        IReadOnlyList<ExportEntry> exports)
+    {
+        if (candidates.Count == 0)
+        {
+            return (null, "No top-level LevelSummary export was found.");
+        }
+
+        if (candidates.Count != 1)
+        {
+            return (null, $"Expected one top-level LevelSummary export but found {candidates.Count}.");
+        }
+
+        var summary = candidates[0];
+        try
+        {
+            var properties = ReadObjectProperties(summary, exports, requireComplete: true).Values;
+            return (new UnrealLevelSummary(
+                String(properties, "Title"),
+                String(properties, "Author"),
+                String(properties, "Description"),
+                String(properties, "LevelEnterText"),
+                String(properties, "ExtraInfo"),
+                String(properties, "DecoTextName"),
+                BoolValue(properties, "HideFromMenus"),
+                Int(properties, "IdealPlayerCountMin"),
+                Int(properties, "IdealPlayerCountMax"),
+                Int(properties, "SinglePlayerTeamSize"),
+                Object(properties, "Screenshot")), null);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or OverflowException)
+        {
+            return (null, $"LevelSummary '{ResolveObjectPath(summary, exports)}' could not be decoded: {exception.Message}");
+        }
+    }
 
     private IReadOnlyList<UnrealSkyBackdrop> ReadSkyBackdrops(IReadOnlyList<ExportEntry> exports)
     {
@@ -669,21 +719,72 @@ public sealed class UnrealPackageReader
             throw new InvalidDataException($"BSP model '{name}' has an invalid serialized range.");
 
         // Lineage II packages exist with and without the four-byte per-surface
-        // extension after UE2's light-map scale. Prefer the common extended
-        // layout, then retry the stock UE2 layout when its following arrays do
-        // not decode structurally.
-        return UnrealModelSurfaceLayoutDecoder.Decode(lineageSurfaceBytes =>
+        // extension after UE2's light-map scale. Decode both layouts and select
+        // the candidate whose node, surface, vertex, and point references are
+        // structurally coherent.
+        return UnrealModelSurfaceLayoutDecoder.DecodeBest(
+            lineageSurfaceBytes =>
+            {
+                var nativeOffset = checked(model.SerialOffset + 1);
+                var reader = new PackageCursor(data, nativeOffset, model.SerialSize - 1);
+                reader.Skip(25 + 16);
+                var vectors = ReadVectorArray(reader, "model vectors");
+                var points = ReadVectorArray(reader, "model points");
+                var nodes = ReadBrushNodes(reader);
+                var surfaces = ReadBrushSurfaces(reader, exports, lineageSurfaceBytes);
+                var vertices = ReadBrushVertices(reader);
+                return new UnrealModelData(name, vectors, points, nodes, surfaces, vertices);
+            },
+            CompareModelLayouts);
+    }
+
+    private static int CompareModelLayouts(UnrealModelData left, UnrealModelData right)
+    {
+        var leftScore = ModelLayoutScore(left);
+        var rightScore = ModelLayoutScore(right);
+        var invalidComparison = rightScore.InvalidNodeCount.CompareTo(leftScore.InvalidNodeCount);
+        return invalidComparison != 0
+            ? invalidComparison
+            : leftScore.ValidNodeCount.CompareTo(rightScore.ValidNodeCount);
+    }
+
+    private static (int InvalidNodeCount, int ValidNodeCount) ModelLayoutScore(UnrealModelData model)
+    {
+        var invalid = 0;
+        var valid = 0;
+        foreach (var node in model.Nodes.Where(node => node.VertexCount > 0))
         {
-            var nativeOffset = checked(model.SerialOffset + 1);
-            var reader = new PackageCursor(data, nativeOffset, model.SerialSize - 1);
-            reader.Skip(25 + 16);
-            var vectors = ReadVectorArray(reader, "model vectors");
-            var points = ReadVectorArray(reader, "model points");
-            var nodes = ReadBrushNodes(reader);
-            var surfaces = ReadBrushSurfaces(reader, exports, lineageSurfaceBytes);
-            var vertices = ReadBrushVertices(reader);
-            return new UnrealModelData(name, vectors, points, nodes, surfaces, vertices);
-        });
+            if (node.Surface < 0 || node.Surface >= model.Surfaces.Count ||
+                node.VertexCount < 3 ||
+                node.VertexPool < 0 ||
+                node.VertexPool > model.Vertices.Count - node.VertexCount ||
+                !IsFinite(node.Normal) ||
+                node.Normal.LengthSquared() <= 1e-8f)
+            {
+                invalid++;
+                continue;
+            }
+
+            var surface = model.Surfaces[node.Surface];
+            if (surface.BasePoint < 0 || surface.BasePoint >= model.Points.Count ||
+                surface.TextureU < 0 || surface.TextureU >= model.Vectors.Count ||
+                surface.TextureV < 0 || surface.TextureV >= model.Vectors.Count ||
+                !IsFinite(model.Points[surface.BasePoint]) ||
+                !IsFinite(model.Vectors[surface.TextureU]) ||
+                !IsFinite(model.Vectors[surface.TextureV]) ||
+                model.Vertices
+                    .Skip(node.VertexPool)
+                    .Take(node.VertexCount)
+                    .Any(index => index < 0 || index >= model.Points.Count || !IsFinite(model.Points[index])))
+            {
+                invalid++;
+                continue;
+            }
+
+            valid++;
+        }
+
+        return (invalid, valid);
     }
 
     private UnrealBrushGeometry ReadBrushGeometry(
@@ -1443,6 +1544,15 @@ public sealed class UnrealPackageReader
     private static float Float(IReadOnlyDictionary<string, object?> properties, string name, float fallback) =>
         properties.TryGetValue(name, out var value) && value is float number ? number : fallback;
 
+    private static int? Int(IReadOnlyDictionary<string, object?> properties, string name) =>
+        properties.TryGetValue(name, out var value) && value is int number ? number : null;
+
+    private static string? String(IReadOnlyDictionary<string, object?> properties, string name) =>
+        properties.TryGetValue(name, out var value) ? value as string : null;
+
+    private static bool? BoolValue(IReadOnlyDictionary<string, object?> properties, string name) =>
+        properties.TryGetValue(name, out var value) && value is bool flag ? flag : null;
+
     private static UnrealObjectReference? Object(IReadOnlyDictionary<string, object?> properties, string name) =>
         properties.TryGetValue(name, out var value) ? value as UnrealObjectReference : null;
 
@@ -1826,7 +1936,7 @@ public sealed class UnrealPackageReader
         licenseeVersion = (ushort)(packedVersion >> 16);
         var lineagePackage =
             (packageVersion == 123 && licenseeVersion is >= 12 and <= 36) ||
-            (packageVersion == 118 && licenseeVersion is 6 or 11);
+            (packageVersion == 118 && licenseeVersion is 1 or 3 or 6 or 11);
         var standardPackage = packageVersion is 118 or 123 or 126 && licenseeVersion == 0;
         if (!lineagePackage && !standardPackage)
         {
@@ -1906,6 +2016,13 @@ public sealed class UnrealPackageReader
         UnrealObjectReference? animationNext = null;
         var minFrameRate = 0f;
         var maxFrameRate = 0f;
+        var masked = false;
+        var alphaTexture = false;
+        var twoSided = false;
+        UnrealObjectReference? detail = null;
+        var detailScale = 8f;
+        byte uClampMode = 0;
+        byte vClampMode = 0;
         while (true)
         {
             var propertyName = ReadName(reader);
@@ -1948,6 +2065,34 @@ public sealed class UnrealPackageReader
             {
                 maxFrameRate = reader.ReadSingle();
             }
+            else if (string.Equals(propertyName, "bMasked", StringComparison.OrdinalIgnoreCase) && type == 3)
+            {
+                masked = (info & 0x80) != 0;
+            }
+            else if (string.Equals(propertyName, "bAlphaTexture", StringComparison.OrdinalIgnoreCase) && type == 3)
+            {
+                alphaTexture = (info & 0x80) != 0;
+            }
+            else if (string.Equals(propertyName, "bTwoSided", StringComparison.OrdinalIgnoreCase) && type == 3)
+            {
+                twoSided = (info & 0x80) != 0;
+            }
+            else if (string.Equals(propertyName, "Detail", StringComparison.OrdinalIgnoreCase) && type == 5)
+            {
+                detail = ResolveObjectReference(reader.ReadCompactIndex(), exports);
+            }
+            else if (string.Equals(propertyName, "DetailScale", StringComparison.OrdinalIgnoreCase) && size == 4)
+            {
+                detailScale = reader.ReadSingle();
+            }
+            else if (string.Equals(propertyName, "UClampMode", StringComparison.OrdinalIgnoreCase) && size == 1)
+            {
+                uClampMode = reader.ReadByte();
+            }
+            else if (string.Equals(propertyName, "VClampMode", StringComparison.OrdinalIgnoreCase) && size == 1)
+            {
+                vClampMode = reader.ReadByte();
+            }
             else
             {
                 reader.Skip(size);
@@ -1978,7 +2123,14 @@ public sealed class UnrealPackageReader
                 0,
                 animationNext,
                 minFrameRate,
-                maxFrameRate);
+                maxFrameRate,
+                masked,
+                alphaTexture,
+                twoSided,
+                detail,
+                detailScale,
+                uClampMode,
+                vClampMode);
         }
 
         if (mipCount < 0 || mipCount > 32)
@@ -2036,7 +2188,14 @@ public sealed class UnrealPackageReader
             mipCount,
             animationNext,
             minFrameRate,
-            maxFrameRate);
+            maxFrameRate,
+            masked,
+            alphaTexture,
+            twoSided,
+            detail,
+            detailScale,
+            uClampMode,
+            vClampMode);
     }
 
     private static string ResolveObjectPath(ExportEntry export, IReadOnlyList<ExportEntry> exports)

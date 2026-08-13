@@ -23,4 +23,31 @@ internal static class UnrealModelSurfaceLayoutDecoder
 
         throw firstError!;
     }
+
+    internal static T DecodeBest<T>(Func<int, T> decode, Comparison<T> compare)
+    {
+        ArgumentNullException.ThrowIfNull(decode);
+        ArgumentNullException.ThrowIfNull(compare);
+        Exception? firstError = null;
+        var hasBest = false;
+        var best = default(T)!;
+        foreach (var lineageSurfaceBytes in new[] { LineageSurfaceBytes, StockSurfaceBytes })
+        {
+            try
+            {
+                var candidate = decode(lineageSurfaceBytes);
+                if (!hasBest || compare(candidate, best) > 0)
+                {
+                    best = candidate;
+                    hasBest = true;
+                }
+            }
+            catch (Exception exception) when (exception is InvalidDataException or OverflowException)
+            {
+                firstError ??= exception;
+            }
+        }
+
+        return hasBest ? best : throw firstError!;
+    }
 }

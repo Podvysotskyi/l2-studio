@@ -174,17 +174,26 @@ public static class GlbStaticMeshEncoder
 
         var images = new List<object>();
         var textures = new List<object>();
-        var textureIndices = new Dictionary<string, int>(StringComparer.Ordinal);
-        int TextureIndex(string url)
+        var samplers = new List<object>
         {
-            if (textureIndices.TryGetValue(url, out var existing))
+            new { magFilter = 9729, minFilter = 9987, wrapS = 10497, wrapT = 10497 },
+            new { magFilter = 9729, minFilter = 9987, wrapS = 33071, wrapT = 10497 },
+            new { magFilter = 9729, minFilter = 9987, wrapS = 10497, wrapT = 33071 },
+            new { magFilter = 9729, minFilter = 9987, wrapS = 33071, wrapT = 33071 }
+        };
+        var textureIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+        int TextureIndex(string url, bool clampU = false, bool clampV = false)
+        {
+            var sampler = (clampU ? 1 : 0) + (clampV ? 2 : 0);
+            var key = $"{sampler}\n{url}";
+            if (textureIndices.TryGetValue(key, out var existing))
             {
                 return existing;
             }
             var index = textures.Count;
             images.Add(new { uri = ImageUri(url) });
-            textures.Add(new { sampler = 0, source = index });
-            textureIndices[url] = index;
+            textures.Add(new { sampler, source = index });
+            textureIndices[key] = index;
             return index;
         }
 
@@ -201,7 +210,10 @@ public static class GlbStaticMeshEncoder
             };
             if (binding.DiffuseUrl is not null)
             {
-                pbr["baseColorTexture"] = new { index = TextureIndex(binding.DiffuseUrl) };
+                pbr["baseColorTexture"] = new
+                {
+                    index = TextureIndex(binding.DiffuseUrl, binding.ClampU, binding.ClampV)
+                };
             }
             var material = new Dictionary<string, object?>
             {
@@ -212,6 +224,11 @@ public static class GlbStaticMeshEncoder
                 {
                     l2 = new
                     {
+                        // GLTFLoader intentionally receives a transparent image while Studio
+                        // prepares materials. Keep the primary image locations in the L2
+                        // contract so the browser can load every channel independently.
+                        diffuseUrl = binding.DiffuseUrl,
+                        emissiveUrl = binding.EmissiveUrl,
                         blendMode = binding.BlendMode.ToString().ToLowerInvariant(),
                         opacityUrl = binding.OpacityUrl,
                         opacitySource = binding.OpacitySource.ToString().ToLowerInvariant(),
@@ -234,6 +251,8 @@ public static class GlbStaticMeshEncoder
                         specularUrl = binding.SpecularUrl,
                         specularityMaskUrl = binding.SpecularityMaskUrl,
                         performLightingOnSpecularPass = binding.PerformLightingOnSpecularPass,
+                        clampU = binding.ClampU,
+                        clampV = binding.ClampV,
                         windMode = binding.WindMode == StaticMeshWindMode.None
                             ? null
                             : binding.WindMode.ToString().ToLowerInvariant()
@@ -333,7 +352,7 @@ public static class GlbStaticMeshEncoder
         if (materials.Count > 0)
         {
             document["materials"] = materials;
-            document["samplers"] = new[] { new { magFilter = 9729, minFilter = 9987, wrapS = 10497, wrapT = 10497 } };
+            document["samplers"] = samplers;
             document["images"] = images;
             document["textures"] = textures;
         }

@@ -469,6 +469,10 @@ public sealed partial class AssetImportJobProcessor
                     {
                         warnings.Add($"{source.FileName}: {map.EnvironmentWarning}");
                     }
+                    if (!scenes && map.SummaryWarning is not null)
+                    {
+                        warnings.Add($"{source.FileName}: {map.SummaryWarning}");
+                    }
                     var mapPath = Path.Combine(stagingPath, source.Name);
                     Directory.CreateDirectory(mapPath);
                     var effectiveSkyZones = scene is null || scene.SkyZones.Count > 0
@@ -652,6 +656,7 @@ public sealed partial class AssetImportJobProcessor
                                 source.FileName,
                                 source.Sha256,
                                 111,
+                                PublishSummary(map.Summary),
                                 PublishEnvironment(map),
                                 terrains,
                                 actors,
@@ -1902,6 +1907,20 @@ public sealed partial class AssetImportJobProcessor
     };
     private static MapVector Vec(System.Numerics.Vector3 value) => new(value.X, value.Y, value.Z);
     private static MapRotation Rot(UnrealRotator value) => new(value.Pitch, value.Yaw, value.Roll);
+    private static MapLevelSummaryManifestEntry? PublishSummary(UnrealLevelSummary? summary) => summary is null
+        ? null
+        : new MapLevelSummaryManifestEntry(
+            summary.Title,
+            summary.Author,
+            summary.Description,
+            summary.LevelEnterText,
+            summary.ExtraInfo,
+            summary.DecoTextName,
+            summary.HideFromMenus,
+            summary.IdealPlayerCountMin,
+            summary.IdealPlayerCountMax,
+            summary.SinglePlayerTeamSize,
+            summary.Screenshot?.Path);
     private static MapEnvironmentManifestEntry PublishEnvironment(UnrealLevel map)
     {
         var environment = map.Environment;

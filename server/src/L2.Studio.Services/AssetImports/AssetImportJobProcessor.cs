@@ -34,8 +34,8 @@ public sealed partial class AssetImportJobProcessor(
     ILogger<AssetImportJobProcessor> logger) : IAssetImportWorkItemProcessor
 {
     private readonly List<AssetCatalogDependencyPublication> dependencyHints = [];
-    internal const int MapSchemaVersion = 13;
-    internal const int SceneSchemaVersion = 12;
+    internal const int MapSchemaVersion = 15;
+    internal const int SceneSchemaVersion = 13;
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new(JsonSerializerDefaults.Web)
     {

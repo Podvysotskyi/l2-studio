@@ -85,7 +85,6 @@ function statusIcon(status: ImportProgressStatus) {
     v-if="!open && items.length"
     class="fixed bottom-5 right-5 z-40 shadow-lg"
     :label="activeItems.length ? 'View import progress' : 'View import results'"
-    :icon="drawerIcon"
     :color="drawerColor"
     :class="activeItems.length ? '[&_svg]:animate-spin' : ''"
     @click="updateOpen(true)"

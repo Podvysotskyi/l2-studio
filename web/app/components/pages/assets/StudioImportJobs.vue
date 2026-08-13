@@ -4,9 +4,7 @@ import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import {
   getAssetImportDiagnostics,
-  getStaleAssetSources,
   getAssetImportWorkItems,
-  rebuildStaleAssetSources,
   startAssetImport,
   startAssetFileImport
 } from '../../../services/studio-api'
@@ -14,14 +12,16 @@ import { useAssetImportsStore } from '../../../stores/asset-imports'
 import type {
   AssetImportDiagnostic,
   AssetImportJob,
-  AssetImportWorkItem,
-  StaleAssetSource
+  AssetImportWorkItem
 } from '../../../types/models/asset-import-job'
+import {
+  assetImportKindLabel,
+  assetImportKindOptions,
+  assetImportKinds
+} from '../../../utils/asset-import-kinds'
 
 const importStore = useAssetImportsStore()
 const { jobs: jobsByKind, loading, error } = storeToRefs(importStore)
-const activeView = ref<'runs' | 'stale'>('runs')
-const initialViewResolved = ref(false)
 const kindFilter = ref<'all' | AssetImportKind>('all')
 const selectedRunId = ref<string>()
 const workItems = ref<AssetImportWorkItem[]>([])
@@ -40,25 +40,12 @@ const detailQuery = ref('')
 const workItemStatusFilter = ref<'all' | AssetImportWorkItem['status']>('all')
 const diagnosticSeverityFilter = ref<'all' | 'warning' | 'error'>('all')
 const reimporting = ref<string>()
-const staleByKind = ref<Partial<Record<AssetImportKind, StaleAssetSource[]>>>({})
-const staleLoading = ref(false)
-const staleError = ref<string>()
-const rebuildingStale = ref(false)
 const forcingKind = ref(false)
 const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
-const importKinds: AssetImportKind[] = [
-  'textures',
-  'music',
-  'sounds',
-  'staticmeshes',
-  'maps',
-  'mappreviews',
-  'scenes'
-]
 const jobs = computed(() =>
-  importKinds
+  assetImportKinds
     .flatMap((kind) => jobsByKind.value[kind] ?? [])
     .sort(
       (left, right) =>
@@ -74,11 +61,6 @@ const visibleJobs = computed(() =>
 const hasActiveJob = computed(() =>
   jobs.value.some((job) => isActive(job.status))
 )
-const staleCount = computed(() => Object.values(staleByKind.value)
-  .reduce((total, sources) => total + (sources?.length ?? 0), 0))
-const visibleStaleSources = computed(() => importKinds
-  .filter((kind) => kindFilter.value === 'all' || kind === kindFilter.value)
-  .flatMap((kind) => (staleByKind.value[kind] ?? []).map((source) => ({ kind, source }))))
 const selectedRun = computed(() =>
   jobs.value.find((job) => job.id === selectedRunId.value)
 )
@@ -88,16 +70,6 @@ const selectedWorkItem = computed(() =>
 const runDiagnosticHasError = computed(() =>
   runDiagnostics.value.some((diagnostic) => diagnostic.severity === 'error')
 )
-const kindOptions = [
-  { label: 'All collections', value: 'all' },
-  { label: 'Textures', value: 'textures' },
-  { label: 'Music', value: 'music' },
-  { label: 'Sounds', value: 'sounds' },
-  { label: 'Static meshes', value: 'staticmeshes' },
-  { label: 'Maps', value: 'maps' },
-  { label: 'Map previews', value: 'mappreviews' },
-  { label: 'Scenes', value: 'scenes' }
-]
 const workItemStatusOptions = [
   { label: 'All file statuses', value: 'all' },
   { label: 'Queued', value: 'queued' },
@@ -124,29 +96,13 @@ function statusColor(status: AssetImportJob['status']) {
   return 'info'
 }
 
-function kindLabel(kind: AssetImportKind) {
-  if (kind === 'textures') return 'Textures'
-  if (kind === 'music') return 'Music'
-  if (kind === 'sounds') return 'Sounds'
-  if (kind === 'staticmeshes') return 'Static meshes'
-  if (kind === 'maps') return 'Maps'
-  return kind === 'mappreviews' ? 'Map previews' : 'Scenes'
-}
-
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : '—'
 }
 
 async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
-  const [, staleLoaded] = await Promise.all([
-    importStore.load(importKinds).catch(() => undefined),
-    loadStaleSources()
-  ])
-  if (!initialViewResolved.value) {
-    activeView.value = staleLoaded && staleCount.value > 0 ? 'stale' : 'runs'
-    initialViewResolved.value = true
-  }
+  await importStore.load(assetImportKinds).catch(() => undefined)
   if (selectedRunId.value && !selectedRun.value) {
     closeDetails()
   } else if (selectedRun.value && isActive(selectedRun.value.status)) {
@@ -159,32 +115,6 @@ async function loadJobs(schedule = true) {
 
 async function refreshWorkspace() {
   await loadJobs()
-}
-
-function selectView(view: 'runs' | 'stale', focus = false) {
-  activeView.value = view
-  if (focus) {
-    document.getElementById(view === 'runs' ? 'import-runs-tab' : 'stale-resources-tab')?.focus()
-  }
-}
-
-async function loadStaleSources() {
-  staleLoading.value = true
-  staleError.value = undefined
-  try {
-    const responses = await Promise.all(
-      importKinds.map((kind) => getStaleAssetSources(kind))
-    )
-    staleByKind.value = Object.fromEntries(
-      importKinds.map((kind, index) => [kind, responses[index] ?? []])
-    )
-    return true
-  } catch {
-    staleError.value = 'Stale resources could not be loaded.'
-    return false
-  } finally {
-    staleLoading.value = false
-  }
 }
 
 function resetDetails() {
@@ -349,52 +279,16 @@ async function forceReimport(run: AssetImportJob, item: AssetImportWorkItem) {
   }
 }
 
-async function rebuildAllStale() {
-  rebuildingStale.value = true
-  try {
-    const kinds = importKinds.filter((kind) =>
-      (kindFilter.value === 'all' || kind === kindFilter.value)
-      && staleByKind.value[kind]?.length
-    )
-    await Promise.all(kinds.map((kind) => rebuildStaleAssetSources(kind)))
-    await loadJobs(false)
-    notifications.success({ title: 'Stale rebuilds queued' })
-  } catch {
-    notifications.error({
-      title: 'One or more stale rebuilds could not be queued',
-      description: 'Try the action again.'
-    })
-  } finally {
-    rebuildingStale.value = false
-  }
-}
-
-async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSource) {
-  reimporting.value = `${kind}:${source.sourceKey}`
-  try {
-    await startAssetFileImport(kind, source.sourceKey)
-    await loadJobs(false)
-    notifications.success({ title: 'Stale rebuild queued' })
-  } catch {
-    notifications.error({
-      title: `Stale rebuild for ${source.sourceKey} could not be queued`,
-      description: 'Try the action again.'
-    })
-  } finally {
-    reimporting.value = undefined
-  }
-}
-
 async function forceRebuildKind() {
   if (kindFilter.value === 'all') return
   forcingKind.value = true
   try {
     await startAssetImport(kindFilter.value, { force: true })
     await loadJobs(false)
-    notifications.success({ title: `Forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild queued` })
+    notifications.success({ title: `Forced ${assetImportKindLabel(kindFilter.value).toLowerCase()} rebuild queued` })
   } catch {
     notifications.error({
-      title: `Forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild could not be queued`,
+      title: `Forced ${assetImportKindLabel(kindFilter.value).toLowerCase()} rebuild could not be queued`,
       description: 'Try the action again.'
     })
   } finally {
@@ -420,7 +314,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           label="Refresh"
           color="neutral"
           variant="outline"
-          :loading="loading || staleLoading"
+          :loading="loading"
           @click="refreshWorkspace"
         />
       </template>
@@ -435,66 +329,19 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       :description="error"
     />
 
-    <UAlert
-      v-if="staleError"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-circle-alert"
-      title="Stale resources unavailable"
-      :description="staleError"
-    />
-
     <UCard>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          class="inline-flex w-full rounded-lg bg-elevated p-1 sm:w-auto"
-          role="tablist"
-          aria-label="Import workspace"
-        >
-          <button
-            id="import-runs-tab"
-            type="button"
-            role="tab"
-            class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-none"
-            :class="activeView === 'runs' ? 'bg-default text-highlighted shadow-sm' : 'text-muted hover:text-highlighted'"
-            :aria-selected="activeView === 'runs'"
-            :tabindex="activeView === 'runs' ? 0 : -1"
-            aria-controls="import-runs-panel"
-            @click="selectView('runs')"
-            @keydown.right.prevent="selectView('stale', true)"
-            @keydown.end.prevent="selectView('stale', true)"
-          >
-            <UIcon name="i-lucide-history" class="size-4" />
-            Runs
-            <UBadge color="neutral" variant="subtle" size="sm">{{ visibleJobs.length }}</UBadge>
-          </button>
-          <button
-            id="stale-resources-tab"
-            type="button"
-            role="tab"
-            class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-none"
-            :class="activeView === 'stale' ? 'bg-default text-highlighted shadow-sm' : 'text-muted hover:text-highlighted'"
-            :aria-selected="activeView === 'stale'"
-            :tabindex="activeView === 'stale' ? 0 : -1"
-            aria-controls="stale-resources-panel"
-            @click="selectView('stale')"
-            @keydown.left.prevent="selectView('runs', true)"
-            @keydown.home.prevent="selectView('runs', true)"
-          >
-            <UIcon name="i-lucide-triangle-alert" class="size-4" :class="visibleStaleSources.length ? 'text-warning' : ''" />
-            Stale resources
-            <UBadge :color="visibleStaleSources.length ? 'warning' : 'neutral'" variant="subtle" size="sm">
-              {{ visibleStaleSources.length }}
-            </UBadge>
-          </button>
+        <div>
+          <h2 class="text-sm font-semibold text-highlighted">Import history</h2>
+          <p class="mt-1 text-xs text-muted">{{ visibleJobs.length }} recorded runs</p>
         </div>
         <div class="flex flex-col gap-1 sm:items-end">
           <label for="import-collection-filter" class="text-xs font-medium text-muted">Collection</label>
           <USelect
             id="import-collection-filter"
             v-model="kindFilter"
-            :items="kindOptions"
-            aria-label="Filter import workspace by collection"
+            :items="assetImportKindOptions"
+            aria-label="Filter import runs by collection"
             class="w-full sm:w-52"
           />
         </div>
@@ -502,86 +349,17 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     </UCard>
 
     <UCard
-      v-if="activeView === 'stale'"
-      id="stale-resources-panel"
-      role="tabpanel"
-      aria-labelledby="stale-resources-tab"
       :ui="{ body: 'p-0 sm:p-0' }"
     >
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 class="text-sm font-semibold text-highlighted">Resources requiring rebuild</h2>
-            <p class="text-xs text-muted">
-              Published output remains available until you explicitly rebuild it.
-            </p>
-          </div>
-          <UButton
-            v-if="visibleStaleSources.length"
-            icon="i-lucide-refresh-ccw-dot"
-            :label="`Rebuild stale (${visibleStaleSources.length})`"
-            color="warning"
-            variant="soft"
-            :loading="rebuildingStale"
-            :disabled="hasActiveJob"
-            @click="rebuildAllStale"
-          />
-        </div>
-      </template>
-      <div v-if="visibleStaleSources.length" class="divide-y divide-default">
-        <div v-for="entry in visibleStaleSources" :key="`${entry.kind}:${entry.source.sourceKey}`" class="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <UBadge color="warning" variant="subtle">Stale</UBadge>
-              <UBadge color="neutral" variant="outline">{{ kindLabel(entry.kind) }}</UBadge>
-              <span class="truncate text-sm font-medium text-highlighted">{{ entry.source.sourceKey }}</span>
-            </div>
-            <p class="mt-2 text-xs text-muted">{{ entry.source.reasons.join(' · ') }}</p>
-            <p v-if="entry.source.resourceNames.length" class="mt-1 truncate text-xs text-dimmed">
-              {{ entry.source.resourceNames.join(', ') }}
-            </p>
-          </div>
-          <UButton
-            label="Rebuild"
-            icon="i-lucide-refresh-cw"
-            size="xs"
-            color="warning"
-            variant="soft"
-            :loading="reimporting === `${entry.kind}:${entry.source.sourceKey}`"
-            @click="rebuildStaleSource(entry.kind, entry.source)"
-          />
-        </div>
-      </div>
-      <div v-else class="grid min-h-64 place-items-center p-8 text-center">
-        <div>
-          <UIcon name="i-lucide-circle-check" class="mx-auto size-8 text-success" />
-          <p class="mt-3 text-sm font-medium text-highlighted">
-            {{ staleLoading ? 'Checking for stale resources…' : 'Everything is up to date' }}
-          </p>
-          <p v-if="!staleLoading" class="mt-1 text-xs text-muted">
-            No resources in this collection need to be rebuilt.
-          </p>
-        </div>
-      </div>
-    </UCard>
-
-    <UCard
-      v-else
-      id="import-runs-panel"
-      role="tabpanel"
-      aria-labelledby="import-runs-tab"
-      :ui="{ body: 'p-0 sm:p-0' }"
-    >
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 class="text-sm font-semibold text-highlighted">Import history</h2>
-            <p class="text-xs text-muted">{{ visibleJobs.length }} recorded runs</p>
+            <h2 class="text-sm font-semibold text-highlighted">Import runs</h2>
           </div>
           <UButton
             v-if="kindFilter !== 'all'"
             icon="i-lucide-hammer"
-            :label="`Force rebuild ${kindLabel(kindFilter).toLowerCase()}`"
+            :label="`Force rebuild ${assetImportKindLabel(kindFilter).toLowerCase()}`"
             color="warning"
             variant="outline"
             :loading="forcingKind"
@@ -601,7 +379,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="flex flex-wrap items-center gap-2">
-                <UBadge color="neutral" variant="subtle">{{ kindLabel(run.kind) }}</UBadge>
+                <UBadge color="neutral" variant="subtle">{{ assetImportKindLabel(run.kind) }}</UBadge>
                 <UBadge :color="statusColor(run.status)" variant="subtle">
                   {{ run.status.replaceAll('_', ' ') }}
                 </UBadge>
@@ -636,7 +414,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           <USlideover
             v-if="selectedRunId === run.id"
             :open="Boolean(selectedRun)"
-            :title="`${kindLabel(run.kind)} import`"
+            :title="`${assetImportKindLabel(run.kind)} import`"
             :description="run.requestedSourceKey || `Requested ${formatDate(run.requestedAt)}`"
             :ui="{ content: 'max-w-3xl' }"
             @update:open="open => { if (!open) closeDetails() }"

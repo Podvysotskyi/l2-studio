@@ -85,3 +85,11 @@ export interface AssetImportPage<T> {
   page: number
   pageSize: number
 }
+
+export interface AssetCatalogDiagnosticPage extends AssetImportPage<AssetImportDiagnostic> {
+  runId: string
+  workItemId: string
+  sourceKey: string
+  workItemStatus: AssetImportWorkItemStatus
+  publishedAt: string
+}

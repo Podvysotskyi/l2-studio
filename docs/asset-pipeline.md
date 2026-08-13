@@ -46,11 +46,17 @@ provides an explicit file.
 
 - Texture imports retain source identity and material relationships. Browser
   fallback images are lossless WebP; supported native DXT mip chains may also
-  be published in KTX containers for capable GPUs.
+  be published in KTX containers for capable GPUs. Texture manifests preserve
+  authored masking, alpha, two-sided, detail-map, and clamp behavior, and record
+  transparency found in decoded pixels for direct-texture mesh sections.
 - Static meshes are published as GLB with standard geometry plus material
-  metadata consumed by Web. Studio uses the geometry for diagnostic previews.
+  metadata consumed by Web and Studio. Studio resolves published WebP texture
+  channels independently so an unavailable material falls back per section
+  without preventing geometry inspection.
   Maps and scenes publish complete render manifests whose terrain texture and
-  control-map contracts are consumed independently by both renderers.
+  control-map contracts are consumed independently by both renderers. Map
+  manifests also retain UE2 `LevelSummary` browser metadata (including the raw
+  screenshot material reference) without converting it into a preview image.
 - Embedded UAX PCM payloads are published as RIFF/WAVE without lossy
   transcoding.
 - Music accepts either the proprietary `L2SD` first-page signature or standard

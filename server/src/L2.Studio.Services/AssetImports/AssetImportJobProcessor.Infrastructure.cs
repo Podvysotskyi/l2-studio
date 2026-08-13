@@ -449,5 +449,6 @@ public sealed partial class AssetImportJobProcessor
         string? GpuImageHash,
         string? VersionHash,
         string? Error,
-        bool IsWarning);
+        bool IsWarning,
+        bool HasTransparency = false);
 }

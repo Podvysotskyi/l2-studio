@@ -63,11 +63,26 @@ internal static class StaticMeshMaterialCatalogLoader
             CollectDependencies(root, string.Empty, allMaterials, reachableMaterials, requiredTextures);
         }
 
-        var loadedTextureEntries = await LoadTextureEntriesAsync(
+        var loadedTextureEntries = (await LoadTextureEntriesAsync(
             context,
             catalogs,
             requiredTextures.Values.ToArray(),
-            cancellationToken);
+            cancellationToken)).ToList();
+        var requestedTextureKeys = requiredTextures.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        while (true)
+        {
+            var detailReferences = loadedTextureEntries
+                .Select(texture => texture.Detail)
+                .OfType<TextureMaterialReference>()
+                .Where(reference => requestedTextureKeys.Add(Key(reference.PackageName, reference.ObjectName)))
+                .ToArray();
+            if (detailReferences.Length == 0) break;
+            loadedTextureEntries.AddRange(await LoadTextureEntriesAsync(
+                context,
+                catalogs,
+                detailReferences,
+                cancellationToken));
+        }
         var textureGroups = loadedTextureEntries
             .GroupBy(texture => Key(texture.PackageName, texture.ObjectName), StringComparer.OrdinalIgnoreCase)
             .ToArray();

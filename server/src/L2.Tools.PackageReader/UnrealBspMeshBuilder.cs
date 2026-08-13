@@ -99,10 +99,14 @@ public static class UnrealBspMeshBuilder
                 continue;
             }
 
+            var matchingWaterVolumes = MatchingWaterVolumes(
+                model.Points,
+                pointIndices,
+                waterBoundaries);
             var skyZoneName = SkyZoneName(node, skyZoneNames);
             var role = skyZoneName is not null
                 ? UnrealBspMeshRole.SkyZone
-                : IsPrimaryWaterMaterial(surface.Material)
+                : IsPrimaryWaterMaterial(surface.Material) || matchingWaterVolumes.Length > 0
                     ? UnrealBspMeshRole.WaterSurface
                     : UnrealBspMeshRole.Geometry;
             var key = new GroupKey(
@@ -130,7 +134,7 @@ public static class UnrealBspMeshBuilder
                     node.Normal,
                     surface,
                     role == UnrealBspMeshRole.WaterSurface
-                        ? MatchingWaterVolumes(model.Points, pointIndices, waterBoundaries)
+                        ? matchingWaterVolumes
                         : []))
                 malformedSurfaces++;
         }
@@ -150,10 +154,10 @@ public static class UnrealBspMeshBuilder
                     key.Flags,
                     key.Role == UnrealBspMeshRole.SkyZone
                         ? UnrealBspMeshRole.SkyZone
-                        : key.Role == UnrealBspMeshRole.WaterSurface
-                            ? UnrealBspMeshRole.WaterSurface
                         : IsWorldBase(mesh)
                             ? UnrealBspMeshRole.WorldBase
+                        : key.Role == UnrealBspMeshRole.WaterSurface
+                            ? UnrealBspMeshRole.WaterSurface
                             : UnrealBspMeshRole.Geometry,
                     key.SkyZoneName,
                     chunk.WaterVolumeNames));
@@ -185,6 +189,10 @@ public static class UnrealBspMeshBuilder
          string.Equals(
              material.ObjectName,
              "WaterSurfaceShaderSet.WaterFinal",
+             StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(
+             material.ObjectName,
+             "water.WaterSurface",
              StringComparison.OrdinalIgnoreCase));
 
     private static WaterBoundary[] WaterBoundaries(IReadOnlyList<UnrealWaterVolume> volumes)
@@ -196,6 +204,7 @@ public static class UnrealBspMeshBuilder
             var points = volume.Geometry.Positions
                 .Select(point => TransformVolumePoint(point, volume))
                 .ToArray();
+            var candidates = new List<(WaterBoundary Boundary, float Height)>();
             for (var index = 0; index < volume.Geometry.Indices.Count; index += 3)
             {
                 var a = points[volume.Geometry.Indices[index]];
@@ -204,8 +213,17 @@ public static class UnrealBspMeshBuilder
                 var cross = Vector3.Cross(b - a, c - a);
                 if (!Finite(a) || !Finite(b) || !Finite(c) || cross.LengthSquared() <= 1e-8f)
                     continue;
-                result.Add(new WaterBoundary(volume.Name, a, b, c, Vector3.Normalize(cross)));
+                var normal = Vector3.Normalize(cross);
+                if (MathF.Abs(normal.Z) < 0.99f) continue;
+                candidates.Add((
+                    new WaterBoundary(volume.Name, a, b, c, normal),
+                    (a.Z + b.Z + c.Z) / 3));
             }
+            if (candidates.Count == 0) continue;
+            var maximumHeight = candidates.Max(candidate => candidate.Height);
+            result.AddRange(candidates
+                .Where(candidate => maximumHeight - candidate.Height <= 32)
+                .Select(candidate => candidate.Boundary));
         }
         return result.ToArray();
     }
