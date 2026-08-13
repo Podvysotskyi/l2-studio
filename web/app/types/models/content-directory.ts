@@ -2,12 +2,12 @@ export interface NpcRecord {
   id: number
   level: number
   name: string | null
-  npcTypeId: number
-  npcType: string
-  npcRaceId: number | null
-  npcRace: string | null
-  npcSexId: number
-  npcSex: string
+  npcTypeName: string
+  npcTypeDisplayName: string
+  npcRaceName: string | null
+  npcRaceDisplayName: string | null
+  npcSexName: string
+  npcSexDisplayName: string
 }
 
 export interface PlayerClassRecord {
@@ -49,11 +49,15 @@ export interface LookupRecord {
   name: string
 }
 
+export interface NpcLookupRecord {
+  name: string
+  displayName: string
+}
+
+export type NpcLookupKind = 'npc-types' | 'npc-races' | 'npc-sexes'
+
 export type LookupKind =
   | 'player-races'
   | 'player-sexes'
-  | 'npc-races'
-  | 'npc-sexes'
-  | 'npc-types'
   | 'skill-operate-types'
   | 'skill-target-types'

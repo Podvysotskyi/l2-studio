@@ -4,6 +4,7 @@ import {
   getAssetCatalogs,
   getAssetImportJobs,
   getLookupDirectory,
+  getNpcLookupDirectory,
   getNpcDirectory,
   getPlayerClasses,
   getSkillDirectory
@@ -14,6 +15,7 @@ vi.mock('../../app/services/studio-api', () => ({
   getAssetCatalogs: vi.fn(),
   getAssetImportJobs: vi.fn(),
   getLookupDirectory: vi.fn(),
+  getNpcLookupDirectory: vi.fn(),
   getNpcDirectory: vi.fn(),
   getPlayerClasses: vi.fn(),
   getSkillDirectory: vi.fn()
@@ -25,9 +27,12 @@ describe('Dashboard store', () => {
     vi.mocked(getAssetCatalogs).mockReset()
     vi.mocked(getAssetImportJobs).mockReset()
     vi.mocked(getLookupDirectory).mockReset()
+    vi.mocked(getNpcLookupDirectory).mockReset()
     vi.mocked(getNpcDirectory).mockReset()
     vi.mocked(getPlayerClasses).mockReset()
     vi.mocked(getSkillDirectory).mockReset()
+    vi.mocked(getLookupDirectory).mockResolvedValue([])
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue([])
   })
 
   it('aggregates content, asset, and recent-job summaries', async () => {
@@ -45,6 +50,7 @@ describe('Dashboard store', () => {
     })
     vi.mocked(getPlayerClasses).mockResolvedValue([])
     vi.mocked(getLookupDirectory).mockResolvedValue([])
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue([])
     vi.mocked(getAssetCatalogs).mockResolvedValue([
       {
         kind: 'textures',

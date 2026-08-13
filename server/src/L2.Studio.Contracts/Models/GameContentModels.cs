@@ -4,12 +4,12 @@ public sealed record NpcSummary(
     int Id,
     short Level,
     string? Name,
-    int NpcTypeId,
-    string NpcType,
-    int? NpcRaceId,
-    string? NpcRace,
-    int NpcSexId,
-    string NpcSex);
+    string NpcTypeName,
+    string NpcTypeDisplayName,
+    string? NpcRaceName,
+    string? NpcRaceDisplayName,
+    string NpcSexName,
+    string NpcSexDisplayName);
 
 public sealed record NpcDirectoryPage(
     IReadOnlyList<NpcSummary> Items,
@@ -17,7 +17,7 @@ public sealed record NpcDirectoryPage(
     int Page,
     int PageSize);
 
-public sealed record NpcLookupSummary(int Id, string Name);
+public sealed record NpcLookupSummary(string Name, string DisplayName);
 
 public sealed record PlayerClassSummary(
     int Id,

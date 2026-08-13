@@ -4,6 +4,7 @@ import {
   getAssetCatalogs,
   getAssetImportJobs,
   getLookupDirectory,
+  getNpcLookupDirectory,
   getNpcDirectory,
   getPlayerClasses,
   getSkillDirectory
@@ -65,9 +66,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
         getPlayerClasses(),
         lookupCount('player-races'),
         lookupCount('player-sexes'),
-        lookupCount('npc-races'),
-        lookupCount('npc-sexes'),
-        lookupCount('npc-types'),
+        getNpcLookupDirectory('npc-races').then(items => items.length),
+        getNpcLookupDirectory('npc-sexes').then(items => items.length),
+        getNpcLookupDirectory('npc-types').then(items => items.length),
         lookupCount('skill-operate-types'),
         lookupCount('skill-target-types')
       ])

@@ -1,6 +1,7 @@
 using L2.Studio.Api.Controllers;
 using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
+using Microsoft.AspNetCore.Mvc;
 using L2.Studio.Repositories.Interfaces;
 using Xunit;
 
@@ -42,7 +43,7 @@ public sealed class ContentDirectoryControllerTests
     [Fact]
     public async Task DelegatesLookupRequestsToTheMatchingRepositoryMethod()
     {
-        var expected = new[] { new NpcLookupSummary(1, "Humanoid") };
+        var expected = new[] { new NpcLookupSummary("Humanoid", "Humanoid") };
         var repository = new StubContentDirectoryRepository { NpcTypes = expected };
         var controller = new ContentDirectoryController(repository);
         using var cancellation = new CancellationTokenSource();
@@ -51,6 +52,30 @@ public sealed class ContentDirectoryControllerTests
 
         Assert.Same(expected, result);
         Assert.Equal(cancellation.Token, repository.NpcTypesToken);
+    }
+
+    [Fact]
+    public async Task TrimsAndUpdatesNpcLookupDisplayNames()
+    {
+        var repository = new StubContentDirectoryRepository();
+        var controller = new ContentDirectoryController(repository);
+
+        var result = await controller.UpdateNpcRace(
+            "c1", "DARK_ELF", new UpdateNpcLookupRequest("  Dark Elf  "), CancellationToken.None);
+
+        var response = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(new NpcLookupSummary("DARK_ELF", "Dark Elf"), response.Value);
+        Assert.Equal("npc-races", repository.UpdatedKind);
+        Assert.Equal("Dark Elf", repository.UpdatedDisplayName);
+    }
+
+    [Fact]
+    public async Task RejectsBlankNpcLookupDisplayNames()
+    {
+        var controller = new ContentDirectoryController(new StubContentDirectoryRepository());
+        var result = await controller.UpdateNpcSex(
+            "c1", "ETC", new UpdateNpcLookupRequest("  "), CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(result.Result);
     }
 
     private sealed class StubContentDirectoryRepository : IContentDirectoryRepository
@@ -63,6 +88,8 @@ public sealed class ContentDirectoryControllerTests
         public CancellationToken NpcToken { get; private set; }
         public string? SkillQuery { get; private set; }
         public CancellationToken NpcTypesToken { get; private set; }
+        public string? UpdatedKind { get; private set; }
+        public string? UpdatedDisplayName { get; private set; }
 
         public Task<NpcDirectoryPage> SearchNpcsAsync(string gameVersion, string query, int page, int pageSize, CancellationToken cancellationToken)
         {
@@ -81,6 +108,12 @@ public sealed class ContentDirectoryControllerTests
 
         public Task<IReadOnlyList<NpcLookupSummary>> GetNpcRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
         public Task<IReadOnlyList<NpcLookupSummary>> GetNpcSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
+        public Task<NpcLookupSummary?> UpdateNpcLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken)
+        {
+            UpdatedKind = kind;
+            UpdatedDisplayName = displayName;
+            return Task.FromResult<NpcLookupSummary?>(new(name, displayName));
+        }
         public Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerClassSummary>>([]);
         public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
         public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);

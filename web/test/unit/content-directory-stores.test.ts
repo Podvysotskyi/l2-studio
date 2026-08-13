@@ -82,11 +82,11 @@ function npc(name: string) {
     id: 1,
     level: 10,
     name,
-    npcTypeId: 29,
-    npcType: 'Monster',
-    npcRaceId: 17,
-    npcRace: 'Humanoid',
-    npcSexId: 0,
-    npcSex: 'Male'
+    npcTypeName: 'Monster',
+    npcTypeDisplayName: 'Monster',
+    npcRaceName: 'HUMANOID',
+    npcRaceDisplayName: 'Humanoid',
+    npcSexName: 'MALE',
+    npcSexDisplayName: 'Male'
   }
 }

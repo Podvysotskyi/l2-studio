@@ -15,6 +15,8 @@ import type {
 import type {
   LookupKind,
   LookupRecord,
+  NpcLookupKind,
+  NpcLookupRecord,
   PlayerClassRecord
 } from '../types/models/content-directory'
 import type { DirectoryRequest } from '../types/requests/directory-request'
@@ -24,6 +26,7 @@ import type {
 } from '../types/responses/content-directory-response'
 import type { StudioServiceInfo } from '../types/responses/studio-service-info'
 import type { GameVersionSummary } from '../types/models/game-version'
+import type { NpcLookupImportRun } from '../types/models/npc-lookup-import'
 import type {
   AssetReleaseDetail,
   AssetReleasePage,
@@ -62,6 +65,45 @@ export function getSkillDirectory(
 
 export function getLookupDirectory(kind: LookupKind): Promise<LookupRecord[]> {
   return $fetch<LookupRecord[]>(versionPath(`/content/${kind}`))
+}
+
+export function getNpcLookupDirectory(kind: NpcLookupKind): Promise<NpcLookupRecord[]> {
+  return $fetch<NpcLookupRecord[]>(versionPath(`/content/${kind}`))
+}
+
+export function updateNpcLookupDisplayName(
+  kind: NpcLookupKind,
+  name: string,
+  displayName: string
+): Promise<NpcLookupRecord> {
+  return $fetch<NpcLookupRecord>(
+    versionPath(`/content/${kind}/${encodeURIComponent(name)}`),
+    { method: 'PATCH', body: { displayName } }
+  )
+}
+
+export function getNpcLookupImportJobs(
+  kind: Exclude<NpcLookupKind, 'npc-sexes'>,
+  limit = 1
+): Promise<NpcLookupImportRun[]> {
+  return $fetch<NpcLookupImportRun[]>(versionPath(`/content/${kind}/imports`), {
+    query: { limit }
+  })
+}
+
+export function getNpcLookupImportJob(
+  kind: Exclude<NpcLookupKind, 'npc-sexes'>,
+  id: string
+): Promise<NpcLookupImportRun> {
+  return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports/${id}`))
+}
+
+export function startNpcLookupImport(
+  kind: Exclude<NpcLookupKind, 'npc-sexes'>
+): Promise<NpcLookupImportRun> {
+  return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports`), {
+    method: 'POST'
+  })
 }
 
 export function getPlayerClasses(): Promise<PlayerClassRecord[]> {

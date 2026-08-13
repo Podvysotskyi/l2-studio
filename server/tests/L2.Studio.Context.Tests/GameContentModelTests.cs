@@ -38,6 +38,39 @@ public sealed class GameContentModelTests
     }
 
     [Fact]
+    public void ModelsNpcLookupsByCanonicalNameAndLimitsActiveImports()
+    {
+        using var context = CreateContext();
+
+        Assert.Equal(
+            [nameof(NpcType.GameVersion), nameof(NpcType.Name)],
+            Entity<NpcType>(context).FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal(
+            [nameof(NpcRace.GameVersion), nameof(NpcRace.Name)],
+            Entity<NpcRace>(context).FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal(
+            [nameof(NpcSex.GameVersion), nameof(NpcSex.Name)],
+            Entity<NpcSex>(context).FindPrimaryKey()!.Properties.Select(property => property.Name));
+
+        var npc = Entity<Npc>(context);
+        Assert.Contains(npc.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(NpcType) &&
+            key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Npc.GameVersion), nameof(Npc.NpcTypeName)]));
+        Assert.Contains(npc.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(NpcRace) &&
+            key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Npc.GameVersion), nameof(Npc.NpcRaceName)]));
+        Assert.Contains(npc.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(NpcSex) &&
+            key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Npc.GameVersion), nameof(Npc.NpcSexName)]));
+
+        Assert.Contains(Entity<NpcLookupImportRun>(context).GetIndexes(), index =>
+            index.IsUnique && index.GetFilter() == "status IN ('queued', 'running')");
+    }
+
+    [Fact]
     public void ModelsImportOwnershipWithCascadingDeletes()
     {
         using var context = CreateContext();

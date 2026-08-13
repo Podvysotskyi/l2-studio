@@ -20,6 +20,7 @@ public static class StudioApplicationConfigurationExtensions
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();
         services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddScoped<IAssetImportRepository, AssetImportRepository>();
+        services.AddScoped<INpcLookupImportRepository, NpcLookupImportRepository>();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
         services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddSingleton<GameVersionSeeder>();

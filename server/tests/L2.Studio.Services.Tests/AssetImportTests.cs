@@ -40,6 +40,22 @@ public sealed class AssetImportTests
     }
 
     [Fact]
+    public void DefinesVersionSpecificNpcLookupCatalogs()
+    {
+        Assert.Equal(28, NpcLookupCatalogs.C1Types.Count);
+        Assert.Equal(46, NpcLookupCatalogs.C4Types.Count);
+        Assert.Equal(48, NpcLookupCatalogs.InterludeTypes.Count);
+        Assert.Equal(21, NpcLookupCatalogs.C1Races.Count);
+        Assert.Equal(22, NpcLookupCatalogs.C4Races.Count);
+        Assert.Equal(22, NpcLookupCatalogs.InterludeRaces.Count);
+        Assert.DoesNotContain(NpcLookupCatalogs.C1Races, item => item.Name == "DIVINE");
+        Assert.Contains(NpcLookupCatalogs.C4Races, item => item.Name == "DIVINE");
+        Assert.DoesNotContain(NpcLookupCatalogs.InterludeRaces, item => item.Name == "NONE");
+        Assert.Equal("Village Master Dark Elf", NpcLookupCatalogs.FriendlyName("VillageMasterDElf"));
+        Assert.Equal("Siege Weapon", NpcLookupCatalogs.FriendlyName("SIEGE_WEAPON"));
+    }
+
+    [Fact]
     public void AggregatesRunCountsAndWarningsByTerminalFile()
     {
         var run = Run(

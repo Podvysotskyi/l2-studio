@@ -28,6 +28,18 @@ public sealed record GenerateMapPreview(Guid WorkItemId) : IAssetImportFileComma
 
 public sealed record AssetImportWorkItemCompleted(Guid RunId, Guid WorkItemId);
 public sealed record FinalizeAssetImportRun(Guid RunId);
+
+public interface INpcLookupImportCommand
+{
+    Guid RunId { get; }
+}
+
+public sealed record ImportC1NpcTypes(Guid RunId) : INpcLookupImportCommand;
+public sealed record ImportC4NpcTypes(Guid RunId) : INpcLookupImportCommand;
+public sealed record ImportInterludeNpcTypes(Guid RunId) : INpcLookupImportCommand;
+public sealed record ImportC1NpcRaces(Guid RunId) : INpcLookupImportCommand;
+public sealed record ImportC4NpcRaces(Guid RunId) : INpcLookupImportCommand;
+public sealed record ImportInterludeNpcRaces(Guid RunId) : INpcLookupImportCommand;
 public sealed record DeleteAssetVersion(string RelativePath, bool Force);
 public sealed record ReconcileAssetStorage;
 public sealed record ValidateAssetRelease(Guid ReleaseId);

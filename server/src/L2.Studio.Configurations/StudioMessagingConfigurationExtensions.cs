@@ -71,6 +71,12 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<DeleteAssetVersion>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ValidateAssetRelease>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ActivateAssetRelease>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1NpcTypes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC4NpcTypes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportInterludeNpcTypes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1NpcRaces>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC4NpcRaces>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportInterludeNpcRaces>().ToPostgresqlQueue(ControlQueue);
     }
 
     private static void RouteFileMessages(WolverineOptions options)

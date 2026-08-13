@@ -12,6 +12,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<NpcType> NpcTypes => Set<NpcType>();
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
     public DbSet<NpcSex> NpcSexes => Set<NpcSex>();
+    public DbSet<NpcLookupImportRun> NpcLookupImportRuns => Set<NpcLookupImportRun>();
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<SkillIcon> SkillIcons => Set<SkillIcon>();
     public DbSet<SkillOperateType> SkillOperateTypes => Set<SkillOperateType>();
@@ -480,27 +481,44 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
 
         var npcType = modelBuilder.Entity<NpcType>();
         npcType.ToTable("npc_types");
-        npcType.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcType.HasKey(entity => new { entity.GameVersion, entity.Name });
         npcType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
-        npcType.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcType.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_types_name");
+        npcType.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
 
         var npcRace = modelBuilder.Entity<NpcRace>();
         npcRace.ToTable("npc_races");
-        npcRace.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcRace.HasKey(entity => new { entity.GameVersion, entity.Name });
         npcRace.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
-        npcRace.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcRace.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcRace.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_races_name");
+        npcRace.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
 
         var npcSex = modelBuilder.Entity<NpcSex>();
         npcSex.ToTable("npc_sexes");
-        npcSex.HasKey(entity => new { entity.GameVersion, entity.Id });
+        npcSex.HasKey(entity => new { entity.GameVersion, entity.Name });
         npcSex.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
-        npcSex.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcSex.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
-        npcSex.HasIndex(entity => new { entity.GameVersion, entity.Name }).IsUnique().HasDatabaseName("ix_npc_sexes_name");
+        npcSex.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+
+        var npcLookupImportRun = modelBuilder.Entity<NpcLookupImportRun>();
+        npcLookupImportRun.ToTable("npc_lookup_import_runs");
+        npcLookupImportRun.HasKey(entity => entity.Id);
+        npcLookupImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        npcLookupImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        npcLookupImportRun.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(32);
+        npcLookupImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        npcLookupImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        npcLookupImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        npcLookupImportRun.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        npcLookupImportRun.Property(entity => entity.TotalCount).HasColumnName("total_count");
+        npcLookupImportRun.Property(entity => entity.InsertedCount).HasColumnName("inserted_count");
+        npcLookupImportRun.Property(entity => entity.ExistingCount).HasColumnName("existing_count");
+        npcLookupImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        npcLookupImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.RequestedAt })
+            .HasDatabaseName("ix_npc_lookup_import_runs_recent");
+        npcLookupImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind })
+            .IsUnique().HasFilter("status IN ('queued', 'running')")
+            .HasDatabaseName("ix_npc_lookup_import_runs_active");
 
         var npc = modelBuilder.Entity<Npc>();
         npc.ToTable("npcs", table => table.HasCheckConstraint("ck_npcs_level", "level BETWEEN 1 AND 255"));
@@ -509,23 +527,23 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npc.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npc.Property(entity => entity.Level).HasColumnName("level");
         npc.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(100).IsRequired(false);
-        npc.Property(entity => entity.NpcTypeId).HasColumnName("npc_type_id");
-        npc.Property(entity => entity.NpcRaceId).HasColumnName("npc_race_id").IsRequired(false);
-        npc.Property(entity => entity.NpcSexId).HasColumnName("npc_sex_id");
-        npc.HasIndex(entity => entity.NpcTypeId).HasDatabaseName("ix_npcs_npc_type_id");
-        npc.HasIndex(entity => entity.NpcRaceId).HasDatabaseName("ix_npcs_npc_race_id");
-        npc.HasIndex(entity => entity.NpcSexId).HasDatabaseName("ix_npcs_npc_sex_id");
+        npc.Property(entity => entity.NpcTypeName).HasColumnName("npc_type_name").HasMaxLength(64);
+        npc.Property(entity => entity.NpcRaceName).HasColumnName("npc_race_name").HasMaxLength(64).IsRequired(false);
+        npc.Property(entity => entity.NpcSexName).HasColumnName("npc_sex_name").HasMaxLength(64);
+        npc.HasIndex(entity => new { entity.GameVersion, entity.NpcTypeName }).HasDatabaseName("ix_npcs_npc_type_name");
+        npc.HasIndex(entity => new { entity.GameVersion, entity.NpcRaceName }).HasDatabaseName("ix_npcs_npc_race_name");
+        npc.HasIndex(entity => new { entity.GameVersion, entity.NpcSexName }).HasDatabaseName("ix_npcs_npc_sex_name");
         npc.HasOne(entity => entity.NpcType)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcTypeId })
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcTypeName })
             .OnDelete(DeleteBehavior.Restrict);
         npc.HasOne(entity => entity.NpcRace)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcRaceId })
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcRaceName })
             .OnDelete(DeleteBehavior.Restrict);
         npc.HasOne(entity => entity.NpcSex)
             .WithMany(entity => entity.Npcs)
-            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSexId })
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSexName })
             .OnDelete(DeleteBehavior.Restrict);
 
         var skillIcon = modelBuilder.Entity<SkillIcon>();
@@ -587,6 +605,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npcType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcRace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcSex.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcLookupImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npc.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillTargetType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -600,7 +619,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         {
             typeof(PlayerRace), typeof(PlayerSex), typeof(PlayerClass), typeof(PlayerFace),
             typeof(PlayerHairStyle), typeof(PlayerHairColor), typeof(NpcType), typeof(NpcRace),
-            typeof(NpcSex), typeof(Npc), typeof(SkillOperateType), typeof(SkillTargetType),
+            typeof(NpcSex), typeof(Npc), typeof(NpcLookupImportRun), typeof(SkillOperateType), typeof(SkillTargetType),
             typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),
             typeof(AssetCatalog)
         })

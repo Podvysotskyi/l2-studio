@@ -110,30 +110,26 @@ const columns: TableColumn<NpcRecord>[] = [
           </template>
           <template #npcType-cell="{ row }">
             <div>
-              <span class="text-sm">{{ row.original.npcType }}</span>
-              <span class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcTypeId }}</span
-              >
+              <span class="text-sm">{{ row.original.npcTypeDisplayName }}</span>
+              <span class="ml-2 text-xs text-dimmed">{{ row.original.npcTypeName }}</span>
             </div>
           </template>
           <template #npcRace-cell="{ row }">
             <div>
               <span class="text-sm">{{
-                row.original.npcRace ?? 'No race'
+                row.original.npcRaceDisplayName ?? 'No race'
               }}</span>
               <span
-                v-if="row.original.npcRaceId !== null"
+                v-if="row.original.npcRaceName !== null"
                 class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcRaceId }}</span
+                >{{ row.original.npcRaceName }}</span
               >
             </div>
           </template>
           <template #npcSex-cell="{ row }">
             <div>
-              <span class="text-sm">{{ row.original.npcSex }}</span>
-              <span class="ml-2 text-xs text-dimmed"
-                >#{{ row.original.npcSexId }}</span
-              >
+              <span class="text-sm">{{ row.original.npcSexDisplayName }}</span>
+              <span class="ml-2 text-xs text-dimmed">{{ row.original.npcSexName }}</span>
             </div>
           </template>
         </UTable>

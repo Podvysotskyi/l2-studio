@@ -37,12 +37,12 @@ public sealed class ContentDirectoryRepository(
                 npc.Id,
                 npc.Level,
                 npc.Name,
-                (int)npc.NpcTypeId,
-                npc.NpcType.Name,
-                (int?)npc.NpcRaceId,
-                npc.NpcRace == null ? null : npc.NpcRace.Name,
-                (int)npc.NpcSexId,
-                npc.NpcSex.Name))
+                npc.NpcTypeName,
+                npc.NpcType.DisplayName,
+                npc.NpcRaceName,
+                npc.NpcRace == null ? null : npc.NpcRace.DisplayName,
+                npc.NpcSexName,
+                npc.NpcSex.DisplayName))
             .ToListAsync(cancellationToken);
 
         return new NpcDirectoryPage(items, total, page, pageSize);
@@ -56,8 +56,8 @@ public sealed class ContentDirectoryRepository(
         return await context.NpcTypes
             .AsNoTracking()
             .Where(item => item.GameVersion == gameVersion)
-            .OrderBy(item => item.Id)
-            .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
+            .OrderBy(item => item.Name)
+            .Select(item => new NpcLookupSummary(item.Name, item.DisplayName))
             .ToListAsync(cancellationToken);
     }
 
@@ -69,8 +69,8 @@ public sealed class ContentDirectoryRepository(
         return await context.NpcRaces
             .AsNoTracking()
             .Where(item => item.GameVersion == gameVersion)
-            .OrderBy(item => item.Id)
-            .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
+            .OrderBy(item => item.Name)
+            .Select(item => new NpcLookupSummary(item.Name, item.DisplayName))
             .ToListAsync(cancellationToken);
     }
 
@@ -82,9 +82,51 @@ public sealed class ContentDirectoryRepository(
         return await context.NpcSexes
             .AsNoTracking()
             .Where(item => item.GameVersion == gameVersion)
-            .OrderBy(item => item.Id)
-            .Select(item => new NpcLookupSummary((int)item.Id, item.Name))
+            .OrderBy(item => item.Name)
+            .Select(item => new NpcLookupSummary(item.Name, item.DisplayName))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<NpcLookupSummary?> UpdateNpcLookupDisplayNameAsync(
+        string gameVersion,
+        string kind,
+        string name,
+        string displayName,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        switch (kind)
+        {
+            case "npc-types":
+            {
+                var item = await context.NpcTypes.SingleOrDefaultAsync(
+                    value => value.GameVersion == gameVersion && value.Name == name, cancellationToken);
+                if (item is null) return null;
+                item.DisplayName = displayName;
+                await context.SaveChangesAsync(cancellationToken);
+                return new NpcLookupSummary(item.Name, item.DisplayName);
+            }
+            case "npc-races":
+            {
+                var item = await context.NpcRaces.SingleOrDefaultAsync(
+                    value => value.GameVersion == gameVersion && value.Name == name, cancellationToken);
+                if (item is null) return null;
+                item.DisplayName = displayName;
+                await context.SaveChangesAsync(cancellationToken);
+                return new NpcLookupSummary(item.Name, item.DisplayName);
+            }
+            case "npc-sexes":
+            {
+                var item = await context.NpcSexes.SingleOrDefaultAsync(
+                    value => value.GameVersion == gameVersion && value.Name == name, cancellationToken);
+                if (item is null) return null;
+                item.DisplayName = displayName;
+                await context.SaveChangesAsync(cancellationToken);
+                return new NpcLookupSummary(item.Name, item.DisplayName);
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind));
+        }
     }
 
     public async Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(

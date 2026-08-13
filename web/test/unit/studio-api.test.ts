@@ -7,10 +7,15 @@ import {
   getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
+  getNpcLookupDirectory,
+  getNpcLookupImportJob,
+  getNpcLookupImportJobs,
   getStudioServiceInfo,
   startAssetFileImport,
   startAssetResourceImport,
   startAssetImport,
+  startNpcLookupImport,
+  updateNpcLookupDisplayName,
   rebuildStaleAssetSources,
   verifyAssetArtifact
 } from '../../app/services/studio-api'
@@ -145,6 +150,33 @@ describe('Studio API service', () => {
     await verifyAssetArtifact('artifact id')
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/assets/artifacts/artifact%20id/verify',
+      { method: 'POST' }
+    )
+  })
+
+  it('reads, edits, and imports NPC lookups through version-scoped APIs', async () => {
+    fetchMock.mockResolvedValue([])
+    await getNpcLookupDirectory('npc-types')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npc-types')
+
+    await updateNpcLookupDisplayName('npc-races', 'DARK_ELF', 'Dark Elf')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-races/DARK_ELF',
+      { method: 'PATCH', body: { displayName: 'Dark Elf' } }
+    )
+
+    await getNpcLookupImportJobs('npc-races')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-races/imports',
+      { query: { limit: 1 } }
+    )
+    await getNpcLookupImportJob('npc-races', 'run-id')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-races/imports/run-id'
+    )
+    await startNpcLookupImport('npc-races')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-races/imports',
       { method: 'POST' }
     )
   })
