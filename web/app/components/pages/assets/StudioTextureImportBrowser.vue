@@ -26,6 +26,7 @@ const selectedTexture = ref<TextureManifestEntry>()
 const reimporting = ref(false)
 const progressJobId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const folder = computed(() => typeof route.query.folder === 'string' && route.query.folder.length ? route.query.folder : undefined)
@@ -59,6 +60,32 @@ const progressItems = computed(() => {
   const job = jobs.value.find(item => item.id === progressJobId.value)
   return job ? [assetImportProgressItem(job, 'Textures')] : []
 })
+const importMenuItems = computed(() => [[
+  {
+    label: 'Import textures',
+    icon: 'i-lucide-play',
+    onSelect: (): void => { void queueImport() }
+  },
+  {
+    label: 'Force rebuild textures',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queueImport(true) }
+  }
+]])
+const selectedTextureMenuItems = computed(() => selectedTexture.value ? [[
+  {
+    label: 'Re-import package',
+    icon: 'i-lucide-rotate-cw',
+    onSelect: (): void => { void reimportTexture() }
+  },
+  {
+    label: 'Force rebuild package',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void reimportTexture(true) }
+  }
+]] : [])
 
 watch([folder, packageName], () => {
   selectedTexture.value = undefined
@@ -124,22 +151,25 @@ async function loadJobs(schedule = true) {
   if (schedule && activeJob.value) pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
-async function queueImport() {
+async function queueImport(force = false) {
   queueing.value = true
   error.value = undefined
   try {
-    const job = await startAssetImport('textures')
+    const job = await startAssetImport('textures', { force })
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value = 'The texture import could not be queued. Another texture import may already be active.'
+    notifications.error({
+      title: 'Texture import could not be queued',
+      description: 'Another texture import may already be active.'
+    })
   } finally {
     queueing.value = false
   }
 }
 
-async function reimportTexture() {
+async function reimportTexture(force = false) {
   if (!selectedTexture.value) return
   reimporting.value = true
   error.value = undefined
@@ -148,13 +178,19 @@ async function reimportTexture() {
       'textures',
       selectedTexture.value.objectName,
       selectedTexture.value.packageName,
-      selectedTexture.value.sourceKey
+      selectedTexture.value.sourceKey,
+      force
     )
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value = 'The texture package re-import could not be queued.'
+    notifications.error({
+      title: force
+        ? 'Forced texture package rebuild could not be queued'
+        : 'Texture package re-import could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     reimporting.value = false
   }
@@ -173,7 +209,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     <StudioPageHeader eyebrow="Asset pipeline" title="Textures" description="Browse generated textures by their original client path." icon="i-lucide-images">
       <template #actions>
         <UButton label="Import jobs" icon="i-lucide-history" color="neutral" variant="outline" to="/pipeline/imports" />
-        <UButton label="Import textures" icon="i-lucide-play" :loading="queueing" :disabled="Boolean(activeJob)" @click="queueImport" />
+        <UDropdownMenu :items="importMenuItems" :content="{ align: 'end' }">
+          <UButton label="Import textures" icon="i-lucide-play" trailing-icon="i-lucide-chevron-down" :loading="queueing" :disabled="Boolean(activeJob)" />
+        </UDropdownMenu>
       </template>
     </StudioPageHeader>
 
@@ -211,7 +249,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             <img v-if="selectedTexture.url" :src="selectedTexture.url" :alt="selectedTexture.path" :style="{ width: previewWidth(selectedTexture) }" class="h-auto max-h-[58vh] max-w-full object-contain [image-rendering:pixelated]" />
             <div v-else class="text-center text-sm text-muted"><UIcon name="i-lucide-image-off" class="mx-auto mb-2 size-6" />Preview unavailable</div>
           </div>
-          <div class="flex items-center justify-between gap-3 border-t border-default p-3 text-xs text-muted"><span>{{ selectedTexture.width }}×{{ selectedTexture.height }} · {{ selectedTexture.format }} · {{ selectedTexture.mipCount }} mips</span><UButton label="Re-import package" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting" @click="reimportTexture" /></div>
+          <div class="flex items-center justify-between gap-3 border-t border-default p-3 text-xs text-muted"><span>{{ selectedTexture.width }}×{{ selectedTexture.height }} · {{ selectedTexture.format }} · {{ selectedTexture.mipCount }} mips</span><UDropdownMenu :items="selectedTextureMenuItems" :content="{ align: 'end' }"><UButton label="Package actions" icon="i-lucide-rotate-cw" trailing-icon="i-lucide-chevron-down" size="xs" color="neutral" variant="outline" :loading="reimporting" :disabled="Boolean(activeJob)" /></UDropdownMenu></div>
         </aside>
       </div>
       <div v-else class="grid min-h-64 place-items-center p-8 text-center text-sm text-muted">No imported texture catalog is available. Queue the first import.</div>

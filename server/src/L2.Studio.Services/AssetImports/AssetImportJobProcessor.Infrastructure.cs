@@ -26,12 +26,12 @@ public sealed partial class AssetImportJobProcessor
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string VersionedUrl(
-        string sourceFolder,
+        string provisionalUrlRoot,
         string packageName,
         string fileName,
         string hash,
         bool gpuTextureAvailable = true) =>
-        $"/{EscapedUrlRoot(sourceFolder)}/{Uri.EscapeDataString(packageName)}/{Uri.EscapeDataString(fileName)}" +
+        $"/{EscapedUrlRoot(provisionalUrlRoot)}/{Uri.EscapeDataString(packageName)}/{Uri.EscapeDataString(fileName)}" +
         (gpuTextureAvailable ? string.Empty : "?gpu=none");
 
     private static string VersionedFileUrl(string sourceFolder, string fileName, string hash) =>
@@ -52,7 +52,7 @@ public sealed partial class AssetImportJobProcessor
         GameContentDbContext context,
         AssetImportJob job,
         string finalPath,
-        string sourceFolder,
+        string provisionalUrlRoot,
         int schemaVersion,
         int? protocol,
         IReadOnlyList<TGroup> groups,
@@ -79,11 +79,11 @@ public sealed partial class AssetImportJobProcessor
             cancellationToken);
         var fingerprint = AssetArtifactFingerprint.Compute(job.Kind, job.SourceHash!, dependencies.Select(dependency => (
             dependency.Kind, dependency.DependencyKey, dependency.ArtifactFingerprint ?? "missing")));
-        (finalPath, sourceFolder, publicationGroups, publicationItems, metadataJson) = RelocateArtifact(
-            job, finalPath, sourceFolder, fingerprint, publicationGroups, publicationItems, metadataJson);
+        (finalPath, provisionalUrlRoot, publicationGroups, publicationItems, metadataJson) = RelocateArtifact(
+            job, finalPath, provisionalUrlRoot, fingerprint, publicationGroups, publicationItems, metadataJson);
         job.ArtifactFingerprint = fingerprint;
         await File.WriteAllTextAsync(Path.Combine(finalPath, ".l2-asset-version"), fingerprint, cancellationToken);
-        var files = await InventoryFilesAsync(finalPath, sourceFolder, cancellationToken);
+        var files = await InventoryFilesAsync(finalPath, provisionalUrlRoot, cancellationToken);
         var contentHash = AggregateContentHash(files);
         await File.WriteAllTextAsync(
             Path.Combine(finalPath, ".l2-artifact.json"),
@@ -217,11 +217,11 @@ public sealed partial class AssetImportJobProcessor
         public int GetHashCode((string Kind, string DependencyKey) value) => HashCode.Combine(value.Kind, value.DependencyKey);
     }
 
-    private (string FinalPath, string SourceFolder, AssetCatalogPublicationEntry[] Groups,
+    internal (string FinalPath, string PublishedUrlRoot, AssetCatalogPublicationEntry[] Groups,
         AssetCatalogPublicationEntry[] Items, string MetadataJson) RelocateArtifact(
         AssetImportJob job,
         string finalPath,
-        string sourceFolder,
+        string provisionalUrlRoot,
         string fingerprint,
         AssetCatalogPublicationEntry[] groups,
         AssetCatalogPublicationEntry[] items,
@@ -231,9 +231,9 @@ public sealed partial class AssetImportJobProcessor
         var target = Path.Combine(AssetRoot(job), relative);
         var targetFolder = Path.Combine("versions", job.GameVersion, relative).Replace('\\', '/');
         if (string.Equals(finalPath, target, StringComparison.Ordinal))
-            return (finalPath, sourceFolder, groups, items, metadataJson);
+            return (finalPath, provisionalUrlRoot, groups, items, metadataJson);
         foreach (var path in Directory.EnumerateFiles(finalPath, "*.json", SearchOption.AllDirectories))
-            File.WriteAllText(path, File.ReadAllText(path).Replace(sourceFolder, targetFolder, StringComparison.Ordinal));
+            File.WriteAllText(path, File.ReadAllText(path).Replace(provisionalUrlRoot, targetFolder, StringComparison.Ordinal));
         if (Directory.Exists(target))
         {
             if (!string.Equals(DirectoryContentHash(finalPath), DirectoryContentHash(target), StringComparison.Ordinal))
@@ -247,14 +247,14 @@ public sealed partial class AssetImportJobProcessor
             Directory.Move(finalPath, target);
         }
         AssetCatalogPublicationEntry Replace(AssetCatalogPublicationEntry entry) =>
-            entry with { MetadataJson = entry.MetadataJson.Replace(sourceFolder, targetFolder, StringComparison.Ordinal) };
+            entry with { MetadataJson = entry.MetadataJson.Replace(provisionalUrlRoot, targetFolder, StringComparison.Ordinal) };
         return (target, targetFolder, groups.Select(Replace).ToArray(), items.Select(Replace).ToArray(),
-            metadataJson.Replace(sourceFolder, targetFolder, StringComparison.Ordinal));
+            metadataJson.Replace(provisionalUrlRoot, targetFolder, StringComparison.Ordinal));
     }
 
-    private static async Task<AssetArtifactFilePublication[]> InventoryFilesAsync(
+    internal static async Task<AssetArtifactFilePublication[]> InventoryFilesAsync(
         string root,
-        string publicRoot,
+        string publishedUrlRoot,
         CancellationToken cancellationToken)
     {
         var files = new List<AssetArtifactFilePublication>();
@@ -269,7 +269,7 @@ public sealed partial class AssetImportJobProcessor
             var size = new FileInfo(path).Length;
             files.Add(new AssetArtifactFilePublication(
                 relative,
-                $"/{publicRoot.Trim('/')}/{string.Join('/', relative.Split('/').Select(Uri.EscapeDataString))}",
+                $"/{publishedUrlRoot.Trim('/')}/{string.Join('/', relative.Split('/').Select(Uri.EscapeDataString))}",
                 FileRole(relative),
                 MediaType(relative),
                 size,

@@ -10,6 +10,13 @@ describe('published asset URLs', () => {
       .toBe('http://localhost:5300/versions/c1/Textures/a.webp')
   })
 
+  it('preserves already absolute generated asset URLs', () => {
+    expect(publishedAssetUrl(
+      'https://assets.example/versions/c1/Maps/a/manifest.json',
+      'http://localhost:5300/'
+    )).toBe('https://assets.example/versions/c1/Maps/a/manifest.json')
+  })
+
   it('resolves nested manifest URLs without altering display paths', () => {
     expect(resolvePublishedAssetUrls({
       manifestUrl: '/versions/c1/Maps/a/manifest.json',

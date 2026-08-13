@@ -102,12 +102,18 @@ describe('Studio API service', () => {
     )
   })
 
-  it('encodes single-file re-import filenames', async () => {
+  it('preserves single-file route separators while encoding each path segment', async () => {
     fetchMock.mockResolvedValue({})
     await startAssetFileImport('textures', 'systextures/Lineage Effects.utx')
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/assets/textures/imports/files/systextures%2FLineage%20Effects.utx',
+      '/api/game-versions/c1/assets/textures/imports/files/systextures/Lineage%20Effects.utx',
       { method: 'POST', query: { force: false } }
+    )
+
+    await startAssetFileImport('scenes', 'Maps/Entry.unr', true)
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/scenes/imports/files/Maps/Entry.unr',
+      { method: 'POST', query: { force: true } }
     )
   })
 

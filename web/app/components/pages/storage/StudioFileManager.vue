@@ -23,13 +23,14 @@ const entries = ref<StorageEntry[]>([])
 const query = ref('')
 const sort = ref<StorageSort>('name-asc')
 const loading = ref(false)
-const error = ref<string>()
+const loadError = ref<string>()
 const uploads = ref<StorageUploadItem[]>([])
 const uploadDrawerOpen = ref(false)
 const selectedPaths = ref<string[]>([])
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const folderInput = useTemplateRef<HTMLInputElement>('folderInput')
 const dialogs = useStudioDialogs()
+const notifications = useStudioToasts()
 
 const writable = computed(() => kind.value === 'resources')
 const visibleEntries = computed(() => visibleStorageEntries(entries.value, query.value, sort.value))
@@ -66,7 +67,7 @@ watch(kind, () => {
 
 async function load() {
   loading.value = true
-  error.value = undefined
+  loadError.value = undefined
   try {
     const listing = await getStorageEntries(kind.value, currentPath.value)
     entries.value = listing.entries
@@ -75,7 +76,7 @@ async function load() {
     )
   } catch (reason) {
     entries.value = []
-    error.value = requestMessage(reason, 'Storage contents could not be loaded.')
+    loadError.value = requestMessage(reason, 'Storage contents could not be loaded.')
   } finally {
     loading.value = false
   }
@@ -107,7 +108,8 @@ async function createFolder() {
   if (!name) return
   await runMutation(
     () => createStorageFolder(childPath(name)),
-    'The folder could not be created.'
+    'The folder could not be created.',
+    'Folder created'
   )
 }
 
@@ -128,7 +130,8 @@ async function moveWithConflict(path: string, destination: string) {
   try {
     await moveStorageEntry(path, destination)
   } catch (reason) {
-    const replace = requestStatus(reason) === 409 && await dialogs.confirm({
+    const conflict = requestStatus(reason) === 409
+    const replace = conflict && await dialogs.confirm({
       title: 'Replace existing entry?',
       description: `An entry already exists at ${destination}. Replacing it cannot be undone.`,
       confirmLabel: 'Replace',
@@ -137,14 +140,20 @@ async function moveWithConflict(path: string, destination: string) {
     if (replace) {
       await runMutation(
         () => moveStorageEntry(path, destination, true),
-        'The entry could not be moved.'
+        'The entry could not be moved.',
+        'Entry moved'
       )
       return
     }
-    error.value = requestMessage(reason, 'The entry could not be moved.')
+    if (conflict) return
+    notifications.error({
+      title: 'Entry could not be moved',
+      description: requestMessage(reason, 'Try the move again.')
+    })
     return
   }
   await load()
+  notifications.success({ title: 'Entry moved' })
 }
 
 async function remove(entry: StorageEntry) {
@@ -157,7 +166,8 @@ async function remove(entry: StorageEntry) {
   if (!confirmed) return
   await runMutation(
     () => deleteStorageEntry(entry.path),
-    'The entry could not be deleted.'
+    'The entry could not be deleted.',
+    'Entry deleted'
   )
 }
 
@@ -194,16 +204,26 @@ async function removeSelected() {
     failure = reason
   }
   await load()
-  if (failure) error.value = requestMessage(failure, 'Some selected entries could not be deleted.')
+  if (failure) {
+    notifications.error({
+      title: 'Some entries could not be deleted',
+      description: requestMessage(failure, 'Try the delete again.')
+    })
+    return
+  }
+  notifications.success({ title: 'Selected entries deleted' })
 }
 
-async function runMutation(action: () => Promise<unknown>, fallback: string) {
-  error.value = undefined
+async function runMutation(action: () => Promise<unknown>, fallback: string, successTitle: string) {
   try {
     await action()
     await load()
+    notifications.success({ title: successTitle })
   } catch (reason) {
-    error.value = requestMessage(reason, fallback)
+    notifications.error({
+      title: fallback,
+      description: requestMessage(reason, 'Try the action again.')
+    })
   }
 }
 
@@ -243,7 +263,10 @@ async function queueUploads(files: File[], preservePaths: boolean) {
 }
 
 function rejectFolderDrop() {
-  error.value = 'Dropped folders are not supported. Use Upload → Choose folder to upload folder contents.'
+  notifications.error({
+    title: 'Dropped folders are not supported',
+    description: 'Use Upload → Choose folder to upload folder contents.'
+  })
 }
 
 async function runUploadQueue() {
@@ -367,12 +390,12 @@ onMounted(() => void load())
     </div>
 
     <UAlert
-      v-if="error"
+      v-if="loadError"
       color="error"
       variant="subtle"
       icon="i-lucide-circle-alert"
       title="Storage operation failed"
-      :description="error"
+      :description="loadError"
     />
 
     <StudioStorageExplorer

@@ -178,7 +178,7 @@ public sealed partial class AssetImportJobProcessor
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
             var previewEntries = maps.Select(map => entries[map.SourceKey]).ToArray();
-            await PublishCatalogAsync(context, job, finalPath, AssetImportJobValues.MapPreviews, 1, null,
+            await PublishCatalogAsync(context, job, finalPath, outputUrlRoot, 1, null,
                 Array.Empty<string>(), previewEntries, group => group, item => item.Name, _ => null,
                 item => item.Status, new MapPreviewCatalogMetadata(MapPreviewGeneration.RendererVersion), cancellationToken);
             job.ProcessedCount = job.TotalCount;
@@ -249,7 +249,10 @@ public sealed partial class AssetImportJobProcessor
                         Height = MapPreviewGeneration.Size,
                         DeviceScaleFactor = 1
                     }).WaitAsync(cancellationToken);
-                    var url = MapPreviewCaptureUrl(options.Value.StudioBaseUrl, map);
+                    var url = MapPreviewCaptureUrl(
+                        options.Value.StudioBaseUrl,
+                        options.Value.MapPreviewAssetBaseUrl,
+                        map);
                     await page.GoToAsync(url, new NavigationOptions
                     {
                         WaitUntil = [WaitUntilNavigation.DOMContentLoaded],
@@ -336,9 +339,13 @@ public sealed partial class AssetImportJobProcessor
         }
     }
 
-    internal static string MapPreviewCaptureUrl(string studioBaseUrl, MapPreviewRenderMap map) =>
+    internal static string MapPreviewCaptureUrl(
+        string studioBaseUrl,
+        string assetBaseUrl,
+        MapPreviewRenderMap map) =>
         $"{studioBaseUrl.TrimEnd('/')}/internal/map-preview/{Uri.EscapeDataString(map.Name)}" +
-        $"?manifestUrl={Uri.EscapeDataString(map.ManifestUrl)}";
+        $"?manifestUrl={Uri.EscapeDataString(map.ManifestUrl)}" +
+        $"&assetBaseUrl={Uri.EscapeDataString(assetBaseUrl.TrimEnd('/'))}";
 
     private static async Task<string> ResolveBrowserWebSocketEndpointAsync(
         string browserUrl,
@@ -750,12 +757,12 @@ public sealed partial class AssetImportJobProcessor
             Promote(stagingPath, finalPath);
             if (scenes)
             {
-                await PublishCatalogAsync(context, job, finalPath, "maps", SceneSchemaVersion, 111, Array.Empty<string>(), sceneCatalogEntries,
+                await PublishCatalogAsync(context, job, finalPath, outputUrlRoot, SceneSchemaVersion, 111, Array.Empty<string>(), sceneCatalogEntries,
                     group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
             }
             else
             {
-                await PublishCatalogAsync(context, job, finalPath, "maps", MapSchemaVersion, 111, Array.Empty<string>(), catalogEntries,
+                await PublishCatalogAsync(context, job, finalPath, outputUrlRoot, MapSchemaVersion, 111, Array.Empty<string>(), catalogEntries,
                     group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
             }
             job.Status = warnings.Count == 0

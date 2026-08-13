@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount } from 'vue'
 import {
   getAssetCatalog,
   getAssetImportJobs,
+  startAssetFileImport,
   startAssetImport
 } from '../../../services/studio-api'
 import { assetImportProgressItem } from '../../../utils/import-progress'
@@ -12,9 +13,11 @@ import { assetImportProgressItem } from '../../../utils/import-progress'
 const jobs = ref<AssetImportJob[]>([])
 const catalog = ref<AssetCatalogPage<SceneCatalogEntry>>()
 const queueing = ref(false)
+const reimporting = ref<string>()
 const error = ref<string>()
 const progressJobId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -54,17 +57,70 @@ async function loadJobs(schedule = true) {
     pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
-async function queueImport() {
+const importMenuItems = computed(() => [[
+  {
+    label: 'Import scenes',
+    icon: 'i-lucide-play',
+    onSelect: (): void => { void queueImport() }
+  },
+  {
+    label: 'Force rebuild scenes',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queueImport(true) }
+  }
+]])
+
+function sceneMenuItems(scene: SceneCatalogEntry) {
+  return [[
+    {
+      label: 'Re-import scene',
+      icon: 'i-lucide-rotate-cw',
+      onSelect: (): void => { void reimportScene(scene) }
+    },
+    {
+      label: 'Force rebuild scene',
+      icon: 'i-lucide-hammer',
+      color: 'warning' as const,
+      onSelect: (): void => { void reimportScene(scene, true) }
+    }
+  ]]
+}
+
+async function queueImport(force = false) {
   queueing.value = true
   try {
-    const job = await startAssetImport('scenes')
+    const job = await startAssetImport('scenes', { force })
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value = 'The scene import could not be queued.'
+    notifications.error({
+      title: 'Scene import could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     queueing.value = false
+  }
+}
+
+async function reimportScene(scene: SceneCatalogEntry, force = false) {
+  reimporting.value = scene.sourceKey
+  error.value = undefined
+  try {
+    const job = await startAssetFileImport('scenes', scene.sourceKey, force)
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
+    await loadJobs()
+  } catch {
+    notifications.error({
+      title: force
+        ? `Forced scene rebuild for ${scene.name} could not be queued`
+        : `Scene re-import for ${scene.name} could not be queued`,
+      description: 'Try the action again.'
+    })
+  } finally {
+    reimporting.value = undefined
   }
 }
 
@@ -84,13 +140,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       icon="i-lucide-clapperboard"
     >
       <template #actions>
-        <UButton
-          label="Import scenes"
-          icon="i-lucide-play"
-          :loading="queueing"
-          :disabled="Boolean(activeJob)"
-          @click="queueImport"
-        />
+        <UDropdownMenu :items="importMenuItems" :content="{ align: 'end' }">
+          <UButton
+            label="Import scenes"
+            icon="i-lucide-play"
+            trailing-icon="i-lucide-chevron-down"
+            :loading="queueing"
+            :disabled="Boolean(activeJob)"
+          />
+        </UDropdownMenu>
       </template>
     </StudioPageHeader>
 
@@ -129,19 +187,31 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               {{ scene.error }}
             </p>
           </div>
-          <UButton
-            label="Open scene"
-            icon="i-lucide-arrow-right"
-            trailing
-            color="neutral"
-            variant="outline"
-            :disabled="!scene.manifestUrl"
-            :to="
-              scene.manifestUrl
-                ? { name: 'library-scenes-name', params: { name: scene.name }, query: { source: scene.sourceKey } }
-                : undefined
-            "
-          />
+          <div class="flex shrink-0 items-center gap-2">
+            <UDropdownMenu :items="sceneMenuItems(scene)" :content="{ align: 'end' }">
+              <UButton
+                icon="i-lucide-ellipsis"
+                :aria-label="`Actions for ${scene.name}`"
+                color="neutral"
+                variant="ghost"
+                :loading="reimporting === scene.sourceKey"
+                :disabled="Boolean(activeJob)"
+              />
+            </UDropdownMenu>
+            <UButton
+              label="Open scene"
+              icon="i-lucide-arrow-right"
+              trailing
+              color="neutral"
+              variant="outline"
+              :disabled="!scene.manifestUrl"
+              :to="
+                scene.manifestUrl
+                  ? { name: 'library-scenes-name', params: { name: scene.name }, query: { source: scene.sourceKey } }
+                  : undefined
+              "
+            />
+          </div>
         </div>
       </UCard>
     </div>

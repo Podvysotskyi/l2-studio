@@ -24,7 +24,9 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   generatePreview: [map: MapCatalogEntry]
+  forceGeneratePreview: [map: MapCatalogEntry]
   reimport: [map: MapCatalogEntry]
+  forceReimport: [map: MapCatalogEntry]
 }>()
 
 const viewport = ref<HTMLElement>()
@@ -152,6 +154,40 @@ function onClickCapture(event: MouseEvent) {
 
 function selectCell(cell: MapWorldCell) {
   if (cell.map) selectedMap.value = cell.map
+}
+
+function mapImportMenuItems(map: MapCatalogEntry) {
+  return [[
+    {
+      label: 'Re-import map',
+      icon: 'i-lucide-rotate-cw',
+      onSelect: () => emit('reimport', map)
+    },
+    {
+      label: 'Force rebuild map',
+      icon: 'i-lucide-hammer',
+      color: 'warning' as const,
+      onSelect: () => emit('forceReimport', map)
+    }
+  ]]
+}
+
+function previewMenuItems(map: MapCatalogEntry) {
+  return [[
+    {
+      label: selectedPreview.value?.imageUrl
+        ? 'Regenerate preview'
+        : 'Generate preview',
+      icon: 'i-lucide-refresh-cw',
+      onSelect: () => emit('generatePreview', map)
+    },
+    {
+      label: 'Force regenerate preview',
+      icon: 'i-lucide-hammer',
+      color: 'warning' as const,
+      onSelect: () => emit('forceGeneratePreview', map)
+    }
+  ]]
 }
 
 function onViewportKeydown(event: KeyboardEvent) {
@@ -399,29 +435,30 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
           "
         />
         <div class="mt-5 grid gap-2">
-          <UButton
-            label="Re-import map"
-            icon="i-lucide-rotate-cw"
-            color="neutral"
-            variant="outline"
-            block
-            :loading="reimportingMapName === selectedMap.name"
-            @click="emit('reimport', selectedMap)"
-          />
-          <UButton
-            :label="
-              selectedPreview?.imageUrl
-                ? 'Regenerate preview'
-                : 'Generate preview'
-            "
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            block
-            :loading="queueingPreviewName === selectedMap.name"
-            :disabled="previewJobActive || !selectedMap.manifestUrl"
-            @click="emit('generatePreview', selectedMap)"
-          />
+          <UDropdownMenu :items="mapImportMenuItems(selectedMap)" :content="{ align: 'end' }">
+            <UButton
+              label="Map import actions"
+              icon="i-lucide-rotate-cw"
+              trailing-icon="i-lucide-chevron-down"
+              color="neutral"
+              variant="outline"
+              block
+              :loading="reimportingMapName === selectedMap.name"
+              :disabled="previewJobActive"
+            />
+          </UDropdownMenu>
+          <UDropdownMenu :items="previewMenuItems(selectedMap)" :content="{ align: 'end' }">
+            <UButton
+              :label="selectedPreview?.imageUrl ? 'Preview actions' : 'Generate preview'"
+              icon="i-lucide-refresh-cw"
+              trailing-icon="i-lucide-chevron-down"
+              color="neutral"
+              variant="outline"
+              block
+              :loading="queueingPreviewName === selectedMap.name"
+              :disabled="previewJobActive || !selectedMap.manifestUrl"
+            />
+          </UDropdownMenu>
           <UButton
             label="Open map"
             icon="i-lucide-arrow-up-right"

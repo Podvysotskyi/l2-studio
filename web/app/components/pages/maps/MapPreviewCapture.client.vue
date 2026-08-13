@@ -4,7 +4,10 @@ import { StudioWorldRenderer } from '~/runtime'
 import { getPublishedManifest } from '../../../services/published-assets'
 import { nextTick, onBeforeUnmount, onMounted } from 'vue'
 
-const props = defineProps<{ manifestUrl: string }>()
+const props = defineProps<{
+  manifestUrl: string
+  assetBaseUrl?: string
+}>()
 const canvas = ref<HTMLCanvasElement>()
 let preview: StudioWorldRenderer | undefined
 
@@ -27,7 +30,10 @@ onMounted(async () => {
       canvas.value ??
       document.querySelector<HTMLCanvasElement>('[data-map-preview-canvas]')
     if (!target) throw new Error('The preview canvas is unavailable.')
-    const manifest = await getPublishedManifest<MapManifest>(props.manifestUrl)
+    const manifest = await getPublishedManifest<MapManifest>(
+      props.manifestUrl,
+      props.assetBaseUrl || undefined
+    )
     preview = new StudioWorldRenderer(target, {
       interactive: false,
       preserveDrawingBuffer: true

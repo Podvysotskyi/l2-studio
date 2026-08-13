@@ -29,6 +29,7 @@ const reimportingMap = ref<string>()
 const progressJobId = ref<string>()
 const progressPreviewJobId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -56,6 +57,48 @@ const progressItems = computed(() => {
   if (previewJob) items.push(assetImportProgressItem(previewJob, 'Map previews'))
   return items
 })
+const mapImportMenuItems = computed(() => [[
+  {
+    label: 'Import maps',
+    icon: 'i-lucide-play',
+    onSelect: (): void => { void queueImport() }
+  },
+  {
+    label: 'Force rebuild maps',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queueImport(true) }
+  }
+]])
+const previewImportMenuItems = computed(() => [[
+  {
+    label: 'Generate previews',
+    icon: 'i-lucide-image',
+    onSelect: (): void => { void queuePreviews() }
+  },
+  {
+    label: 'Force regenerate previews',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queuePreviews(undefined, true) }
+  }
+]])
+
+function mapMenuItems(map: MapCatalogEntry) {
+  return [[
+    {
+      label: 'Re-import map',
+      icon: 'i-lucide-rotate-cw',
+      onSelect: (): void => { void reimportMap(map) }
+    },
+    {
+      label: 'Force rebuild map',
+      icon: 'i-lucide-hammer',
+      color: 'warning' as const,
+      onSelect: (): void => { void reimportMap(map, true) }
+    }
+  ]]
+}
 
 async function loadCatalog() {
   try {
@@ -98,52 +141,67 @@ async function loadJobs(schedule = true) {
     pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
-async function queuePreviews(map?: MapCatalogEntry) {
+async function queuePreviews(map?: MapCatalogEntry, force = false) {
   queueingPreviews.value = true
   queueingPreviewName.value = map?.name
   jobsError.value = undefined
   try {
     const job = map
-      ? await startAssetFileImport('mappreviews', map.sourceKey)
-      : await startAssetImport('mappreviews')
+      ? await startAssetFileImport('mappreviews', map.sourceKey, force)
+      : await startAssetImport('mappreviews', { force })
     progressPreviewJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    jobsError.value = map
-      ? `The preview for ${map.name} could not be queued.`
-      : 'The map previews could not be queued.'
+    const title = map
+      ? force
+        ? `Forced preview rebuild for ${map.name} could not be queued`
+        : `Preview for ${map.name} could not be queued`
+      : force
+        ? 'Forced map-preview rebuild could not be queued'
+        : 'Map previews could not be queued'
+    notifications.error({ title, description: 'Try the action again.' })
   } finally {
     queueingPreviews.value = false
     queueingPreviewName.value = undefined
   }
 }
 
-async function queueImport() {
+async function queueImport(force = false) {
   queueing.value = true
   jobsError.value = undefined
   try {
-    const job = await startAssetImport('maps')
+    const job = await startAssetImport('maps', { force })
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    jobsError.value = 'The map import could not be queued.'
+    notifications.error({
+      title: force ? 'Forced map rebuild could not be queued' : 'Map import could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     queueing.value = false
   }
 }
 
-async function reimportMap(map: MapCatalogEntry) {
+async function reimportMap(map: MapCatalogEntry, force = false) {
   reimportingMap.value = map.name
   jobsError.value = undefined
   try {
-    const job = await startAssetResourceImport('maps', map.name, undefined, map.sourceKey)
+    const job = await startAssetResourceImport(
+      'maps', map.name, undefined, map.sourceKey, force
+    )
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    jobsError.value = `The map re-import for ${map.name} could not be queued.`
+    notifications.error({
+      title: force
+        ? `Forced map rebuild for ${map.name} could not be queued`
+        : `Map re-import for ${map.name} could not be queued`,
+      description: 'Try the action again.'
+    })
   } finally {
     reimportingMap.value = undefined
   }
@@ -165,16 +223,21 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       icon="i-lucide-map"
     >
       <template #actions>
-        <UButton
+        <UDropdownMenu
           v-if="hasMaps"
-          label="Generate previews"
-          icon="i-lucide-image"
-          color="neutral"
-          variant="outline"
-          :loading="queueingPreviews"
-          :disabled="Boolean(activePreviewJob || activeJob)"
-          @click="queuePreviews()"
-        />
+          :items="previewImportMenuItems"
+          :content="{ align: 'end' }"
+        >
+          <UButton
+            label="Generate previews"
+            icon="i-lucide-image"
+            trailing-icon="i-lucide-chevron-down"
+            color="neutral"
+            variant="outline"
+            :loading="queueingPreviews"
+            :disabled="Boolean(activePreviewJob || activeJob)"
+          />
+        </UDropdownMenu>
         <UButton
           label="Import jobs"
           icon="i-lucide-history"
@@ -182,13 +245,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           variant="outline"
           to="/pipeline/imports"
         />
-        <UButton
-          label="Import maps"
-          icon="i-lucide-play"
-          :loading="queueing"
-          :disabled="Boolean(activeJob || activePreviewJob)"
-          @click="queueImport"
-        />
+        <UDropdownMenu :items="mapImportMenuItems" :content="{ align: 'end' }">
+          <UButton
+            label="Import maps"
+            icon="i-lucide-play"
+            trailing-icon="i-lucide-chevron-down"
+            :loading="queueing"
+            :disabled="Boolean(activeJob || activePreviewJob)"
+          />
+        </UDropdownMenu>
       </template>
     </StudioPageHeader>
 
@@ -223,11 +288,13 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       <StudioMapWorldMap
         :grid="worldGrid"
         :previews="previews"
-        :preview-job-active="Boolean(activePreviewJob || queueingPreviews)"
+        :preview-job-active="Boolean(activePreviewJob || queueingPreviews || activeJob || queueing)"
         :queueing-preview-name="queueingPreviewName"
         :reimporting-map-name="reimportingMap"
         @generate-preview="queuePreviews"
+        @force-generate-preview="map => queuePreviews(map, true)"
         @reimport="reimportMap"
+        @force-reimport="map => reimportMap(map, true)"
       />
     </UCard>
 
@@ -248,7 +315,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
               : undefined
           "
         />
-        <UButton icon="i-lucide-rotate-cw" color="neutral" variant="ghost" size="xs" aria-label="Re-import map" :loading="reimportingMap === map.name" @click="reimportMap(map)" />
+        <UDropdownMenu :items="mapMenuItems(map)" :content="{ align: 'end' }">
+          <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="xs" :aria-label="`Actions for ${map.name}`" :loading="reimportingMap === map.name" :disabled="Boolean(activeJob || activePreviewJob)" />
+        </UDropdownMenu>
         </div>
       </div>
     </UCard>

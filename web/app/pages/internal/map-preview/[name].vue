@@ -12,10 +12,23 @@ const manifestUrl = computed(() => {
     ? value
     : ''
 })
+const assetBaseUrl = computed(() => {
+  const value = route.query.assetBaseUrl
+  if (typeof value !== 'string') return ''
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? value : ''
+  } catch {
+    return ''
+  }
+})
 </script>
 
 <template>
   <main class="h-[512px] w-[512px] overflow-hidden bg-black">
-    <MapPreviewCapture :manifest-url="manifestUrl" />
+    <MapPreviewCapture
+      :manifest-url="manifestUrl"
+      :asset-base-url="assetBaseUrl"
+    />
   </main>
 </template>

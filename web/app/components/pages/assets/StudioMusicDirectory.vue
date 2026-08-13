@@ -5,6 +5,7 @@ import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import {
   getAssetCatalog,
   getAssetImportJobs,
+  startAssetFileImport,
   startAssetImport
 } from '../../../services/studio-api'
 import { assetImportProgressItem } from '../../../utils/import-progress'
@@ -15,11 +16,13 @@ const query = ref('')
 const page = ref(1)
 const pageSize = ref(50)
 const queueing = ref(false)
+const reimporting = ref(false)
 const error = ref<string>()
 const selectedTrack = ref<MusicManifestEntry>()
 const audioPlayer = ref<HTMLAudioElement>()
 const progressJobId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -34,6 +37,32 @@ const progressItems = computed(() => {
   const job = jobs.value.find(item => item.id === progressJobId.value)
   return job ? [assetImportProgressItem(job, 'Music')] : []
 })
+const importMenuItems = computed(() => [[
+  {
+    label: 'Import music',
+    icon: 'i-lucide-play',
+    onSelect: (): void => { void queueImport() }
+  },
+  {
+    label: 'Force rebuild music',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queueImport(true) }
+  }
+]])
+const selectedTrackMenuItems = computed(() => selectedTrack.value ? [[
+  {
+    label: 'Re-import track',
+    icon: 'i-lucide-rotate-cw',
+    onSelect: (): void => { void reimportTrack() }
+  },
+  {
+    label: 'Force rebuild track',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void reimportTrack(true) }
+  }
+]] : [])
 
 watch([query, pageSize], () => {
   page.value = 1
@@ -100,19 +129,42 @@ async function loadJobs(schedule = true) {
   }
 }
 
-async function queueImport() {
+async function queueImport(force = false) {
   queueing.value = true
   error.value = undefined
   try {
-    const job = await startAssetImport('music')
+    const job = await startAssetImport('music', { force })
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value =
-      'The music import could not be queued. Another music import may already be active.'
+    notifications.error({
+      title: 'Music import could not be queued',
+      description: 'Another music import may already be active.'
+    })
   } finally {
     queueing.value = false
+  }
+}
+
+async function reimportTrack(force = false) {
+  if (!selectedTrack.value) return
+  reimporting.value = true
+  error.value = undefined
+  try {
+    const job = await startAssetFileImport('music', selectedTrack.value.sourceKey, force)
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
+    await loadJobs()
+  } catch {
+    notifications.error({
+      title: force
+        ? 'Forced music track rebuild could not be queued'
+        : 'Music track re-import could not be queued',
+      description: 'Try the action again.'
+    })
+  } finally {
+    reimporting.value = false
   }
 }
 
@@ -136,13 +188,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           variant="outline"
           to="/pipeline/imports"
         />
-        <UButton
-          label="Import music"
-          icon="i-lucide-play"
-          :loading="queueing"
-          :disabled="Boolean(activeJob)"
-          @click="queueImport"
-        />
+        <UDropdownMenu :items="importMenuItems" :content="{ align: 'end' }">
+          <UButton
+            label="Import music"
+            icon="i-lucide-play"
+            trailing-icon="i-lucide-chevron-down"
+            :loading="queueing"
+            :disabled="Boolean(activeJob)"
+          />
+        </UDropdownMenu>
       </template>
     </StudioPageHeader>
 
@@ -181,6 +235,18 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           preload="metadata"
           class="h-10 w-full sm:w-[28rem]"
         />
+        <UDropdownMenu :items="selectedTrackMenuItems" :content="{ align: 'end' }">
+          <UButton
+            label="Track actions"
+            icon="i-lucide-ellipsis"
+            trailing-icon="i-lucide-chevron-down"
+            size="xs"
+            color="neutral"
+            variant="outline"
+            :loading="reimporting"
+            :disabled="Boolean(activeJob)"
+          />
+        </UDropdownMenu>
       </div>
     </UCard>
 

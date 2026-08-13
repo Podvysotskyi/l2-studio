@@ -1,8 +1,9 @@
 import type { MapTerrainManifestEntry } from '~/types/studio'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   assembleTerrainControlArray,
   blendShader,
+  createTerrainMaterial,
   terrainSamplerCount,
   unpackTerrainControlPixels,
   validateTerrainMaterial
@@ -154,5 +155,22 @@ describe('terrain material', () => {
         { ...terrain.layers[1]!, textureWidth: 512 }
       ]
     })).toMatch(/inconsistent dimensions/)
+  })
+
+  it('lets Three.js add its GLSL 3 compatibility output for terrain shaders', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('loading stopped')))
+    const renderer = {
+      capabilities: { maxTextures: 16 },
+      getContext: () => ({ getParameter: () => 256 })
+    }
+    const controller = createTerrainMaterial(
+      terrain,
+      renderer as Parameters<typeof createTerrainMaterial>[1]
+    )
+
+    expect(controller.material.glslVersion).toBeNull()
+    await expect(controller.ready).rejects.toThrow('loading stopped')
+    controller.dispose()
+    vi.unstubAllGlobals()
   })
 })

@@ -6,7 +6,6 @@ import {
   ClampToEdgeWrapping,
   DataArrayTexture,
   DoubleSide,
-  GLSL3,
   LinearFilter,
   LinearMipmapLinearFilter,
   RGBAFormat,
@@ -163,7 +162,6 @@ export function createTerrainMaterial(
     uniforms,
     vertexShader: terrainVertexShader(),
     fragmentShader: terrainFragmentShader(terrain),
-    glslVersion: GLSL3,
     side: DoubleSide
   })
 

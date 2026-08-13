@@ -36,12 +36,13 @@ const page = ref(1)
 const pageSize = ref(10)
 const loading = computed(() => store.isLoading(props.kind))
 const error = computed(() => store.errors[props.kind])
-const actionError = ref<string>()
+const importStatusError = ref<string>()
 const savingName = ref<string>()
 const latestRun = ref<NpcLookupImportRun>()
 const queueingMode = ref<NpcLookupImportMode>()
 const progressRunId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const columns: TableColumn<NpcLookupRecord>[] = [
@@ -83,10 +84,10 @@ async function loadLatestRun(schedule = true) {
       progressRunId.value = latest.id
       importDrawerOpen.value = true
     }
-    actionError.value = undefined
+    importStatusError.value = undefined
     if (schedule && activeRun.value) schedulePoll()
   } catch {
-    actionError.value = 'The latest import status could not be loaded.'
+    importStatusError.value = 'The latest import status could not be loaded.'
   }
 }
 
@@ -102,7 +103,7 @@ async function pollRun() {
     if (activeRun.value) schedulePoll()
     else if (latestRun.value.status === 'succeeded') await loadRecords()
   } catch {
-    actionError.value = 'The active import status could not be refreshed.'
+    importStatusError.value = 'The active import status could not be refreshed.'
   }
 }
 
@@ -118,16 +119,19 @@ async function queueImport(mode: NpcLookupImportMode) {
     if (!confirmed) return
   }
   queueingMode.value = mode
-  actionError.value = undefined
+  importStatusError.value = undefined
   try {
     latestRun.value = await startNpcLookupImport(importKind.value, mode)
     progressRunId.value = latestRun.value.id
     importDrawerOpen.value = true
     schedulePoll()
   } catch {
-    actionError.value = mode === 'restore_defaults'
-      ? `The default ${props.itemLabel.toLowerCase()} could not be restored.`
-      : `The ${props.itemLabel.toLowerCase()} import could not be queued.`
+    notifications.error({
+      title: mode === 'restore_defaults'
+        ? `Default ${props.itemLabel.toLowerCase()} could not be restored`
+        : `${props.itemLabel} import could not be queued`,
+      description: 'Try the action again.'
+    })
   } finally {
     queueingMode.value = undefined
   }
@@ -143,11 +147,14 @@ async function edit(record: NpcLookupRecord) {
   })
   if (!displayName || displayName === record.displayName) return
   savingName.value = record.name
-  actionError.value = undefined
   try {
     await store.updateDisplayName(props.kind, record.name, displayName)
+    notifications.success({ title: 'Display name saved' })
   } catch {
-    actionError.value = `The display name for ${record.name} could not be saved.`
+    notifications.error({
+      title: 'Display name could not be saved',
+      description: `Try saving ${record.name} again.`
+    })
   } finally {
     savingName.value = undefined
   }
@@ -186,7 +193,7 @@ onUnmounted(() => clearTimeout(pollTimer))
       </template>
     </StudioPageHeader>
 
-    <UAlert v-if="error || actionError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Catalog action failed" :description="error ?? actionError" />
+    <UAlert v-if="error || importStatusError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Catalog unavailable" :description="error ?? importStatusError" />
 
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <div class="flex flex-wrap items-center justify-between gap-4 border-b border-default px-4 py-3">

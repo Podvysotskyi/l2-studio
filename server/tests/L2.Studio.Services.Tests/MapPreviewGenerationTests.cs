@@ -109,8 +109,11 @@ public sealed class MapPreviewGenerationTests
             "/versions/c1/Maps/17_25/fingerprint/17_25/manifest.json?v=abc");
 
         Assert.Equal(
-            "http://studio:3001/internal/map-preview/17_25?manifestUrl=%2Fversions%2Fc1%2FMaps%2F17_25%2Ffingerprint%2F17_25%2Fmanifest.json%3Fv%3Dabc",
-            AssetImportJobProcessor.MapPreviewCaptureUrl("http://studio:3001/", map));
+            "http://studio:3001/internal/map-preview/17_25?manifestUrl=%2Fversions%2Fc1%2FMaps%2F17_25%2Ffingerprint%2F17_25%2Fmanifest.json%3Fv%3Dabc&assetBaseUrl=http%3A%2F%2Fasset-server",
+            AssetImportJobProcessor.MapPreviewCaptureUrl(
+                "http://studio:3001/",
+                "http://asset-server/",
+                map));
     }
 
     private static MapCatalogEntry Map(string hash) => new(

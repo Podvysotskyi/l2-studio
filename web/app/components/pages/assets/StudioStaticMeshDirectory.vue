@@ -29,6 +29,7 @@ const error = ref<string>()
 const reimporting = ref<string>()
 const progressJobId = ref<string>()
 const importDrawerOpen = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -53,6 +54,35 @@ const progressItems = computed(() => {
   const job = jobs.value.find(item => item.id === progressJobId.value)
   return job ? [assetImportProgressItem(job, 'Static meshes')] : []
 })
+const importMenuItems = computed(() => [[
+  {
+    label: 'Import static meshes',
+    icon: 'i-lucide-play',
+    onSelect: (): void => { void queueImport() }
+  },
+  {
+    label: 'Force rebuild static meshes',
+    icon: 'i-lucide-hammer',
+    color: 'warning' as const,
+    onSelect: (): void => { void queueImport(true) }
+  }
+]])
+
+function meshMenuItems(mesh: StaticMeshManifestEntry) {
+  return [[
+    {
+      label: 'Re-import package',
+      icon: 'i-lucide-rotate-cw',
+      onSelect: (): void => { void reimportMesh(mesh) }
+    },
+    {
+      label: 'Force rebuild package',
+      icon: 'i-lucide-hammer',
+      color: 'warning' as const,
+      onSelect: (): void => { void reimportMesh(mesh, true) }
+    }
+  ]]
+}
 const selectedPackageEntry = computed(() => packages.value.find(
   item => item.sourceKey === selectedPackage.value
 ))
@@ -112,23 +142,25 @@ async function loadJobs(schedule = true) {
     pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
-async function queueImport() {
+async function queueImport(force = false) {
   queueing.value = true
   error.value = undefined
   try {
-    const job = await startAssetImport('staticmeshes')
+    const job = await startAssetImport('staticmeshes', { force })
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value =
-      'The static-mesh import could not be queued. Another import may already be active.'
+    notifications.error({
+      title: 'Static-mesh import could not be queued',
+      description: 'Another import may already be active.'
+    })
   } finally {
     queueing.value = false
   }
 }
 
-async function reimportMesh(mesh: StaticMeshManifestEntry) {
+async function reimportMesh(mesh: StaticMeshManifestEntry, force = false) {
   reimporting.value = `${mesh.sourceKey}/${mesh.objectName}`
   error.value = undefined
   try {
@@ -136,13 +168,19 @@ async function reimportMesh(mesh: StaticMeshManifestEntry) {
       'staticmeshes',
       mesh.objectName,
       mesh.packageName,
-      mesh.sourceKey
+      mesh.sourceKey,
+      force
     )
     progressJobId.value = job.id
     importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    error.value = 'The static-mesh package re-import could not be queued.'
+    notifications.error({
+      title: force
+        ? 'Forced static-mesh package rebuild could not be queued'
+        : 'Static-mesh package re-import could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     reimporting.value = undefined
   }
@@ -168,13 +206,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           variant="outline"
           to="/pipeline/imports"
         />
-        <UButton
-          label="Import static meshes"
-          icon="i-lucide-play"
-          :loading="queueing"
-          :disabled="Boolean(activeJob)"
-          @click="queueImport"
-        />
+        <UDropdownMenu :items="importMenuItems" :content="{ align: 'end' }">
+          <UButton
+            label="Import static meshes"
+            icon="i-lucide-play"
+            trailing-icon="i-lucide-chevron-down"
+            :loading="queueing"
+            :disabled="Boolean(activeJob)"
+          />
+        </UDropdownMenu>
       </template>
     </StudioPageHeader>
 
@@ -301,7 +341,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                 class="size-4 text-muted"
               />
               </button>
-              <UButton label="Re-import" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting === `${mesh.sourceKey}/${mesh.objectName}`" @click="reimportMesh(mesh)" />
+              <UDropdownMenu :items="meshMenuItems(mesh)" :content="{ align: 'end' }">
+                <UButton icon="i-lucide-ellipsis" :aria-label="`Actions for ${mesh.objectName}`" size="xs" color="neutral" variant="ghost" :loading="reimporting === `${mesh.sourceKey}/${mesh.objectName}`" :disabled="Boolean(activeJob)" />
+              </UDropdownMenu>
             </div>
             <div
               v-if="visibleMeshes.length === 0"

@@ -306,7 +306,10 @@ export function startAssetFileImport(
   force = false
 ): Promise<AssetImportJob> {
   return $fetch<AssetImportJob>(
-    versionPath(`/assets/${kind}/imports/files/${encodeURIComponent(fileName)}`),
+    versionPath(`/assets/${kind}/imports/files/${fileName
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`),
     { method: 'POST', query: { force } }
   )
 }

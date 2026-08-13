@@ -35,6 +35,7 @@ import {
   filterSceneObjects,
   sceneObjectStatus
 } from '../../../utils/scene-inspector'
+import { isSupportedSceneManifestSchema } from '../../../utils/scene-manifest'
 import { paginate } from '../../../utils/directory'
 
 interface ScenePreviewApi {
@@ -355,7 +356,7 @@ async function loadScene() {
     const loadedManifest = await getPublishedManifest<SceneManifest>(
       entry.manifestUrl
     )
-    if (loadedManifest.schemaVersion !== 11)
+    if (!isSupportedSceneManifestSchema(loadedManifest.schemaVersion))
       throw new Error('The scene manifest schema is unsupported.')
     manifest.value = loadedManifest
     selectedManagerName.value = loadedManifest.sceneManagers[0]?.name

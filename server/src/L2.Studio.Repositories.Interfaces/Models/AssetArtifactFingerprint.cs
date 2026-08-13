@@ -25,8 +25,8 @@ public static class AssetArtifactFingerprint
             AssetImportJobValues.StaticMeshes => "staticmeshes:11:112",
             AssetImportJobValues.Sounds => "sounds:3:111",
             AssetImportJobValues.Music => "music:5",
-            AssetImportJobValues.Maps => "maps:16:111",
-            AssetImportJobValues.Scenes => "scenes:15:111",
+            AssetImportJobValues.Maps => "maps:17:111",
+            AssetImportJobValues.Scenes => "scenes:16:111",
             AssetImportJobValues.MapPreviews => $"mappreviews:3:{AssetImportSourceHash.MapPreviewRendererVersion}",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };

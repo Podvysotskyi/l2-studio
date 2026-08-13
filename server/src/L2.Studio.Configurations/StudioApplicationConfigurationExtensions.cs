@@ -49,6 +49,7 @@ public static class StudioApplicationConfigurationExtensions
                 "Published assets, generated work, and source snapshots must use distinct paths.")
             .Validate(options => IsAbsoluteHttpUrl(options.StudioBaseUrl), "StudioBaseUrl must be an absolute HTTP URL.")
             .Validate(options => IsAbsoluteHttpUrl(options.MapPreviewBrowserUrl), "MapPreviewBrowserUrl must be an absolute HTTP URL.")
+            .Validate(options => IsAbsoluteHttpUrl(options.MapPreviewAssetBaseUrl), "MapPreviewAssetBaseUrl must be an absolute HTTP URL.")
             .Validate(options => options.AbandonedRunTimeout > TimeSpan.Zero, "AbandonedRunTimeout must be positive.")
             .ValidateOnStart();
         return services;

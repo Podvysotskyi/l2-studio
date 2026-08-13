@@ -180,7 +180,8 @@ public sealed class StudioConfigurationExtensionsTests
             ["ConnectionStrings:PostgreSql"] = ConnectionString,
             ["AssetImport:SourceRootPath"] = "",
             ["AssetImport:StudioBaseUrl"] = "ftp://studio.example.com",
-            ["AssetImport:MapPreviewBrowserUrl"] = "relative"
+            ["AssetImport:MapPreviewBrowserUrl"] = "relative",
+            ["AssetImport:MapPreviewAssetBaseUrl"] = "file:///assets"
         };
         var services = new ServiceCollection();
         services.AddStudioWorkerApplication(
@@ -193,6 +194,7 @@ public sealed class StudioConfigurationExtensionsTests
         Assert.Contains("Asset import paths must not be empty.", exception.Failures);
         Assert.Contains("StudioBaseUrl must be an absolute HTTP URL.", exception.Failures);
         Assert.Contains("MapPreviewBrowserUrl must be an absolute HTTP URL.", exception.Failures);
+        Assert.Contains("MapPreviewAssetBaseUrl must be an absolute HTTP URL.", exception.Failures);
     }
 
     private const string ConnectionString =

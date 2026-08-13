@@ -24,7 +24,7 @@ function object(
 }
 
 const manifest: SceneManifest = {
-  schemaVersion: 11,
+  schemaVersion: 12,
   name: 'Lobby',
   fileName: 'Lobby.unr',
   sourceHash: 'hash',

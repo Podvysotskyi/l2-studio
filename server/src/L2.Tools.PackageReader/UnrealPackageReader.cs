@@ -668,31 +668,22 @@ public sealed class UnrealPackageReader
             model.SerialOffset + model.SerialSize > data.Length)
             throw new InvalidDataException($"BSP model '{name}' has an invalid serialized range.");
 
-        Exception? firstError = null;
         // Lineage II packages exist with and without the four-byte per-surface
         // extension after UE2's light-map scale. Prefer the common extended
         // layout, then retry the stock UE2 layout when its following arrays do
         // not decode structurally.
-        foreach (var lineageSurfaceBytes in new[] { 4, 0 })
+        return UnrealModelSurfaceLayoutDecoder.Decode(lineageSurfaceBytes =>
         {
             var nativeOffset = checked(model.SerialOffset + 1);
             var reader = new PackageCursor(data, nativeOffset, model.SerialSize - 1);
-            try
-            {
-                reader.Skip(25 + 16);
-                var vectors = ReadVectorArray(reader, "model vectors");
-                var points = ReadVectorArray(reader, "model points");
-                var nodes = ReadBrushNodes(reader);
-                var surfaces = ReadBrushSurfaces(reader, exports, lineageSurfaceBytes);
-                var vertices = ReadBrushVertices(reader);
-                return new UnrealModelData(name, vectors, points, nodes, surfaces, vertices);
-            }
-            catch (Exception exception) when (exception is InvalidDataException or OverflowException)
-            {
-                firstError ??= exception;
-            }
-        }
-        throw firstError!;
+            reader.Skip(25 + 16);
+            var vectors = ReadVectorArray(reader, "model vectors");
+            var points = ReadVectorArray(reader, "model points");
+            var nodes = ReadBrushNodes(reader);
+            var surfaces = ReadBrushSurfaces(reader, exports, lineageSurfaceBytes);
+            var vertices = ReadBrushVertices(reader);
+            return new UnrealModelData(name, vectors, points, nodes, surfaces, vertices);
+        });
     }
 
     private UnrealBrushGeometry ReadBrushGeometry(
@@ -715,26 +706,29 @@ public sealed class UnrealPackageReader
             throw new InvalidDataException($"Brush model '{brush.Path}' has an invalid serialized range.");
         }
 
-        // Model exports in these UE2 maps have an empty tagged-property block
-        // (the one-byte `None` name) followed immediately by native UModel data.
-        var nativeOffset = checked(model.SerialOffset + 1);
-        var reader = new PackageCursor(data, nativeOffset, model.SerialSize - 1);
-        try
+        return UnrealModelSurfaceLayoutDecoder.Decode(lineageSurfaceBytes =>
         {
-            reader.Skip(25 + 16); // UPrimitive bounding box and sphere.
-            SkipVectorArray(reader, "brush vectors");
-            var points = ReadVectorArray(reader, "brush points");
-            var nodes = ReadBrushNodes(reader);
-            SkipBrushSurfaces(reader);
-            var vertices = ReadBrushVertices(reader);
-            return BuildBrushGeometry(brush.Path, points, nodes, vertices);
-        }
-        catch (InvalidDataException exception)
-        {
-            throw new InvalidDataException(
-                $"Brush model '{brush.Path}' failed near native offset {reader.Position - nativeOffset}: {exception.Message}",
-                exception);
-        }
+            // Model exports in these UE2 maps have an empty tagged-property block
+            // (the one-byte `None` name) followed immediately by native UModel data.
+            var nativeOffset = checked(model.SerialOffset + 1);
+            var reader = new PackageCursor(data, nativeOffset, model.SerialSize - 1);
+            try
+            {
+                reader.Skip(25 + 16); // UPrimitive bounding box and sphere.
+                SkipVectorArray(reader, "brush vectors");
+                var points = ReadVectorArray(reader, "brush points");
+                var nodes = ReadBrushNodes(reader);
+                SkipBrushSurfaces(reader, lineageSurfaceBytes);
+                var vertices = ReadBrushVertices(reader);
+                return BuildBrushGeometry(brush.Path, points, nodes, vertices);
+            }
+            catch (Exception exception) when (exception is InvalidDataException or OverflowException)
+            {
+                throw new InvalidDataException(
+                    $"Brush model '{brush.Path}' failed near native offset {reader.Position - nativeOffset}: {exception.Message}",
+                    exception);
+            }
+        });
     }
 
     private static void SkipVectorArray(PackageCursor reader, string description)
@@ -796,7 +790,7 @@ public sealed class UnrealPackageReader
         return result;
     }
 
-    private static void SkipBrushSurfaces(PackageCursor reader)
+    private static void SkipBrushSurfaces(PackageCursor reader, int lineageSurfaceBytes)
     {
         var count = ReadArrayCount(reader, 1_000_000, "brush BSP surfaces");
         for (var index = 0; index < count; index++)
@@ -804,7 +798,7 @@ public sealed class UnrealPackageReader
             _ = reader.ReadCompactIndex(); // material
             reader.Skip(4); // flags
             for (var field = 0; field < 6; field++) _ = reader.ReadCompactIndex();
-            reader.Skip(16 + 4 + 4); // plane, light-map scale, Lineage II field
+            reader.Skip(16 + 4 + lineageSurfaceBytes); // plane, light-map scale, optional Lineage II field
         }
     }
 

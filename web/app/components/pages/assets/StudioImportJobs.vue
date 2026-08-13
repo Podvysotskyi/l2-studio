@@ -23,7 +23,7 @@ const { jobs: jobsByKind, loading, error } = storeToRefs(importStore)
 const activeView = ref<'runs' | 'stale'>('runs')
 const initialViewResolved = ref(false)
 const kindFilter = ref<'all' | AssetImportKind>('all')
-const expandedRunId = ref<string>()
+const selectedRunId = ref<string>()
 const workItems = ref<AssetImportWorkItem[]>([])
 const workItemTotal = ref(0)
 const workItemPage = ref(1)
@@ -43,9 +43,9 @@ const reimporting = ref<string>()
 const staleByKind = ref<Partial<Record<AssetImportKind, StaleAssetSource[]>>>({})
 const staleLoading = ref(false)
 const staleError = ref<string>()
-const actionError = ref<string>()
 const rebuildingStale = ref(false)
 const forcingKind = ref(false)
+const notifications = useStudioToasts()
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const importKinds: AssetImportKind[] = [
@@ -79,8 +79,8 @@ const staleCount = computed(() => Object.values(staleByKind.value)
 const visibleStaleSources = computed(() => importKinds
   .filter((kind) => kindFilter.value === 'all' || kind === kindFilter.value)
   .flatMap((kind) => (staleByKind.value[kind] ?? []).map((source) => ({ kind, source }))))
-const expandedRun = computed(() =>
-  jobs.value.find((job) => job.id === expandedRunId.value)
+const selectedRun = computed(() =>
+  jobs.value.find((job) => job.id === selectedRunId.value)
 )
 const selectedWorkItem = computed(() =>
   workItems.value.find((item) => item.id === selectedWorkItemId.value)
@@ -147,8 +147,10 @@ async function loadJobs(schedule = true) {
     activeView.value = staleLoaded && staleCount.value > 0 ? 'stale' : 'runs'
     initialViewResolved.value = true
   }
-  if (expandedRun.value && isActive(expandedRun.value.status)) {
-    await loadDetails(expandedRun.value)
+  if (selectedRunId.value && !selectedRun.value) {
+    closeDetails()
+  } else if (selectedRun.value && isActive(selectedRun.value.status)) {
+    await loadDetails(selectedRun.value)
   }
   if (schedule && hasActiveJob.value) {
     pollTimer = setTimeout(() => void loadJobs(), 1000)
@@ -156,7 +158,6 @@ async function loadJobs(schedule = true) {
 }
 
 async function refreshWorkspace() {
-  actionError.value = undefined
   await loadJobs()
 }
 
@@ -186,19 +187,32 @@ async function loadStaleSources() {
   }
 }
 
-async function toggleDetails(run: AssetImportJob) {
-  if (expandedRunId.value === run.id) {
-    expandedRunId.value = undefined
-    return
-  }
-  expandedRunId.value = run.id
+function resetDetails() {
   detailQuery.value = ''
   workItemStatusFilter.value = 'all'
   diagnosticSeverityFilter.value = 'all'
   workItemPage.value = 1
+  workItems.value = []
+  workItemTotal.value = 0
   selectedWorkItemId.value = undefined
   selectedDiagnostics.value = []
+  selectedDiagnosticTotal.value = 0
+  selectedDiagnosticPage.value = 1
+  selectedDiagnosticLoading.value = false
+  runDiagnostics.value = []
+  detailLoading.value = false
+  detailError.value = undefined
+}
+
+async function openDetails(run: AssetImportJob) {
+  selectedRunId.value = run.id
+  resetDetails()
   await loadDetails(run)
+}
+
+function closeDetails() {
+  selectedRunId.value = undefined
+  resetDetails()
 }
 
 async function loadDetails(run: AssetImportJob) {
@@ -220,6 +234,7 @@ async function loadDetails(run: AssetImportJob) {
         pageSize: 25
       })
     ])
+    if (selectedRunId.value !== run.id) return
     workItems.value = workPage.items
     workItemTotal.value = workPage.total
     runDiagnostics.value = runDiagnosticPage.items
@@ -229,9 +244,13 @@ async function loadDetails(run: AssetImportJob) {
       selectedDiagnosticTotal.value = 0
     }
   } catch {
-    detailError.value = 'Per-file import details could not be loaded.'
+    if (selectedRunId.value === run.id) {
+      detailError.value = 'Per-file import details could not be loaded.'
+    }
   } finally {
-    detailLoading.value = false
+    if (selectedRunId.value === run.id) {
+      detailLoading.value = false
+    }
   }
 }
 
@@ -302,8 +321,12 @@ async function reimport(run: AssetImportJob, item: AssetImportWorkItem) {
   try {
     await startAssetFileImport(run.kind, item.sourceKey)
     await loadJobs(false)
+    notifications.success({ title: 'Single-file re-import queued' })
   } catch {
-    detailError.value = 'The single-file re-import could not be started.'
+    notifications.error({
+      title: 'Single-file re-import could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     reimporting.value = undefined
   }
@@ -315,8 +338,12 @@ async function forceReimport(run: AssetImportJob, item: AssetImportWorkItem) {
   try {
     await startAssetFileImport(run.kind, item.sourceKey, true)
     await loadJobs(false)
+    notifications.success({ title: 'Forced single-file rebuild queued' })
   } catch {
-    detailError.value = 'The forced single-file rebuild could not be started.'
+    notifications.error({
+      title: 'Forced single-file rebuild could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     reimporting.value = undefined
   }
@@ -324,7 +351,6 @@ async function forceReimport(run: AssetImportJob, item: AssetImportWorkItem) {
 
 async function rebuildAllStale() {
   rebuildingStale.value = true
-  actionError.value = undefined
   try {
     const kinds = importKinds.filter((kind) =>
       (kindFilter.value === 'all' || kind === kindFilter.value)
@@ -332,8 +358,12 @@ async function rebuildAllStale() {
     )
     await Promise.all(kinds.map((kind) => rebuildStaleAssetSources(kind)))
     await loadJobs(false)
+    notifications.success({ title: 'Stale rebuilds queued' })
   } catch {
-    actionError.value = 'One or more stale rebuilds could not be queued.'
+    notifications.error({
+      title: 'One or more stale rebuilds could not be queued',
+      description: 'Try the action again.'
+    })
   } finally {
     rebuildingStale.value = false
   }
@@ -341,12 +371,15 @@ async function rebuildAllStale() {
 
 async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSource) {
   reimporting.value = `${kind}:${source.sourceKey}`
-  actionError.value = undefined
   try {
     await startAssetFileImport(kind, source.sourceKey)
     await loadJobs(false)
+    notifications.success({ title: 'Stale rebuild queued' })
   } catch {
-    actionError.value = `The stale rebuild for ${source.sourceKey} could not be queued.`
+    notifications.error({
+      title: `Stale rebuild for ${source.sourceKey} could not be queued`,
+      description: 'Try the action again.'
+    })
   } finally {
     reimporting.value = undefined
   }
@@ -355,12 +388,15 @@ async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSourc
 async function forceRebuildKind() {
   if (kindFilter.value === 'all') return
   forcingKind.value = true
-  actionError.value = undefined
   try {
     await startAssetImport(kindFilter.value, { force: true })
     await loadJobs(false)
+    notifications.success({ title: `Forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild queued` })
   } catch {
-    actionError.value = `The forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild could not be queued.`
+    notifications.error({
+      title: `Forced ${kindLabel(kindFilter.value).toLowerCase()} rebuild could not be queued`,
+      description: 'Try the action again.'
+    })
   } finally {
     forcingKind.value = false
   }
@@ -406,15 +442,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       icon="i-lucide-circle-alert"
       title="Stale resources unavailable"
       :description="staleError"
-    />
-
-    <UAlert
-      v-if="actionError"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-circle-alert"
-      title="Import action failed"
-      :description="actionError"
     />
 
     <UCard>
@@ -566,7 +593,12 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
 
       <div v-if="visibleJobs.length" class="divide-y divide-default">
         <article v-for="run in visibleJobs" :key="run.id" class="p-4 sm:p-5">
-          <button class="w-full text-left" type="button" @click="toggleDetails(run)">
+          <button
+            class="w-full text-left hover:bg-elevated"
+            type="button"
+            aria-haspopup="dialog"
+            @click="openDetails(run)"
+          >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="flex flex-wrap items-center gap-2">
                 <UBadge color="neutral" variant="subtle">{{ kindLabel(run.kind) }}</UBadge>
@@ -601,7 +633,16 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             <p v-if="run.error" class="mt-3 text-sm text-error">{{ run.error }}</p>
           </button>
 
-          <div v-if="expandedRunId === run.id" class="mt-5 space-y-5 border-t border-default pt-5">
+          <USlideover
+            v-if="selectedRunId === run.id"
+            :open="Boolean(selectedRun)"
+            :title="`${kindLabel(run.kind)} import`"
+            :description="run.requestedSourceKey || `Requested ${formatDate(run.requestedAt)}`"
+            :ui="{ content: 'max-w-3xl' }"
+            @update:open="open => { if (!open) closeDetails() }"
+          >
+            <template #body>
+              <div class="space-y-5">
             <UAlert
               v-if="detailError"
               color="error"
@@ -752,7 +793,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                 />
               </div>
             </section>
-          </div>
+              </div>
+            </template>
+          </USlideover>
         </article>
       </div>
       <div v-else class="grid min-h-64 place-items-center p-8 text-sm text-muted">

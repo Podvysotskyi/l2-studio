@@ -23,6 +23,7 @@ const integrity = ref<'all' | 'healthy' | 'missing' | 'corrupt'>('all')
 const page = ref(1)
 const verifying = ref(false)
 const config = useRuntimeConfig()
+const notifications = useStudioToasts()
 
 const kinds = [
   { label: 'All kinds', value: 'all' },
@@ -87,8 +88,12 @@ async function verify() {
   try {
     selected.value = await verifyAssetArtifact(selected.value.artifact.id)
     await load()
+    notifications.success({ title: 'Artifact integrity verified' })
   } catch {
-    error.value = 'Artifact integrity verification failed.'
+    notifications.error({
+      title: 'Artifact integrity verification failed',
+      description: 'Try the verification again.'
+    })
   } finally {
     verifying.value = false
   }

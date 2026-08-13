@@ -37,6 +37,7 @@ const audio = ref<AssetReleaseResourceOption[]>([])
 const images = ref<AssetReleaseResourceOption[]>([])
 const form = ref(emptyForm())
 const dialogs = useStudioDialogs()
+const notifications = useStudioToasts()
 
 const statusOptions = [
   { label: 'All releases', value: 'all' },
@@ -106,7 +107,7 @@ async function create() {
     createOpen.value = false
     await load()
     await inspect(result.release)
-  })
+  }, { title: cloneSource.value ? 'Draft cloned' : 'Draft created' })
 }
 
 async function save() {
@@ -115,7 +116,7 @@ async function save() {
     selected.value = await updateAssetRelease(selected.value!.release.id, form.value)
     form.value = formFrom(selected.value)
     await load()
-  })
+  }, { title: 'Draft saved' })
 }
 
 async function refreshSnapshot() {
@@ -132,7 +133,7 @@ async function refreshSnapshot() {
     form.value = formFrom(selected.value)
     await loadResources(selected.value.release.id)
     await load()
-  })
+  }, { title: 'Draft snapshot refreshed' })
 }
 
 async function validate() {
@@ -144,7 +145,9 @@ async function validate() {
       selected.value = await getAssetRelease(selected.value!.release.id)
     }
     await load()
-  })
+  }, () => selected.value?.release.validationStatus === 'valid'
+    ? { type: 'success', title: 'Release validation passed' }
+    : { type: 'warning', title: 'Release validation finished with issues', description: 'Review the validation findings below.' })
 }
 
 async function publish() {
@@ -156,7 +159,7 @@ async function publish() {
     confirmLabel: 'Publish'
   })
   if (!confirmed) return
-  await releaseAction(() => publishAssetRelease(releaseId))
+  await releaseAction(() => publishAssetRelease(releaseId), 'Release published')
 }
 
 async function activate() {
@@ -168,7 +171,7 @@ async function activate() {
     confirmLabel: 'Activate'
   })
   if (!confirmed) return
-  await releaseAction(() => activateAssetRelease(releaseId))
+  await releaseAction(() => activateAssetRelease(releaseId), 'Release activated')
 }
 
 async function retire() {
@@ -180,7 +183,7 @@ async function retire() {
     confirmLabel: 'Retire'
   })
   if (!confirmed) return
-  await releaseAction(() => retireAssetRelease(releaseId))
+  await releaseAction(() => retireAssetRelease(releaseId), 'Release retired')
 }
 
 async function removeDraft() {
@@ -197,14 +200,14 @@ async function removeDraft() {
     await deleteAssetRelease(releaseId)
     selected.value = undefined
     await load()
-  })
+  }, { title: 'Draft deleted' })
 }
 
-async function releaseAction(action: () => Promise<AssetReleaseDetail>) {
+async function releaseAction(action: () => Promise<AssetReleaseDetail>, title: string) {
   await run(async () => {
     selected.value = await action()
     await load()
-  })
+  }, { title })
 }
 
 async function reloadSelected() {
@@ -215,16 +218,31 @@ async function reloadSelected() {
   })
 }
 
-async function run(action: () => Promise<void>) {
+async function run(
+  action: () => Promise<void>,
+  outcome?: StudioToastOutcome | (() => StudioToastOutcome)
+) {
   working.value = true
   error.value = undefined
   try {
     await action()
+    const resolvedOutcome = typeof outcome === 'function' ? outcome() : outcome
+    if (resolvedOutcome?.type === 'warning') notifications.warning(resolvedOutcome)
+    else if (resolvedOutcome) notifications.success(resolvedOutcome)
   } catch (value) {
-    error.value = value instanceof Error ? value.message : 'The release operation failed.'
+    notifications.error({
+      title: 'Release operation failed',
+      description: value instanceof Error ? value.message : 'Try the action again.'
+    })
   } finally {
     working.value = false
   }
+}
+
+interface StudioToastOutcome {
+  type?: 'success' | 'warning'
+  title: string
+  description?: string
 }
 
 function cameraItems(fileId: number | undefined) {
