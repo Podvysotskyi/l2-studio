@@ -1,5 +1,5 @@
 import type { MapRotation, MapVector } from '~/types/studio'
-import { Matrix, Quaternion, Vector3, type Scene } from '@babylonjs/core'
+import { Matrix4, Quaternion, Vector3 } from 'three'
 
 const unrealRotationUnit = (Math.PI * 2) / 65536
 
@@ -7,13 +7,6 @@ export interface UnrealNodeTransform {
   position: Vector3
   rotation: Quaternion
   scaling: Vector3
-}
-
-export function configureUnrealScene(scene: Scene) {
-  // Imported meshes are already converted from Unreal's left-handed, Z-up
-  // basis to glTF's right-handed, Y-up basis. Keep manifest composition in
-  // that same basis so Babylon does not mirror only the GLB geometry.
-  scene.useRightHandedSystem = true
 }
 
 export function unrealVector(value: MapVector) {
@@ -41,15 +34,19 @@ export function unrealRotationQuaternion(value: MapRotation) {
   const yy = cy * sr - cr * sp * sy
   const yz = cr * cp
 
-  return Quaternion.FromRotationMatrix(
-    Matrix.FromValues(lx, lz, ly, 0, yx, yz, yy, 0, px, pz, py, 0, 0, 0, 0, 1)
+  return new Quaternion().setFromRotationMatrix(
+    new Matrix4().set(
+      lx, yx, px, 0,
+      lz, yz, pz, 0,
+      ly, yy, py, 0,
+      0, 0, 0, 1
+    )
   ).normalize()
 }
 
 export function unrealForward(value: MapRotation) {
-  return Vector3.Right().rotateByQuaternionToRef(
-    unrealRotationQuaternion(value),
-    new Vector3()
+  return new Vector3(1, 0, 0).applyQuaternion(
+    unrealRotationQuaternion(value)
   )
 }
 
@@ -61,15 +58,13 @@ export function unrealNodeTransform(
   prePivot: MapVector
 ): UnrealNodeTransform {
   const quaternion = unrealRotationQuaternion(rotation)
-  const scaling = unrealVector(drawScale3D).scale(drawScale)
-  const pivotOffset = unrealVector(prePivot).multiply(scaling)
-  const rotatedPivotOffset = pivotOffset.rotateByQuaternionToRef(
-    quaternion,
-    new Vector3()
-  )
+  const scaling = unrealVector(drawScale3D).multiplyScalar(drawScale)
+  const rotatedPivotOffset = unrealVector(prePivot)
+    .multiply(scaling)
+    .applyQuaternion(quaternion)
 
   return {
-    position: unrealVector(location).subtract(rotatedPivotOffset),
+    position: unrealVector(location).sub(rotatedPivotOffset),
     rotation: quaternion,
     scaling
   }

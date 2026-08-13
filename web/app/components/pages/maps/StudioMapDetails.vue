@@ -57,7 +57,6 @@ const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
 const waterSurfacesVisible = ref(true)
-const distanceFogEnabled = ref(false)
 const terrainLayerStates = ref<TerrainLayerStates>({})
 const query = ref('')
 const lightQuery = ref('')
@@ -281,7 +280,6 @@ async function loadMap() {
   lightHelpersVisible.value = false
   waterVolumesVisible.value = true
   waterSurfacesVisible.value = true
-  distanceFogEnabled.value = false
   terrainLayerStates.value = {}
   query.value = ''
   lightQuery.value = ''
@@ -435,7 +433,6 @@ async function loadMap() {
             :selected-water-surface-name="selectedWaterSurfaceName"
             :water-volumes-visible="waterVolumesVisible"
             :selected-water-name="selectedWaterName"
-            :distance-fog-enabled="distanceFogEnabled"
             @error="previewError = $event"
             @material-error="terrainMaterialError = $event"
             @light-select="selectedLightName = $event"
@@ -1128,12 +1125,6 @@ async function loadMap() {
                       readability.
                     </p>
                   </div>
-                  <USwitch
-                    v-model="distanceFogEnabled"
-                    label="Apply fog"
-                    aria-label="Apply authored distance fog"
-                    :disabled="!manifest.environment.distanceFog"
-                  />
                 </div>
 
                 <dl class="mt-4 space-y-3 text-sm">

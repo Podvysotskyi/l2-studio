@@ -6,6 +6,7 @@ using L2.Studio.Services;
 using L2.Studio.Services.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,6 +71,25 @@ public sealed class StudioConfigurationExtensionsTests
         Assert.True(policy.SupportsCredentials);
         Assert.Contains("*", policy.Headers);
         Assert.Contains("*", policy.Methods);
+    }
+
+    [Fact]
+    public async Task AddsFilteredHttpRequestLogging()
+    {
+        var builder = CreateWebBuilder();
+        builder.AddStudioApi(
+            "l2-studio-api",
+            new DependencyOptions { PostgreSqlRequired = false });
+        await using var app = builder.Build();
+
+        var options = app.Services.GetRequiredService<IOptions<HttpLoggingOptions>>().Value;
+
+        Assert.Equal(
+            HttpLoggingFields.RequestProperties |
+            HttpLoggingFields.ResponseStatusCode |
+            HttpLoggingFields.Duration,
+            options.LoggingFields);
+        Assert.Single(app.Services.GetServices<IHttpLoggingInterceptor>());
     }
 
     [Fact]

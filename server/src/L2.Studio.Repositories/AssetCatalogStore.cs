@@ -28,6 +28,7 @@ public sealed class AssetCatalogStore(
             await transaction.CommitAsync(cancellationToken);
             return;
         }
+        ApplyBuildFingerprint(workItem, publication);
 
         var catalog = await context.AssetCatalogs.Include(item => item.Sources)
             .SingleOrDefaultAsync(item => item.GameVersion == publication.GameVersion &&
@@ -57,7 +58,7 @@ public sealed class AssetCatalogStore(
         var artifact = await context.AssetArtifacts.Include(item => item.Files)
             .SingleOrDefaultAsync(item => item.GameVersion == publication.GameVersion &&
                 item.Kind == publication.Kind && item.NormalizedSourceKey == publication.NormalizedSourceKey &&
-                item.BuildFingerprint == workItem.ArtifactFingerprint, cancellationToken);
+                item.BuildFingerprint == publication.BuildFingerprint, cancellationToken);
         if (artifact is not null && (artifact.ContentHash != publication.ContentHash ||
             !SameFiles(artifact.Files, publication.Files)))
             throw new InvalidDataException(
@@ -73,7 +74,7 @@ public sealed class AssetCatalogStore(
                 NormalizedSourceKey = publication.NormalizedSourceKey,
                 SourceHash = publication.SourceHash,
                 RecipeVersion = publication.RecipeVersion,
-                BuildFingerprint = workItem.ArtifactFingerprint!,
+                BuildFingerprint = publication.BuildFingerprint,
                 ContentHash = publication.ContentHash,
                 OutputRoot = publication.OutputRoot,
                 SchemaVersion = publication.SchemaVersion,
@@ -123,7 +124,7 @@ public sealed class AssetCatalogStore(
             SourceKey = publication.SourceKey,
             NormalizedSourceKey = publication.NormalizedSourceKey,
             SourceHash = publication.SourceHash,
-            ArtifactFingerprint = workItem.ArtifactFingerprint,
+            ArtifactFingerprint = publication.BuildFingerprint,
             OutputRoot = publication.OutputRoot,
             MetadataJson = publication.MetadataJson,
             ReferencedOutputRootsJson = JsonSerializer.Serialize(references),
@@ -165,7 +166,7 @@ public sealed class AssetCatalogStore(
                 .Where(item => item.GroupName == group.Name)
                 .Select(item => $"{group.Name}.{item.Name}"))
                 .Append(publication.NormalizedSourceKey),
-            workItem.ArtifactFingerprint!,
+            publication.BuildFingerprint,
             publication.PublishedAt,
             cancellationToken);
 
@@ -194,6 +195,19 @@ public sealed class AssetCatalogStore(
         outbox.Enroll(context);
         await outbox.PublishAsync(new AssetImportWorkItemCompleted(workItem.RunId, workItem.Id));
         await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
+    }
+
+    internal static void ApplyBuildFingerprint(
+        AssetImportWorkItem workItem,
+        AssetCatalogPublication publication)
+    {
+        if (string.IsNullOrWhiteSpace(publication.BuildFingerprint))
+            throw new InvalidDataException("The artifact build fingerprint is required.");
+        var outputFingerprint = Path.GetFileName(publication.OutputRoot.TrimEnd('/', '\\'));
+        if (!string.Equals(outputFingerprint, publication.BuildFingerprint, StringComparison.Ordinal))
+            throw new InvalidDataException(
+                "The artifact output directory does not match its build fingerprint.");
+        workItem.ArtifactFingerprint = publication.BuildFingerprint;
     }
 
     public async Task FailAsync(Guid workItemId, string error, CancellationToken cancellationToken)

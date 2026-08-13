@@ -16,5 +16,7 @@
     <ProjectReference Include="../../src/L2.Studio.Messages/L2.Studio.Messages.csproj" />
     <ProjectReference Include="../../src/L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
     <ProjectReference Include="../../src/L2.Studio.Services/L2.Studio.Services.csproj" />
+    <ProjectReference Include="../../src/L2.Tools.PackageReader/L2.Tools.PackageReader.csproj" />
+    <ProjectReference Include="../../src/L2.Tools.StaticMeshConverter/L2.Tools.StaticMeshConverter.csproj" />
   </ItemGroup>
 </Project>

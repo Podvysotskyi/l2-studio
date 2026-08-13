@@ -11,16 +11,16 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@babylonjs/core": "^8.0.0",
-    "@babylonjs/loaders": "^8.56.2",
     "@nuxt/ui": "4.10.0",
     "@pinia/nuxt": "^0.11.0",
     "nuxt": "4.5.1",
-    "pinia": "^3.0.0"
+    "pinia": "^3.0.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
     "@types/node": "^26.2.0",
+    "@types/three": "^0.185.0",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0",
     "vue-tsc": "^3.0.0"

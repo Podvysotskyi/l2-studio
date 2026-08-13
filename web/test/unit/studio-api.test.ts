@@ -62,6 +62,8 @@ describe('Studio API service', () => {
     await getAssetImportWorkItems('maps', 'run-id', {
       sourceKey: '17_25.unr',
       status: 'failed',
+      query: 'terrain',
+      diagnosticSeverity: 'error',
       pageSize: 25
     })
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -70,6 +72,8 @@ describe('Studio API service', () => {
         query: {
           sourceKey: '17_25.unr',
           status: 'failed',
+          query: 'terrain',
+          diagnosticSeverity: 'error',
           page: 1,
           pageSize: 25
         }
@@ -80,6 +84,7 @@ describe('Studio API service', () => {
       severity: 'error',
       code: 'conversion.failed',
       query: 'terrain',
+      scope: 'run',
       page: 2
     })
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -89,6 +94,7 @@ describe('Studio API service', () => {
           severity: 'error',
           code: 'conversion.failed',
           query: 'terrain',
+          scope: 'run',
           page: 2,
           pageSize: 50
         }

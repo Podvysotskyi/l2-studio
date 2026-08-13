@@ -8,6 +8,7 @@ public sealed record AssetCatalogPublication(
     string NormalizedSourceKey,
     string SourceFolder,
     string SourceHash,
+    string BuildFingerprint,
     string OutputRoot,
     int SchemaVersion,
     int? Protocol,

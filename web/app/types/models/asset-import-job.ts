@@ -54,6 +54,7 @@ export interface AssetImportWorkItem {
   processedResourceCount: number
   skippedResourceCount: number
   warningCount: number
+  errorCount: number
   error: string | null
   unpublishedAt: string | null
 }

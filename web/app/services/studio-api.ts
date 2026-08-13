@@ -344,6 +344,8 @@ export function getAssetImportWorkItems(
   request: {
     sourceKey?: string
     status?: string
+    query?: string
+    diagnosticSeverity?: string
     page?: number
     pageSize?: number
   } = {}
@@ -354,6 +356,8 @@ export function getAssetImportWorkItems(
       query: {
         ...(request.sourceKey ? { sourceKey: request.sourceKey } : {}),
         ...(request.status ? { status: request.status } : {}),
+        ...(request.query ? { query: request.query } : {}),
+        ...(request.diagnosticSeverity ? { diagnosticSeverity: request.diagnosticSeverity } : {}),
         page: request.page ?? 1,
         pageSize: request.pageSize ?? 50
       }
@@ -371,6 +375,7 @@ export function getAssetImportDiagnostics(
     stage?: string
     workItemStatus?: string
     query?: string
+    scope?: 'run'
     page?: number
     pageSize?: number
   } = {}

@@ -356,9 +356,9 @@ public static class GlbStaticMeshEncoder
         return output.ToArray();
     }
 
-    private static string ImageUri(string url) => url.StartsWith("/", StringComparison.Ordinal)
-        ? url.TrimStart('/')
-        : url;
+    // Retain the published namespace marker so browser loaders can distinguish
+    // texture assets from paths relative to the GLB's package directory.
+    private static string ImageUri(string url) => url;
 
     // Unreal is left-handed with Z up; glTF is right-handed with Y up. Swapping
     // Y and Z has a negative determinant, which also converts Unreal's clockwise

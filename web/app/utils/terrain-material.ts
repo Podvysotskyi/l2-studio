@@ -1,8 +1,9 @@
 export {
+  assembleTerrainControlArray,
   blendShader,
   createTerrainMaterial,
   terrainSamplerCount,
   unpackTerrainControlPixels,
-  type TerrainMaterialController,
-  type TerrainMaterialResult
+  validateTerrainMaterial,
+  type TerrainMaterialController
 } from '~/runtime'

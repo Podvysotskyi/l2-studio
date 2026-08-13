@@ -29,6 +29,12 @@ dependencies. Publication updates the active catalog slice in a short database
 transaction; superseded artifacts remain registered and may remain on disk.
 Integrity checks compare registered files with generated output.
 
+Generated outputs retain the source hierarchy directly below their version
+root: `versions/{version}/{source-directory}/{source-file}/{build-fingerprint}`.
+For example, texture packages from `System Textures/` and `Textures/` publish
+directly beneath those folders; map, scene, and preview sources publish beneath
+`Maps/`.
+
 A release selects a coherent version-scoped artifact graph and its client entry
 points. Publishing writes an immutable `client-manifest.json`; activation
 atomically replaces only `versions/{version}/current.json`. Rolling back means
@@ -41,9 +47,10 @@ provides an explicit file.
 - Texture imports retain source identity and material relationships. Browser
   fallback images are lossless WebP; supported native DXT mip chains may also
   be published in KTX containers for capable GPUs.
-- Static meshes are published as GLB with material metadata required by the
-  Studio and Web renderers. Maps and scenes publish complete render manifests
-  that reference independently generated dependencies.
+- Static meshes are published as GLB with standard geometry plus material
+  metadata consumed by Web. Studio uses the geometry for diagnostic previews.
+  Maps and scenes publish complete render manifests whose terrain texture and
+  control-map contracts are consumed independently by both renderers.
 - Embedded UAX PCM payloads are published as RIFF/WAVE without lossy
   transcoding.
 - Music accepts either the proprietary `L2SD` first-page signature or standard

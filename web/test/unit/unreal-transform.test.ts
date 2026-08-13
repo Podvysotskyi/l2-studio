@@ -1,7 +1,6 @@
-import { NullEngine, Scene, Vector3 } from '@babylonjs/core'
+import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import {
-  configureUnrealScene,
   unrealForward,
   unrealNodeTransform,
   unrealRotationQuaternion,
@@ -15,25 +14,13 @@ function expectVector(actual: Vector3, expected: Vector3) {
 }
 
 function rotatedForward(pitch: number, yaw: number, roll: number) {
-  return new Vector3(1, 0, 0).rotateByQuaternionToRef(
-    unrealRotationQuaternion({ pitch, yaw, roll }),
-    new Vector3()
+  return new Vector3(1, 0, 0).applyQuaternion(
+    unrealRotationQuaternion({ pitch, yaw, roll })
   )
 }
 
 describe('Unreal map transforms', () => {
-  it('configures composed map scenes to use the glTF coordinate system', () => {
-    const engine = new NullEngine()
-    const scene = new Scene(engine)
-
-    configureUnrealScene(scene)
-
-    expect(scene.useRightHandedSystem).toBe(true)
-    scene.dispose()
-    engine.dispose()
-  })
-
-  it('maps Unreal Z-up vectors to Babylon Y-up vectors', () => {
+  it('maps Unreal Z-up vectors to Three.js Y-up vectors', () => {
     expectVector(unrealVector({ x: 1, y: 2, z: 3 }), new Vector3(1, 3, 2))
   })
 
@@ -48,10 +35,7 @@ describe('Unreal map transforms', () => {
       yaw: 0,
       roll: 16384
     })
-    const rotatedUp = new Vector3(0, 1, 0).rotateByQuaternionToRef(
-      quaternion,
-      new Vector3()
-    )
+    const rotatedUp = new Vector3(0, 1, 0).applyQuaternion(quaternion)
     expectVector(rotatedUp, new Vector3(0, 0, 1))
   })
 
@@ -74,7 +58,7 @@ describe('Unreal map transforms', () => {
 
     convertedBasis.forEach((axis, index) => {
       expectVector(
-        axis.rotateByQuaternionToRef(quaternion, new Vector3()),
+        axis.applyQuaternion(quaternion),
         expected[index]!
       )
     })

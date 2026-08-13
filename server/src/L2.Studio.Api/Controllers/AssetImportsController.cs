@@ -148,6 +148,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         Guid id,
         [FromQuery] string? sourceKey,
         [FromQuery] string? status,
+        [FromQuery] string? query,
+        [FromQuery] string? diagnosticSeverity,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken token = default)
@@ -157,7 +159,10 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         if (pageSize is < 1 or > 100) return ValidationError("pageSize", "Page size must be between 1 and 100.");
         if (status is not null && !AssetImportJobValues.ActiveStatuses.Concat(AssetImportJobValues.WorkItemTerminalStatuses).Contains(status))
             return ValidationError("status", "Work-item status is invalid.");
-        var result = await repository.GetWorkItemsAsync(id, gameVersion, kind, sourceKey, status, page, pageSize, token);
+        if (diagnosticSeverity is not null && diagnosticSeverity is not "warning" and not "error")
+            return ValidationError("diagnosticSeverity", "Diagnostic severity must be warning or error.");
+        var result = await repository.GetWorkItemsAsync(
+            id, gameVersion, kind, sourceKey, status, query, diagnosticSeverity, page, pageSize, token);
         return result is null ? NotFound() : Ok(result);
     }
 
@@ -172,6 +177,7 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         [FromQuery] string? stage,
         [FromQuery] string? workItemStatus,
         [FromQuery] string? query,
+        [FromQuery] string? scope,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken token = default)
@@ -181,8 +187,10 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         if (pageSize is < 1 or > 100) return ValidationError("pageSize", "Page size must be between 1 and 100.");
         if (severity is not null && severity is not "warning" and not "error")
             return ValidationError("severity", "Severity must be warning or error.");
+        if (scope is not null && scope is not "run")
+            return ValidationError("scope", "Diagnostic scope is invalid.");
         var result = await repository.GetDiagnosticsAsync(
-            id, gameVersion, kind, sourceKey, severity, code, stage, workItemStatus, query, page, pageSize, token);
+            id, gameVersion, kind, sourceKey, severity, code, stage, workItemStatus, query, scope, page, pageSize, token);
         return result is null ? NotFound() : Ok(result);
     }
 

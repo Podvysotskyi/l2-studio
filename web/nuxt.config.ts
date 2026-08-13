@@ -39,5 +39,8 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_ASSET_BASE_URL ?? 'http://localhost:5300'
     }
   },
-  typescript: { typeCheck: true }
+  // Nuxt's development checker can start before its generated component types
+  // are refreshed, producing transient false missing-module errors. Keep
+  // typechecking enabled for builds and the explicit `npm run typecheck` check.
+  typescript: { typeCheck: process.env.NODE_ENV !== 'development' }
 })

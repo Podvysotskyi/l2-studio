@@ -16,5 +16,6 @@ public sealed record AssetImportWorkItemSummary(
     int ProcessedResourceCount,
     int SkippedResourceCount,
     int WarningCount,
+    int ErrorCount,
     string? Error,
     DateTimeOffset? UnpublishedAt);

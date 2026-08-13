@@ -107,6 +107,7 @@ public sealed partial class AssetImportJobProcessor
             job.NormalizedSourceKey,
             job.Kind,
             job.SourceHash!,
+            fingerprint,
             Path.GetRelativePath(Path.GetFullPath(options.Value.AssetRootPath), finalPath).Replace('\\', '/'),
             schemaVersion,
             protocol,
@@ -226,11 +227,7 @@ public sealed partial class AssetImportJobProcessor
         AssetCatalogPublicationEntry[] items,
         string metadataJson)
     {
-        var sourceStem = Path.GetFileNameWithoutExtension(job.SourceKey);
-        var sourceDirectory = Path.GetDirectoryName(job.SourceKey);
-        var relative = string.IsNullOrEmpty(sourceDirectory)
-            ? Path.Combine(job.Kind, sourceStem, fingerprint)
-            : Path.Combine(job.Kind, sourceDirectory, sourceStem, fingerprint);
+        var relative = ArtifactRelativePath(job.SourceKey, fingerprint);
         var target = Path.Combine(AssetRoot(job), relative);
         var targetFolder = Path.Combine("versions", job.GameVersion, relative).Replace('\\', '/');
         if (string.Equals(finalPath, target, StringComparison.Ordinal))
@@ -345,22 +342,28 @@ public sealed partial class AssetImportJobProcessor
         string assetRootPath,
         AssetImportJob job)
     {
-        var sourceStem = Path.GetFileNameWithoutExtension(job.SourceKey);
-        var sourceDirectory = Path.GetDirectoryName(job.SourceKey);
+        if (string.IsNullOrWhiteSpace(job.ArtifactFingerprint)) throw new InvalidOperationException("The artifact fingerprint is unavailable.");
+        var relative = ArtifactRelativePath(job.SourceKey, job.ArtifactFingerprint);
+        return (
+            Path.Combine(assetRootPath, relative),
+            Path.Combine(AssetWorkRoot(job), job.Id.ToString("N")),
+            Path.Combine("versions", job.GameVersion, relative).Replace('\\', '/'));
+    }
+
+    internal static string ArtifactRelativePath(string sourceKey, string buildFingerprint)
+    {
+        var sourceStem = Path.GetFileNameWithoutExtension(sourceKey);
+        var sourceDirectory = Path.GetDirectoryName(sourceKey);
         RequireSafeSegment(sourceStem, "source filename");
+        RequireSafeSegment(buildFingerprint, "build fingerprint");
         if (!string.IsNullOrEmpty(sourceDirectory))
         {
             foreach (var segment in sourceDirectory.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
                 RequireSafeSegment(segment, "source folder");
         }
-        if (string.IsNullOrWhiteSpace(job.ArtifactFingerprint)) throw new InvalidOperationException("The artifact fingerprint is unavailable.");
-        var relative = string.IsNullOrEmpty(sourceDirectory)
-            ? Path.Combine(job.Kind, sourceStem, job.ArtifactFingerprint)
-            : Path.Combine(job.Kind, sourceDirectory, sourceStem, job.ArtifactFingerprint);
-        return (
-            Path.Combine(assetRootPath, relative),
-            Path.Combine(AssetWorkRoot(job), job.Id.ToString("N")),
-            Path.Combine("versions", job.GameVersion, relative).Replace('\\', '/'));
+        return string.IsNullOrEmpty(sourceDirectory)
+            ? Path.Combine(sourceStem, buildFingerprint)
+            : Path.Combine(sourceDirectory, sourceStem, buildFingerprint);
     }
 
     private static async Task<string[]> ActiveCatalogItemJsonAsync(

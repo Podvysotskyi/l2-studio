@@ -173,6 +173,17 @@ export function studioRouteGroup(path: string): StudioNavigationGroup | undefine
   return undefined
 }
 
+export function withStudioRouteGroup(
+  expandedGroups: StudioNavigationGroup[],
+  path: string
+): StudioNavigationGroup[] {
+  const routeGroup = studioRouteGroup(path)
+
+  if (!routeGroup || expandedGroups.includes(routeGroup)) return expandedGroups
+
+  return [...expandedGroups, routeGroup]
+}
+
 export function studioRouteTitle(path: string) {
   if (path === '/') return 'Dashboard'
   if (path === '/authoring/npcs') return 'NPC definitions'

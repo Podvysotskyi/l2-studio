@@ -49,10 +49,8 @@ public sealed class AssetStorageHandlers(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var outputPath = ContainedPath(root, source.OutputRoot);
-            var marker = Path.Combine(outputPath, ".l2-asset-version");
-            if (Directory.Exists(outputPath) && File.Exists(marker) &&
-                string.Equals((await File.ReadAllTextAsync(marker, cancellationToken)).Trim(),
-                    source.Artifact.BuildFingerprint, StringComparison.Ordinal))
+            if (await MatchesPublishedArtifactAsync(
+                    outputPath, source.Artifact.BuildFingerprint, cancellationToken))
             {
                 source.Artifact.IntegrityStatus = "healthy";
                 source.Artifact.LastVerifiedAt = timeProvider.GetUtcNow();
@@ -92,6 +90,19 @@ public sealed class AssetStorageHandlers(
         }
         await context.SaveChangesAsync(cancellationToken);
 
+    }
+
+    internal static async Task<bool> MatchesPublishedArtifactAsync(
+        string outputPath,
+        string buildFingerprint,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(outputPath)) return false;
+        var marker = Path.Combine(outputPath, ".l2-asset-version");
+        return File.Exists(marker) && string.Equals(
+            (await File.ReadAllTextAsync(marker, cancellationToken)).Trim(),
+            buildFingerprint,
+            StringComparison.Ordinal);
     }
 
     private async Task<bool> IsReferencedAsync(string relativePath, CancellationToken cancellationToken)

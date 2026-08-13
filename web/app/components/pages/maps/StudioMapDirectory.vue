@@ -13,6 +13,7 @@ import {
   startAssetImport,
   startAssetResourceImport
 } from '../../../services/studio-api'
+import { hasImportedMaps } from '../../../utils/map-catalog-state'
 import { buildMapWorldGrid } from '../../../utils/map-world-grid'
 import { assetImportProgressItem } from '../../../utils/import-progress'
 
@@ -24,7 +25,6 @@ const queueing = ref(false)
 const queueingPreviews = ref(false)
 const queueingPreviewName = ref<string>()
 const jobsError = ref<string>()
-const catalogError = ref<string>()
 const reimportingMap = ref<string>()
 const progressJobId = ref<string>()
 const progressPreviewJobId = ref<string>()
@@ -47,6 +47,7 @@ const previews = computed(
 const worldGrid = computed(() =>
   buildMapWorldGrid(catalog.value?.items ?? [])
 )
+const hasMaps = computed(() => hasImportedMaps(catalog.value))
 const progressItems = computed(() => {
   const items = []
   const job = jobs.value.find(item => item.id === progressJobId.value)
@@ -61,10 +62,8 @@ async function loadCatalog() {
     catalog.value = await getAssetCatalog<MapCatalogEntry>('maps', {
       pageSize: 500
     })
-    catalogError.value = undefined
   } catch {
     catalog.value = undefined
-    catalogError.value = 'The generated map catalog could not be loaded.'
   }
   try {
     previewCatalog.value =
@@ -167,6 +166,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     >
       <template #actions>
         <UButton
+          v-if="hasMaps"
           label="Generate previews"
           icon="i-lucide-image"
           color="neutral"
@@ -199,20 +199,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Map imports unavailable"
       :description="jobsError"
     />
-    <UAlert
-      v-if="catalogError"
-      color="error"
-      variant="subtle"
-      title="Map catalog unavailable"
-      :description="catalogError"
-    >
-      <template #actions>
-        <UButton color="error" variant="soft" size="sm" @click="loadCatalog">
-          Try again
-        </UButton>
-      </template>
-    </UAlert>
-
     <UCard v-if="worldGrid.cells.length" :ui="{ body: 'p-0 sm:p-0' }">
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -266,9 +252,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </div>
     </UCard>
-    <UCard v-if="!worldGrid.cells.length && !catalogError">
+    <UCard v-if="!hasMaps">
       <p class="py-16 text-center text-sm text-muted">
-        No generated map manifest is available. Queue the first import.
+        No generated map catalog is available. Queue the first import.
       </p>
     </UCard>
 

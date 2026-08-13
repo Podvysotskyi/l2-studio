@@ -6,8 +6,13 @@ namespace L2.Studio.Repositories.Interfaces.Tests;
 public sealed class AssetArtifactFingerprintTests
 {
     [Theory]
-    [InlineData("maps", "maps:14:111")]
-    [InlineData("scenes", "scenes:13:111")]
+    [InlineData("textures", "textures:9:121")]
+    [InlineData("staticmeshes", "staticmeshes:11:112")]
+    [InlineData("sounds", "sounds:3:111")]
+    [InlineData("music", "music:5")]
+    [InlineData("maps", "maps:16:111")]
+    [InlineData("scenes", "scenes:15:111")]
+    [InlineData("mappreviews", "mappreviews:3:3")]
     public void UsesCurrentManifestRecipeVersions(string kind, string expected)
     {
         Assert.Equal(expected, AssetArtifactFingerprint.RecipeVersion(kind));

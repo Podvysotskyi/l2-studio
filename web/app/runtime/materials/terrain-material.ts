@@ -3,346 +3,281 @@ import type {
   MapTerrainManifestEntry
 } from '~/types/studio'
 import {
-  MaterialPluginBase,
-  PBRMaterial,
-  RawTexture2DArray,
-  Texture,
-  type BaseTexture,
-  type MaterialDefines,
-  type Scene,
-  type UniformBuffer
-} from '@babylonjs/core'
-
-export interface TerrainMaterialResult {
-  material?: PBRMaterial
-  controller?: TerrainMaterialController
-  ready?: Promise<void>
-  error?: string
-}
+  ClampToEdgeWrapping,
+  DataArrayTexture,
+  DoubleSide,
+  GLSL3,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  RGBAFormat,
+  RepeatWrapping,
+  ShaderMaterial,
+  UnsignedByteType,
+  type WebGLRenderer
+} from 'three'
 
 export interface TerrainMaterialController {
+  material: ShaderMaterial
+  ready: Promise<void>
   setLayerEnabled(index: number, enabled: boolean): void
   setAllLayersEnabled(enabled: boolean): void
+  dispose(): void
 }
 
 const channelComponents = ['r', 'g', 'b', 'a'] as const
 
 export function terrainSamplerCount(terrain: MapTerrainManifestEntry) {
-  return (
-    new Set(terrain.layers.map((layer) => layer.textureArrayGroup)).size + 1
-  )
+  return new Set(terrain.layers.map(layer => layer.textureArrayGroup)).size + 1
 }
 
-export function createTerrainMaterial(
+export function validateTerrainMaterial(
   terrain: MapTerrainManifestEntry,
-  scene: Scene
-): TerrainMaterialResult {
+  renderer?: WebGLRenderer
+) {
   if (terrain.materialStatus !== 'resolved')
-    return { error: terrain.materialError ?? 'Terrain material is unresolved.' }
+    return terrain.materialError ?? 'Terrain material is unresolved.'
   if (!terrain.layers.length || !terrain.controlMapUrls.length)
-    return { error: 'Terrain material has no layers or control maps.' }
+    return 'Terrain material has no layers or control maps.'
   if (terrain.controlMapEncoding !== 'webp-rgb-a-horizontal')
-    return { error: 'Terrain control-map encoding is unsupported.' }
-  if (!scene.getEngine().getCaps().texture2DArrayMaxLayerCount)
-    return { error: 'Terrain texture arrays require WebGL2.' }
+    return 'Terrain control-map encoding is unsupported.'
   if (
     terrain.controlMapWidth <= 0 ||
     terrain.controlMapHeight <= 0 ||
     terrain.layers.some(
-      (layer) =>
+      layer =>
         !layer.textureUrl ||
         layer.textureWidth <= 0 ||
         layer.textureHeight <= 0 ||
+        !Number.isInteger(layer.textureArrayGroup) ||
+        layer.textureArrayGroup < 0 ||
+        !Number.isInteger(layer.textureArrayLayer) ||
+        layer.textureArrayLayer < 0 ||
         !['xy', 'xz', 'yz'].includes(layer.textureMapAxis) ||
         !finiteUvTransform(layer) ||
+        !Number.isInteger(layer.controlMapChannel) ||
         layer.controlMapChannel < 0 ||
         layer.controlMapChannel > 3 ||
+        !Number.isInteger(layer.controlMapIndex) ||
         layer.controlMapIndex < 0 ||
         layer.controlMapIndex >= terrain.controlMapUrls.length
     )
   )
-    return { error: 'Terrain contains an unsupported or incomplete layer.' }
+    return 'Terrain contains an unsupported or incomplete layer.'
 
-  const material = new PBRMaterial(`${terrain.name}:material`, scene)
-  material.metallic = 0
-  material.roughness = 1
-  material.environmentIntensity = 0
-  material.specularIntensity = 0
-  material.maxSimultaneousLights = 4
-  const controller = new TerrainLayerPlugin(material, terrain)
-  return { material, controller, ready: controller.ready }
+  const groups = groupLayers(terrain.layers)
+  if (
+    [...groups.values()].some(layers =>
+      layers.some(
+        layer =>
+          layer.textureWidth !== layers[0]!.textureWidth ||
+          layer.textureHeight !== layers[0]!.textureHeight
+      )
+    )
+  )
+    return 'Terrain texture-array layers have inconsistent dimensions.'
+
+  if (renderer) {
+    if (terrainSamplerCount(terrain) > renderer.capabilities.maxTextures)
+      return 'Terrain exceeds the available texture sampler limit.'
+    const context = renderer.getContext() as WebGL2RenderingContext
+    const maximumLayers = context.getParameter(
+      context.MAX_ARRAY_TEXTURE_LAYERS
+    ) as number
+    const requiredLayers = Math.max(
+      terrain.controlMapUrls.length,
+      ...[...groups.values()].map(
+        layers => Math.max(...layers.map(layer => layer.textureArrayLayer)) + 1
+      )
+    )
+    if (requiredLayers > maximumLayers)
+      return 'Terrain exceeds the available texture-array layer limit.'
+  }
 }
 
-class TerrainLayerPlugin
-  extends MaterialPluginBase
-  implements TerrainMaterialController
-{
-  private readonly diffuseTextures = new Map<number, RawTexture2DArray>()
-  private readonly controlTexture: RawTexture2DArray
-  private readonly enabledLayers: boolean[]
-  private readonly definitions: string
-  private readonly fragmentBlend: string
-  readonly ready: Promise<void>
+export function createTerrainMaterial(
+  terrain: MapTerrainManifestEntry,
+  renderer: WebGLRenderer
+): TerrainMaterialController {
+  const validationError = validateTerrainMaterial(terrain, renderer)
+  if (validationError) throw new Error(validationError)
 
-  constructor(material: PBRMaterial, terrain: MapTerrainManifestEntry) {
-    super(material, 'L2TerrainTextureArrays', 200)
-    const scene = material.getScene()
-    const groups = new Map<number, MapTerrainLayerManifestEntry[]>()
-    for (const layer of terrain.layers) {
-      const layers = groups.get(layer.textureArrayGroup) ?? []
-      layers.push(layer)
-      groups.set(layer.textureArrayGroup, layers)
-    }
-    const loads: Promise<void>[] = []
-    for (const [group, layers] of groups) {
-      const width = layers[0]!.textureWidth
-      const height = layers[0]!.textureHeight
-      const depth =
-        Math.max(...layers.map((layer) => layer.textureArrayLayer)) + 1
-      const texture = RawTexture2DArray.CreateRGBATexture(
-        new Uint8Array(width * height * depth * 4),
+  const groups = groupLayers(terrain.layers)
+  const diffuseTextures = new Map<number, DataArrayTexture>()
+  const uniforms: Record<string, { value: unknown }> = {}
+  const loads: Promise<void>[] = []
+
+  for (const [group, layers] of groups) {
+    const width = layers[0]!.textureWidth
+    const height = layers[0]!.textureHeight
+    const depth = Math.max(...layers.map(layer => layer.textureArrayLayer)) + 1
+    const texture = dataArrayTexture(width, height, depth, true)
+    texture.wrapS = RepeatWrapping
+    texture.wrapT = RepeatWrapping
+    texture.minFilter = LinearMipmapLinearFilter
+    texture.magFilter = LinearFilter
+    texture.generateMipmaps = true
+    diffuseTextures.set(group, texture)
+    uniforms[`terrainDiffuseArray${group}`] = { value: texture }
+    loads.push(
+      loadTextureArray(
+        texture,
         width,
         height,
-        depth,
-        scene,
-        true,
-        false,
-        Texture.TRILINEAR_SAMPLINGMODE
+        layers.map(layer => ({
+          url: layer.textureUrl!,
+          layer: layer.textureArrayLayer
+        }))
       )
-      texture.name = `${terrain.name}:diffuse-array-${group}`
-      texture.gammaSpace = true
-      this.diffuseTextures.set(group, texture)
-      loads.push(
-        loadTextureArray(
-          texture,
-          width,
-          height,
-          depth,
-          layers.map((layer) => ({
-            url: layer.textureUrl!,
-            layer: layer.textureArrayLayer
-          }))
-        )
-      )
-    }
-    this.controlTexture = RawTexture2DArray.CreateRGBATexture(
-      new Uint8Array(
-        terrain.controlMapWidth *
-          terrain.controlMapHeight *
-          terrain.controlMapUrls.length *
-          4
-      ),
+    )
+  }
+
+  const controlTexture = dataArrayTexture(
+    terrain.controlMapWidth,
+    terrain.controlMapHeight,
+    terrain.controlMapUrls.length,
+    false
+  )
+  controlTexture.wrapS = ClampToEdgeWrapping
+  controlTexture.wrapT = ClampToEdgeWrapping
+  controlTexture.minFilter = LinearFilter
+  controlTexture.magFilter = LinearFilter
+  controlTexture.generateMipmaps = false
+  uniforms.terrainControlArray = { value: controlTexture }
+  loads.push(
+    loadControlTextureArray(
+      controlTexture,
       terrain.controlMapWidth,
       terrain.controlMapHeight,
-      terrain.controlMapUrls.length,
-      scene,
-      false,
-      false,
-      Texture.BILINEAR_SAMPLINGMODE
+      terrain.controlMapUrls.map((url, layer) => ({ url, layer }))
     )
-    this.controlTexture.name = `${terrain.name}:control-array-${terrain.controlMapArrayGroup}`
-    this.controlTexture.gammaSpace = false
-    loads.push(
-      loadControlTextureArray(
-        this.controlTexture,
-        terrain.controlMapWidth,
-        terrain.controlMapHeight,
-        terrain.controlMapUrls.length,
-        terrain.controlMapUrls.map((url, layer) => ({ url, layer }))
-      )
-    )
-    this.ready = Promise.all(loads).then(() => undefined)
-    this.enabledLayers = terrain.layers.map(() => true)
-    this.definitions = [
-      'varying vec2 vTerrainUV;',
-      'varying vec3 vTerrainPosition;',
-      ...[...this.diffuseTextures].map(
-        ([group]) => `uniform highp sampler2DArray terrainDiffuseArray${group};`
-      ),
-      'uniform highp sampler2DArray terrainControlArray;'
-    ].join('\n')
-    this.fragmentBlend = blendShader(terrain)
-    this._enable(true)
+  )
+
+  const enabledLayers = terrain.layers.map(() => true)
+  enabledLayers.forEach((enabled, index) => {
+    uniforms[`terrainLayerEnabled${index}`] = { value: enabled ? 1 : 0 }
+  })
+  uniforms.terrainAnyLayerEnabled = { value: 1 }
+
+  const material = new ShaderMaterial({
+    name: `${terrain.name}:material`,
+    uniforms,
+    vertexShader: terrainVertexShader(),
+    fragmentShader: terrainFragmentShader(terrain),
+    glslVersion: GLSL3,
+    side: DoubleSide
+  })
+
+  const syncVisibility = () => {
+    enabledLayers.forEach((enabled, index) => {
+      uniforms[`terrainLayerEnabled${index}`]!.value = enabled ? 1 : 0
+    })
+    uniforms.terrainAnyLayerEnabled!.value = enabledLayers.some(Boolean) ? 1 : 0
   }
 
-  override prepareDefines(defines: MaterialDefines) {
-    const values = defines as MaterialDefines & {
-      _needUVs: boolean
-      UV1: boolean
-    }
-    values._needUVs = true
-    values.UV1 = true
-  }
-
-  override getAttributes(attributes: string[]) {
-    attributes.push('uv')
-  }
-
-  override getSamplers(samplers: string[]) {
-    for (const group of this.diffuseTextures.keys())
-      samplers.push(`terrainDiffuseArray${group}`)
-    samplers.push('terrainControlArray')
-  }
-
-  override getUniforms() {
-    return {
-      ubo: [
-        ...this.enabledLayers.map((_, index) => ({
-          name: `terrainLayerEnabled${index}`,
-          size: 1,
-          type: 'float'
-        })),
-        { name: 'terrainAnyLayerEnabled', size: 1, type: 'float' }
-      ],
-      fragment: this.definitions
+  return {
+    material,
+    ready: Promise.all(loads).then(() => undefined),
+    setLayerEnabled(index, enabled) {
+      if (index < 0 || index >= enabledLayers.length) return
+      enabledLayers[index] = enabled
+      syncVisibility()
+    },
+    setAllLayersEnabled(enabled) {
+      enabledLayers.fill(enabled)
+      syncVisibility()
+    },
+    dispose() {
+      material.dispose()
+      diffuseTextures.forEach(texture => texture.dispose())
+      controlTexture.dispose()
     }
   }
+}
 
-  override bindForSubMesh(uniformBuffer: UniformBuffer) {
-    for (const [group, texture] of this.diffuseTextures)
-      uniformBuffer.setTexture(`terrainDiffuseArray${group}`, texture)
-    uniformBuffer.setTexture('terrainControlArray', this.controlTexture)
-    this.enabledLayers.forEach((enabled, index) =>
-      uniformBuffer.updateFloat(`terrainLayerEnabled${index}`, enabled ? 1 : 0)
-    )
-    uniformBuffer.updateFloat(
-      'terrainAnyLayerEnabled',
-      this.enabledLayers.some(Boolean) ? 1 : 0
-    )
-  }
+function dataArrayTexture(
+  width: number,
+  height: number,
+  depth: number,
+  diffuse: boolean
+) {
+  const texture = new DataArrayTexture(
+    new Uint8Array(width * height * depth * 4),
+    width,
+    height,
+    depth
+  )
+  texture.format = RGBAFormat
+  texture.type = UnsignedByteType
+  texture.flipY = false
+  texture.unpackAlignment = 1
+  texture.userData.diffuse = diffuse
+  return texture
+}
 
-  setLayerEnabled(index: number, enabled: boolean) {
-    if (index >= 0 && index < this.enabledLayers.length)
-      this.enabledLayers[index] = enabled
+function groupLayers(layers: MapTerrainLayerManifestEntry[]) {
+  const groups = new Map<number, MapTerrainLayerManifestEntry[]>()
+  for (const layer of layers) {
+    const group = groups.get(layer.textureArrayGroup) ?? []
+    group.push(layer)
+    groups.set(layer.textureArrayGroup, group)
   }
-
-  setAllLayersEnabled(enabled: boolean) {
-    this.enabledLayers.fill(enabled)
-  }
-
-  override getActiveTextures(activeTextures: BaseTexture[]) {
-    activeTextures.push(...this.diffuseTextures.values(), this.controlTexture)
-  }
-
-  override hasTexture(texture: BaseTexture) {
-    return (
-      [...this.diffuseTextures.values()].includes(
-        texture as RawTexture2DArray
-      ) || texture === this.controlTexture
-    )
-  }
-
-  override dispose(forceDisposeTextures?: boolean) {
-    if (!forceDisposeTextures) return
-    for (const texture of this.diffuseTextures.values()) texture.dispose()
-    this.controlTexture.dispose()
-  }
-
-  override getCustomCode(shaderType: string): Record<string, string> | null {
-    if (shaderType === 'vertex')
-      return {
-        CUSTOM_VERTEX_DEFINITIONS:
-          'varying vec2 vTerrainUV;\nvarying vec3 vTerrainPosition;',
-        CUSTOM_VERTEX_MAIN_END:
-          'vTerrainUV = uvUpdated;\nvTerrainPosition = positionUpdated;'
-      }
-    if (shaderType === 'fragment')
-      return {
-        CUSTOM_FRAGMENT_DEFINITIONS: this.definitions,
-        CUSTOM_FRAGMENT_UPDATE_ALBEDO: this.fragmentBlend
-      }
-    return null
-  }
+  return groups
 }
 
 async function loadTextureArray(
-  texture: RawTexture2DArray,
+  texture: DataArrayTexture,
   width: number,
   height: number,
-  depth: number,
   sources: { url: string; layer: number }[]
 ) {
-  if (
-    typeof document === 'undefined' ||
-    typeof createImageBitmap === 'undefined'
-  )
-    return
-  const pixels = new Uint8Array(width * height * depth * 4)
+  const pixels = texture.image.data as Uint8Array
   await Promise.all(
     sources.map(async ({ url, layer }) => {
-      const response = await fetch(url)
-      if (!response.ok)
-        throw new Error(`Unable to load terrain texture ${url}.`)
-      const bitmap = await createImageBitmap(await response.blob(), {
-        colorSpaceConversion: 'none',
-        premultiplyAlpha: 'none'
-      })
-      if (bitmap.width !== width || bitmap.height !== height) {
-        bitmap.close()
-        throw new Error(`Terrain texture ${url} has unexpected dimensions.`)
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const context = canvas.getContext('2d', { willReadFrequently: true })
-      if (!context)
-        throw new Error('A 2D canvas is required for terrain textures.')
-      context.drawImage(bitmap, 0, 0)
-      bitmap.close()
-      pixels.set(
-        context.getImageData(0, 0, width, height).data,
-        layer * width * height * 4
-      )
+      const decoded = await loadImagePixels(url, width, height)
+      pixels.set(decoded, layer * width * height * 4)
     })
   )
-  texture.update(pixels)
+  texture.needsUpdate = true
 }
 
 async function loadControlTextureArray(
-  texture: RawTexture2DArray,
+  texture: DataArrayTexture,
   width: number,
   height: number,
-  depth: number,
   sources: { url: string; layer: number }[]
 ) {
-  if (
-    typeof document === 'undefined' ||
-    typeof createImageBitmap === 'undefined'
-  )
-    return
-  const pixels = await assembleTerrainControlArray(
+  texture.image.data = await assembleTerrainControlArray(
     width,
     height,
-    depth,
+    texture.image.depth,
     sources,
-    async (url) => {
-      const response = await fetch(url)
-      if (!response.ok)
-        throw new Error(`Unable to load terrain control map ${url}.`)
-      const bitmap = await createImageBitmap(await response.blob(), {
-        colorSpaceConversion: 'none',
-        premultiplyAlpha: 'none'
-      })
-      if (bitmap.width !== width * 2 || bitmap.height !== height) {
-        bitmap.close()
-        throw new Error(
-          `Terrain control map ${url} has unexpected encoded dimensions.`
-        )
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
-      const context = canvas.getContext('2d', { willReadFrequently: true })
-      if (!context) {
-        bitmap.close()
-        throw new Error('A 2D canvas is required for terrain control maps.')
-      }
-      context.drawImage(bitmap, 0, 0)
-      bitmap.close()
-      return context.getImageData(0, 0, canvas.width, canvas.height).data
-    }
+    url => loadImagePixels(url, width * 2, height)
   )
-  texture.update(pixels)
+  texture.needsUpdate = true
+}
+
+async function loadImagePixels(url: string, width: number, height: number) {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Unable to load terrain texture ${url}.`)
+  const bitmap = await createImageBitmap(await response.blob(), {
+    colorSpaceConversion: 'none',
+    premultiplyAlpha: 'none'
+  })
+  if (bitmap.width !== width || bitmap.height !== height) {
+    bitmap.close()
+    throw new Error(`Terrain texture ${url} has unexpected dimensions.`)
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) {
+    bitmap.close()
+    throw new Error('A 2D canvas is required for terrain textures.')
+  }
+  context.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  return context.getImageData(0, 0, width, height).data
 }
 
 export async function assembleTerrainControlArray(
@@ -411,15 +346,60 @@ export function blendShader(terrain: MapTerrainManifestEntry) {
     const component = channelComponents[layer.controlMapChannel]
     lines.push(
       `vec2 terrainLayerUV${index} = ${layerUv(layer)};`,
-      `vec3 terrainLayerColor${index} = texture(terrainDiffuseArray${layer.textureArrayGroup}, vec3(terrainLayerUV${index}, ${glsl(layer.textureArrayLayer)})).rgb;`,
+      `vec3 terrainLayerColor${index} = srgbToLinear(texture(terrainDiffuseArray${layer.textureArrayGroup}, vec3(terrainLayerUV${index}, ${glsl(layer.textureArrayLayer)})).rgb);`,
       `float terrainLayerWeight${index} = texture(terrainControlArray, vec3(vTerrainUV, ${glsl(layer.controlMapIndex)})).${component} * terrainLayerEnabled${index};`,
       `terrainColor = mix(terrainColor, terrainLayerColor${index}, terrainLayerWeight${index});`
     )
   })
   lines.push(
-    'surfaceAlbedo = terrainAnyLayerEnabled > 0.5 ? terrainColor : vec3(0.18);'
+    'terrainColor = terrainAnyLayerEnabled > 0.5 ? terrainColor : vec3(0.18);'
   )
   return lines.join('\n')
+}
+
+function terrainVertexShader() {
+  return `
+    varying vec2 vTerrainUV;
+    varying vec3 vTerrainPosition;
+    varying vec3 vTerrainNormal;
+    void main() {
+      vTerrainUV = uv;
+      vTerrainPosition = position;
+      vTerrainNormal = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+}
+
+function terrainFragmentShader(terrain: MapTerrainManifestEntry) {
+  const samplers = [...new Set(
+    terrain.layers.map(layer => layer.textureArrayGroup)
+  )].map(group => `uniform highp sampler2DArray terrainDiffuseArray${group};`)
+  const toggles = terrain.layers.map(
+    (_, index) => `uniform float terrainLayerEnabled${index};`
+  )
+  return `
+    precision highp float;
+    precision highp sampler2DArray;
+    varying vec2 vTerrainUV;
+    varying vec3 vTerrainPosition;
+    varying vec3 vTerrainNormal;
+    ${samplers.join('\n')}
+    uniform highp sampler2DArray terrainControlArray;
+    ${toggles.join('\n')}
+    uniform float terrainAnyLayerEnabled;
+    vec3 srgbToLinear(vec3 value) {
+      return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), value));
+    }
+    void main() {
+      ${blendShader(terrain)}
+      vec3 lightDirection = normalize(vec3(0.35, 0.8, 0.45));
+      float diffuse = max(dot(normalize(vTerrainNormal), lightDirection), 0.0);
+      gl_FragColor = vec4(terrainColor * (0.55 + diffuse * 0.65), 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }
+  `
 }
 
 function layerUv(layer: MapTerrainLayerManifestEntry) {

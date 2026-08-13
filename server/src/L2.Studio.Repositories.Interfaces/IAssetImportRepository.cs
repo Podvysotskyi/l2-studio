@@ -12,9 +12,10 @@ public interface IAssetImportRepository
     Task<IReadOnlyList<AssetImportRunSummary>> GetRecentAsync(string gameVersion, string kind, int limit, CancellationToken cancellationToken);
     Task<AssetImportRunSummary?> GetAsync(Guid id, string gameVersion, string kind, CancellationToken cancellationToken);
     Task<AssetImportWorkItemPage?> GetWorkItemsAsync(
-        Guid runId, string gameVersion, string kind, string? sourceKey, string? status, int page, int pageSize,
+        Guid runId, string gameVersion, string kind, string? sourceKey, string? status, string? query,
+        string? diagnosticSeverity, int page, int pageSize,
         CancellationToken cancellationToken);
     Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(
         Guid runId, string gameVersion, string kind, string? sourceKey, string? severity, string? code, string? stage,
-        string? workItemStatus, string? query, int page, int pageSize, CancellationToken cancellationToken);
+        string? workItemStatus, string? query, string? scope, int page, int pageSize, CancellationToken cancellationToken);
 }

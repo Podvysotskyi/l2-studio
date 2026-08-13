@@ -239,6 +239,8 @@ public sealed class AssetImportRepository(
         string kind,
         string? sourceKey,
         string? status,
+        string? searchQuery,
+        string? diagnosticSeverity,
         int page,
         int pageSize,
         CancellationToken cancellationToken)
@@ -246,18 +248,32 @@ public sealed class AssetImportRepository(
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         if (!await context.AssetImportRuns.AsNoTracking().AnyAsync(
                 run => run.Id == runId && run.GameVersion == gameVersion && run.Kind == kind, cancellationToken)) return null;
-        var query = context.AssetImportWorkItems.AsNoTracking().Where(item => item.RunId == runId);
+        var workItems = context.AssetImportWorkItems.AsNoTracking().Where(item => item.RunId == runId);
         if (!string.IsNullOrWhiteSpace(sourceKey))
-            query = query.Where(item => EF.Functions.ILike(item.SourceKey, $"%{EscapeLike(sourceKey.Trim())}%", "\\"));
-        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(item => item.Status == status);
-        var total = await query.LongCountAsync(cancellationToken);
-        var items = await query.OrderBy(item => item.SourceKey)
+            workItems = workItems.Where(item => EF.Functions.ILike(item.SourceKey, $"%{EscapeLike(sourceKey.Trim())}%", "\\"));
+        if (!string.IsNullOrWhiteSpace(status)) workItems = workItems.Where(item => item.Status == status);
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            var search = searchQuery.Trim();
+            workItems = workItems.Where(item =>
+                EF.Functions.ILike(item.SourceKey, $"%{EscapeLike(search)}%", "\\") ||
+                item.Diagnostics.Any(diagnostic => EF.Functions.ToTsVector("simple",
+                    (diagnostic.SourceKey ?? string.Empty) + " " +
+                    (diagnostic.ObjectName ?? string.Empty) + " " + diagnostic.Message)
+                    .Matches(EF.Functions.WebSearchToTsQuery("simple", search))));
+        }
+        if (!string.IsNullOrWhiteSpace(diagnosticSeverity))
+            workItems = workItems.Where(item => item.Diagnostics.Any(diagnostic => diagnostic.Severity == diagnosticSeverity));
+        var total = await workItems.LongCountAsync(cancellationToken);
+        var items = await workItems.OrderBy(item => item.SourceKey)
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(item => new AssetImportWorkItemSummary(
                 item.Id, item.RunId, item.ImportKind, item.SourceKey, item.SourceHash, item.ArtifactFingerprint,
                 item.Status, item.AttemptCount, item.CreatedAt, item.StartedAt, item.FinishedAt,
                 item.TotalResourceCount, item.ProcessedResourceCount, item.SkippedResourceCount,
-                item.WarningCount, item.Error, item.UnpublishedAt))
+                item.WarningCount,
+                item.Diagnostics.Count(diagnostic => diagnostic.Severity == "error"),
+                item.Error, item.UnpublishedAt))
             .ToListAsync(cancellationToken);
         return new AssetImportWorkItemPage(items, total, page, pageSize);
     }
@@ -272,6 +288,7 @@ public sealed class AssetImportRepository(
         string? stage,
         string? workItemStatus,
         string? query,
+        string? scope,
         int page,
         int pageSize,
         CancellationToken cancellationToken)
@@ -286,6 +303,7 @@ public sealed class AssetImportRepository(
         if (!string.IsNullOrWhiteSpace(stage)) diagnostics = diagnostics.Where(item => item.Stage == stage);
         if (!string.IsNullOrWhiteSpace(workItemStatus))
             diagnostics = diagnostics.Where(item => item.WorkItem != null && item.WorkItem.Status == workItemStatus);
+        if (scope == "run") diagnostics = diagnostics.Where(item => item.WorkItemId == null);
         if (!string.IsNullOrWhiteSpace(query))
         {
             diagnostics = diagnostics.Where(item =>

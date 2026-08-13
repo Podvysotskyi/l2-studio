@@ -6,10 +6,12 @@ import { useRoute } from 'vue-router'
 definePageMeta({ layout: false })
 
 const route = useRoute()
-const name = computed(() => String(route.params.name))
-const manifestUrl = computed(
-  () => `/maps/${encodeURIComponent(name.value)}/manifest.json`
-)
+const manifestUrl = computed(() => {
+  const value = route.query.manifestUrl
+  return typeof value === 'string' && value.startsWith('/versions/')
+    ? value
+    : ''
+})
 </script>
 
 <template>

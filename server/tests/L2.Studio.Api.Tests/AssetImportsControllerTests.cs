@@ -120,9 +120,9 @@ public sealed class AssetImportsControllerTests
         var id = Guid.NewGuid();
 
         var workItems = await controller.GetWorkItems(
-            "textures", "interlude", id, null, "invalid", 1, 50, CancellationToken.None);
+            "textures", "interlude", id, null, "invalid", null, null, 1, 50, CancellationToken.None);
         var diagnostics = await controller.GetDiagnostics(
-            "textures", "interlude", id, null, "notice", null, null, null, null, 1, 50, CancellationToken.None);
+            "textures", "interlude", id, null, "notice", null, null, null, null, null, 1, 50, CancellationToken.None);
 
         var workItemProblem = Assert.IsType<ValidationProblemDetails>(
             Assert.IsType<BadRequestObjectResult>(workItems.Result).Value);
@@ -130,6 +130,26 @@ public sealed class AssetImportsControllerTests
             Assert.IsType<BadRequestObjectResult>(diagnostics.Result).Value);
         Assert.Equal("Work-item status is invalid.", Assert.Single(workItemProblem.Errors["status"]));
         Assert.Equal("Severity must be warning or error.", Assert.Single(diagnosticProblem.Errors["severity"]));
+    }
+
+    [Fact]
+    public async Task ValidatesUnifiedWorkItemFiltersAndRunDiagnosticScope()
+    {
+        var repository = new StubAssetImportRepository();
+        var controller = new AssetImportsController(repository);
+        var id = Guid.NewGuid();
+
+        var workItems = await controller.GetWorkItems(
+            "textures", "interlude", id, null, null, "terrain", "notice", 1, 50, CancellationToken.None);
+        var diagnostics = await controller.GetDiagnostics(
+            "textures", "interlude", id, null, null, null, null, null, null, "file", 1, 50, CancellationToken.None);
+
+        var workItemProblem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(workItems.Result).Value);
+        var diagnosticProblem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(diagnostics.Result).Value);
+        Assert.Equal("Diagnostic severity must be warning or error.", Assert.Single(workItemProblem.Errors["diagnosticSeverity"]));
+        Assert.Equal("Diagnostic scope is invalid.", Assert.Single(diagnosticProblem.Errors["scope"]));
     }
 
     private static AssetImportRunSummary Run() => new(
@@ -197,7 +217,7 @@ public sealed class AssetImportsControllerTests
         }
 
         public Task<AssetImportRunSummary?> GetAsync(Guid id, string gameVersion, string kind, CancellationToken cancellationToken) => Task.FromResult<AssetImportRunSummary?>(null);
-        public Task<AssetImportWorkItemPage?> GetWorkItemsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? status, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportWorkItemPage?>(null);
-        public Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? severity, string? code, string? stage, string? workItemStatus, string? query, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportDiagnosticPage?>(null);
+        public Task<AssetImportWorkItemPage?> GetWorkItemsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? status, string? query, string? diagnosticSeverity, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportWorkItemPage?>(null);
+        public Task<AssetImportDiagnosticPage?> GetDiagnosticsAsync(Guid runId, string gameVersion, string kind, string? sourceKey, string? severity, string? code, string? stage, string? workItemStatus, string? query, string? scope, int page, int pageSize, CancellationToken cancellationToken) => Task.FromResult<AssetImportDiagnosticPage?>(null);
     }
 }

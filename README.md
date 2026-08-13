@@ -117,7 +117,7 @@ Studio owns its database and migrations. Reset a development database after the 
 The per-file import and generated-artifact migrations are a clean baseline:
 reset existing Studio development databases instead of attempting to retain
 retired import or catalog rows. Generated URLs use immutable
-`versions/{version}/{kind}/{source}/{build-fingerprint}` locations.
+`versions/{version}/{source-directory}/{source-file}/{build-fingerprint}` locations.
 
 ## Configuration and safety
 

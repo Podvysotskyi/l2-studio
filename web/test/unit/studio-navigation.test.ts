@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   studioNavigation,
   studioNavigationGroups,
+  withStudioRouteGroup,
   studioRouteGroup,
   studioRouteTitle
 } from '../../app/utils/studio-navigation'
@@ -52,7 +53,7 @@ describe('Studio navigation', () => {
     expect(routes).not.toContain('/releases')
   })
 
-  it('selects only the group containing the current route', () => {
+  it('finds the group containing the current route', () => {
     expect(studioRouteGroup('/')).toBeUndefined()
     expect(studioRouteGroup('/authoring/players/classes'))
       .toBe(studioNavigationGroups.players)
@@ -65,6 +66,21 @@ describe('Studio navigation', () => {
     expect(studioRouteGroup('/pipeline/imports'))
       .toBe(studioNavigationGroups.pipeline)
     expect(studioRouteGroup('/assets/maps')).toBeUndefined()
+  })
+
+  it('adds the current route group without closing existing groups', () => {
+    const authoringGroups = withStudioRouteGroup(
+      [studioNavigationGroups.players],
+      '/authoring/npcs/races'
+    )
+
+    expect(authoringGroups).toEqual([
+      studioNavigationGroups.players,
+      studioNavigationGroups.npcs
+    ])
+    expect(withStudioRouteGroup(authoringGroups, '/authoring/npcs'))
+      .toEqual(authoringGroups)
+    expect(withStudioRouteGroup(authoringGroups, '/')).toEqual(authoringGroups)
   })
 
   it('provides titles for canonical list and detail routes', () => {

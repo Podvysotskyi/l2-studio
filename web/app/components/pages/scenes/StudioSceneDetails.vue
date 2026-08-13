@@ -81,7 +81,6 @@ const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
 const waterVolumesVisible = ref(true)
 const waterSurfacesVisible = ref(true)
-const distanceFogEnabled = ref(false)
 const terrainLayerStates = ref<TerrainLayerStates>({})
 const actorQuery = ref('')
 const lightQuery = ref('')
@@ -483,7 +482,6 @@ onBeforeUnmount(stop)
             :selected-water-surface-name="selectedWaterSurfaceName"
             :water-volumes-visible="waterVolumesVisible"
             :selected-water-name="selectedWaterName"
-            :distance-fog-enabled="distanceFogEnabled"
             @error="previewError = $event"
             @material-error="materialError = $event"
             @light-select="selectedLightName = $event"
@@ -1218,11 +1216,6 @@ onBeforeUnmount(stop)
                       }}
                     </p>
                   </div>
-                  <USwitch
-                    v-model="distanceFogEnabled"
-                    label="Apply fog"
-                    :disabled="!manifest.environment.distanceFog"
-                  />
                 </div>
                 <p class="text-xs text-muted">
                   Brightness

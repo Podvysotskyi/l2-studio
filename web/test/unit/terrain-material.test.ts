@@ -1,9 +1,11 @@
 import type { MapTerrainManifestEntry } from '~/types/studio'
 import { describe, expect, it } from 'vitest'
 import {
+  assembleTerrainControlArray,
   blendShader,
   terrainSamplerCount,
-  unpackTerrainControlPixels
+  unpackTerrainControlPixels,
+  validateTerrainMaterial
 } from '../../app/utils/terrain-material'
 
 const terrain: MapTerrainManifestEntry = {
@@ -95,6 +97,7 @@ describe('terrain material', () => {
       shader.indexOf('terrainLayerColor1')
     )
     expect(shader).toContain('terrainAnyLayerEnabled > 0.5')
+    expect(shader).toContain('srgbToLinear')
   })
 
   it('reconstructs four independent weights from opaque transport pixels', () => {
@@ -118,5 +121,38 @@ describe('terrain material', () => {
         1
       )
     ).toThrow(/opaque/)
+  })
+
+  it('assembles independently addressed control-map array layers', async () => {
+    const layer0 = new Uint8Array([10, 20, 30, 255, 0, 0, 0, 255])
+    const layer1 = new Uint8Array([40, 50, 60, 255, 128, 0, 0, 255])
+
+    const pixels = await assembleTerrainControlArray(
+      1,
+      1,
+      2,
+      [
+        { url: 'layer-1', layer: 1 },
+        { url: 'layer-0', layer: 0 }
+      ],
+      async url => url === 'layer-0' ? layer0 : layer1
+    )
+
+    expect([...pixels]).toEqual([10, 20, 30, 0, 40, 50, 60, 128])
+  })
+
+  it('validates authored terrain before allocating GPU resources', () => {
+    expect(validateTerrainMaterial(terrain)).toBeUndefined()
+    expect(validateTerrainMaterial({
+      ...terrain,
+      layers: [{ ...terrain.layers[0]!, textureUrl: null }]
+    })).toMatch(/unsupported or incomplete/)
+    expect(validateTerrainMaterial({
+      ...terrain,
+      layers: [
+        terrain.layers[0]!,
+        { ...terrain.layers[1]!, textureWidth: 512 }
+      ]
+    })).toMatch(/inconsistent dimensions/)
   })
 })

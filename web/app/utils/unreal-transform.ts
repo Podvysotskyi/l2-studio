@@ -1,5 +1,4 @@
 export {
-  configureUnrealScene,
   unrealForward,
   unrealNodeTransform,
   unrealRotationQuaternion,

@@ -126,7 +126,8 @@ public sealed partial class AssetImportJobProcessor
                 }
                 else
                 {
-                    changed.Add(new MapPreviewRenderMap(map.Name, map.Sha256, map.SourceKey));
+                    changed.Add(new MapPreviewRenderMap(
+                        map.Name, map.Sha256, map.SourceKey, map.ManifestUrl));
                 }
             }
             await context.SaveChangesAsync(cancellationToken);
@@ -248,8 +249,7 @@ public sealed partial class AssetImportJobProcessor
                         Height = MapPreviewGeneration.Size,
                         DeviceScaleFactor = 1
                     }).WaitAsync(cancellationToken);
-                    var studioUrl = options.Value.StudioBaseUrl.TrimEnd('/');
-                    var url = $"{studioUrl}/internal/map-preview/{Uri.EscapeDataString(map.Name)}";
+                    var url = MapPreviewCaptureUrl(options.Value.StudioBaseUrl, map);
                     await page.GoToAsync(url, new NavigationOptions
                     {
                         WaitUntil = [WaitUntilNavigation.DOMContentLoaded],
@@ -335,6 +335,10 @@ public sealed partial class AssetImportJobProcessor
             browser.Disconnect();
         }
     }
+
+    internal static string MapPreviewCaptureUrl(string studioBaseUrl, MapPreviewRenderMap map) =>
+        $"{studioBaseUrl.TrimEnd('/')}/internal/map-preview/{Uri.EscapeDataString(map.Name)}" +
+        $"?manifestUrl={Uri.EscapeDataString(map.ManifestUrl)}";
 
     private static async Task<string> ResolveBrowserWebSocketEndpointAsync(
         string browserUrl,

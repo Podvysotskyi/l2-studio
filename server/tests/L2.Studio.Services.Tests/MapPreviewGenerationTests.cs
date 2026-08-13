@@ -99,6 +99,20 @@ public sealed class MapPreviewGenerationTests
             MapPreviewGeneration.RendererVersion);
     }
 
+    [Fact]
+    public void CapturesTheExactPublishedMapManifest()
+    {
+        var map = new MapPreviewRenderMap(
+            "17_25",
+            "map-hash",
+            "Maps/17_25.unr",
+            "/versions/c1/Maps/17_25/fingerprint/17_25/manifest.json?v=abc");
+
+        Assert.Equal(
+            "http://studio:3001/internal/map-preview/17_25?manifestUrl=%2Fversions%2Fc1%2FMaps%2F17_25%2Ffingerprint%2F17_25%2Fmanifest.json%3Fv%3Dabc",
+            AssetImportJobProcessor.MapPreviewCaptureUrl("http://studio:3001/", map));
+    }
+
     private static MapCatalogEntry Map(string hash) => new(
         "17_25", "17_25.unr", null, 1, 2, 3, hash, "resolved", null);
 

@@ -1,6 +1,8 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -23,6 +25,14 @@ public static class StudioHostConfigurationExtensions
 
         builder.Logging.ClearProviders();
         builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogLevel.Warning);
+        builder.Logging.AddFilter("Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware", LogLevel.Information);
+        builder.Services.AddHttpLogging(options => options.LoggingFields =
+            HttpLoggingFields.RequestProperties |
+            HttpLoggingFields.ResponseStatusCode |
+            HttpLoggingFields.Duration);
+        builder.Services.AddHttpLoggingInterceptor<HealthCheckHttpLoggingInterceptor>();
         if (otlpEndpoint is not null)
         {
             builder.Logging.AddOpenTelemetry(options =>
@@ -64,6 +74,7 @@ public static class StudioHostConfigurationExtensions
 
     public static WebApplication MapStudioApi(this WebApplication app)
     {
+        app.UseHttpLogging();
         app.UseCors();
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {

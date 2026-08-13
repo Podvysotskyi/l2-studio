@@ -5,18 +5,18 @@ import { useRoute } from 'vue-router'
 import { useSystemStore } from '../../stores/system'
 import {
   studioNavigation,
-  studioRouteGroup
+  withStudioRouteGroup
 } from '../../utils/studio-navigation'
 
 const route = useRoute()
 const systemStore = useSystemStore()
 const { serviceState, description } = storeToRefs(systemStore)
-const expandedGroup = ref(studioRouteGroup(route.path))
+const expandedGroups = ref(withStudioRouteGroup([], route.path))
 
 watch(
   () => route.path,
   path => {
-    expandedGroup.value = studioRouteGroup(path)
+    expandedGroups.value = withStudioRouteGroup(expandedGroups.value, path)
   }
 )
 </script>
@@ -52,10 +52,10 @@ watch(
 
     <template #default="{ collapsed }">
       <UNavigationMenu
-        v-model="expandedGroup"
+        v-model="expandedGroups"
         :items="studioNavigation"
         orientation="vertical"
-        type="single"
+        type="multiple"
         :collapsed="collapsed"
         :tooltip="collapsed"
         :popover="collapsed"

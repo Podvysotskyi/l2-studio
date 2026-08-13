@@ -11,22 +11,33 @@ public static class L2MusicDecoder
 
     public static L2MusicTrack Decode(ReadOnlySpan<byte> input)
     {
-        if (input.Length < 28 || !input[..4].SequenceEqual(LineageSignature))
+        if (input.Length < 28)
         {
-            throw new InvalidDataException("The music file does not have an L2SD Ogg signature.");
+            throw new InvalidDataException("The music file does not have an L2SD or OggS signature.");
         }
 
         var decoded = input.ToArray();
-        OggSignature.CopyTo(decoded, 0);
+        var hasLineageSignature = input[..4].SequenceEqual(LineageSignature);
+        if (hasLineageSignature)
+        {
+            OggSignature.CopyTo(decoded, 0);
+        }
+        else if (!input[..4].SequenceEqual(OggSignature))
+        {
+            throw new InvalidDataException("The music file does not have an L2SD or OggS signature.");
+        }
+
         var position = 0;
         var sampleRate = 0;
         var channels = 0;
+        var hasLineageTrailer = false;
         ulong finalGranule = 0;
 
         while (position < decoded.Length)
         {
             if (decoded.Length - position == LineageTrailerSize)
             {
+                hasLineageTrailer = true;
                 break;
             }
 
@@ -78,13 +89,13 @@ public static class L2MusicDecoder
             throw new InvalidDataException("The music file has no valid Vorbis identification packet.");
         }
 
-        if (decoded.Length - position != LineageTrailerSize)
+        if (hasLineageSignature && !hasLineageTrailer)
         {
             throw new InvalidDataException("The music file does not have the expected Lineage trailer.");
         }
 
         return new L2MusicTrack(
-            decoded[..position],
+            hasLineageTrailer ? decoded[..position] : decoded,
             sampleRate,
             channels,
             finalGranule / (double)sampleRate);
