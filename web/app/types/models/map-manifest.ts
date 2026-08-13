@@ -22,6 +22,7 @@ export interface MapCatalogEntry {
   sha256: string
   status: 'resolved' | 'skipped'
   error: string | null
+  sourceKey: string
 }
 
 export interface MapPreviewCatalogEntry {
@@ -32,6 +33,7 @@ export interface MapPreviewCatalogEntry {
   height: number
   status: 'resolved' | 'skipped'
   error: string | null
+  sourceKey: string
 }
 
 export interface MapTerrainManifestEntry {

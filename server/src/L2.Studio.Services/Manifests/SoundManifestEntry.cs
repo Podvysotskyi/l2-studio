@@ -8,4 +8,5 @@ internal sealed record SoundManifestEntry(
     int SampleRate,
     int Channels,
     long SizeBytes,
-    string Sha256);
+    string Sha256,
+    string SourceKey = "");

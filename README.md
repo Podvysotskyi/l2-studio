@@ -57,7 +57,7 @@ docker compose up --build
 
 Original game resources persist in the `l2-studio_resources-data` Docker volume and generated assets persist in `l2-studio_assets-data`. The Studio web application writes resources through its server-side file manager, while the API and Worker mount them read-only. The Worker writes generated assets; Studio and the asset server mount only the `public` subtree read-only. Import source snapshots live in the Worker-only `l2-studio_import-work` volume and generated output staging lives outside the public subtree.
 
-Open **Operations → File storage** to upload files or complete folder contents. Storage is scoped by the global game-version selector. Navigate to a folder, or create one, before uploading to choose the destination beneath the version's source folder (`C1`, `C4`, or `Interlude`). Studio accepts every file type, including extensionless files; asset imports still discover input from their expected resource folders and formats. Generated assets are shown from `public/versions/{version-key}` and are intentionally read-only because published files must be changed through asset imports.
+Open **Operations → File storage** to upload files or complete folder contents. Storage is scoped by the global game-version selector. Navigate to a folder, or create one, before uploading to choose the destination beneath the version's source folder (`C1`, `C4`, or `Interlude`). Studio accepts every file type, including extensionless files. Asset imports recursively scan the selected version directory and discover supported package formats regardless of the uploaded subfolder name. Generated assets are shown from `public/versions/{version-key}` and are intentionally read-only because published files must be changed through asset imports.
 
 Open **Operations → Artifact registry** to inspect immutable generated builds. The registry records each build fingerprint, recipe version, aggregate content hash, output file with its SHA-256 and media type, dependencies, active-publication state, and integrity status. Superseded builds remain registered and on disk. Use **Verify file integrity** for a deep hash audit; Worker startup performs a lightweight active-publication reconciliation.
 
@@ -88,7 +88,7 @@ Do not commit original source packages or generated private assets.
 
 Studio partitions authored content, import state, catalogs, and generated
 outputs by game version. The global UI selector sends version-scoped API routes;
-the worker reads sources from `C1`, `C4`, or `Interlude` below the configured
+the worker recursively reads sources from `C1`, `C4`, or `Interlude` below the configured
 source root and publishes files below `versions/{version}/` in the asset root.
 Studio does not generate bootstrap content at startup; import or author each
 version's content explicitly.

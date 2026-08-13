@@ -4,6 +4,7 @@ import type { AssetCatalogPage, TextureManifestEntry, TexturePackage } from '~/t
 import type { AssetImportJob } from '../../../types/models/asset-import-job'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { getAssetCatalog, getAssetImportJobs, startAssetImport, startAssetResourceImport } from '../../../services/studio-api'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 interface TextureTreeItem extends TreeItem {
   folder?: string
@@ -23,6 +24,8 @@ const queueing = ref(false)
 const error = ref<string>()
 const selectedTexture = ref<TextureManifestEntry>()
 const reimporting = ref(false)
+const progressJobId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const folder = computed(() => typeof route.query.folder === 'string' && route.query.folder.length ? route.query.folder : undefined)
@@ -52,6 +55,10 @@ const treeItems = computed<TextureTreeItem[]>(() => {
 const selectedTreeItem = computed(() => treeItems.value
   .flatMap(item => item.children ?? [])
   .find(item => item.folder === folder.value && item.packageName === packageName.value))
+const progressItems = computed(() => {
+  const job = jobs.value.find(item => item.id === progressJobId.value)
+  return job ? [assetImportProgressItem(job, 'Textures')] : []
+})
 
 watch([folder, packageName], () => {
   selectedTexture.value = undefined
@@ -103,6 +110,10 @@ async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
     jobs.value = await getAssetImportJobs('textures')
+    if (activeJob.value && activeJob.value.id !== progressJobId.value) {
+      progressJobId.value = activeJob.value.id
+      importDrawerOpen.value = true
+    }
     error.value = undefined
     if (!activeJob.value) {
       await Promise.all([loadTree(), loadCatalog()])
@@ -117,7 +128,9 @@ async function queueImport() {
   queueing.value = true
   error.value = undefined
   try {
-    await startAssetImport('textures')
+    const job = await startAssetImport('textures')
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value = 'The texture import could not be queued. Another texture import may already be active.'
@@ -131,7 +144,14 @@ async function reimportTexture() {
   reimporting.value = true
   error.value = undefined
   try {
-    await startAssetResourceImport('textures', selectedTexture.value.objectName, selectedTexture.value.packageName)
+    const job = await startAssetResourceImport(
+      'textures',
+      selectedTexture.value.objectName,
+      selectedTexture.value.packageName,
+      selectedTexture.value.sourceKey
+    )
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value = 'The texture package re-import could not be queued.'
@@ -158,11 +178,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
     </StudioPageHeader>
 
     <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Asset import unavailable" :description="error" />
-    <UCard v-if="activeJob" variant="subtle">
-      <div class="flex items-center gap-4"><UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" /><div class="min-w-0 flex-1"><p class="font-medium text-highlighted">Import {{ activeJob.status }}</p><p class="truncate text-xs text-muted">{{ activeJob.requestedSourceKey ?? 'Full scan' }}</p></div><UBadge color="info" variant="subtle">{{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}</UBadge></div>
-      <UProgress class="mt-4" :model-value="activeJob.completedFileCount" :max="activeJob.discoveredFileCount || 1" />
-    </UCard>
-
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <div v-if="treeCatalog" class="grid min-h-[36rem] md:h-[clamp(40rem,calc(100dvh-20rem),64rem)] md:min-h-0" :class="selectedTexture ? 'md:grid-cols-[16rem_minmax(0,1fr)_minmax(20rem,28rem)]' : 'md:grid-cols-[16rem_minmax(0,1fr)]'">
         <aside class="border-b border-default p-3 md:flex md:min-h-0 md:flex-col md:border-r md:border-b-0">
@@ -201,5 +216,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       </div>
       <div v-else class="grid min-h-64 place-items-center p-8 text-center text-sm text-muted">No imported texture catalog is available. Queue the first import.</div>
     </UCard>
+
+    <StudioImportProgressDrawer v-model:open="importDrawerOpen" :items="progressItems" />
   </div>
 </template>

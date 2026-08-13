@@ -15,6 +15,7 @@ public sealed class NpcLookupImportRepository(
     public async Task<NpcLookupImportRunSummary?> QueueAsync(
         string gameVersion,
         string kind,
+        string mode,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -34,6 +35,7 @@ public sealed class NpcLookupImportRepository(
             Id = Guid.NewGuid(),
             GameVersion = gameVersion,
             Kind = kind,
+            Mode = mode,
             Status = NpcLookupImportJobValues.Queued,
             RequestedAt = timeProvider.GetUtcNow()
         };
@@ -90,6 +92,7 @@ public sealed class NpcLookupImportRepository(
     private static NpcLookupImportRunSummary ToSummary(NpcLookupImportRun run) => new(
         run.Id,
         run.Kind,
+        run.Mode,
         run.Status,
         run.RequestedAt,
         run.StartedAt,
@@ -97,5 +100,6 @@ public sealed class NpcLookupImportRepository(
         run.TotalCount,
         run.InsertedCount,
         run.ExistingCount,
+        run.RestoredCount,
         run.Error);
 }

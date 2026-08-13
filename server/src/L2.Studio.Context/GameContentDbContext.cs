@@ -452,7 +452,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         assetCatalogGroup.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(256);
         assetCatalogGroup.Property(entity => entity.MetadataJson).HasColumnName("metadata_json").HasColumnType("jsonb");
         assetCatalogGroup.HasIndex(entity => new { entity.CatalogId, entity.Name })
-            .IsUnique().HasDatabaseName("ix_asset_catalog_groups_catalog_name");
+            .HasDatabaseName("ix_asset_catalog_groups_catalog_name");
         assetCatalogGroup.HasOne(entity => entity.Catalog).WithMany(entity => entity.Groups)
             .HasForeignKey(entity => entity.CatalogId).OnDelete(DeleteBehavior.Cascade);
         assetCatalogGroup.HasOne(entity => entity.Source).WithMany(entity => entity.Groups)
@@ -506,6 +506,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npcLookupImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
         npcLookupImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npcLookupImportRun.Property(entity => entity.Kind).HasColumnName("kind").HasMaxLength(32);
+        npcLookupImportRun.Property(entity => entity.Mode).HasColumnName("mode").HasMaxLength(32)
+            .HasDefaultValue("add_missing");
         npcLookupImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
         npcLookupImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
         npcLookupImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
@@ -513,6 +515,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npcLookupImportRun.Property(entity => entity.TotalCount).HasColumnName("total_count");
         npcLookupImportRun.Property(entity => entity.InsertedCount).HasColumnName("inserted_count");
         npcLookupImportRun.Property(entity => entity.ExistingCount).HasColumnName("existing_count");
+        npcLookupImportRun.Property(entity => entity.RestoredCount).HasColumnName("restored_count");
         npcLookupImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
         npcLookupImportRun.HasIndex(entity => new { entity.GameVersion, entity.Kind, entity.RequestedAt })
             .HasDatabaseName("ix_npc_lookup_import_runs_recent");

@@ -67,13 +67,15 @@ public sealed class AssetCatalogsControllerTests
         };
         var controller = new AssetCatalogsController(repository);
 
-        var result = await controller.Get("interlude", "textures", "Stone", CancellationToken.None);
+        var result = await controller.Get(
+            "interlude", "textures", "Stone", "Textures/Stone.utx", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var item = Assert.IsType<JsonElement>(ok.Value);
         Assert.Equal("Stone", item.GetProperty("name").GetString());
         Assert.Equal("textures", repository.ItemKind);
         Assert.Equal("Stone", repository.ItemName);
+        Assert.Equal("Textures/Stone.utx", repository.ItemSourceKey);
     }
 
     private static AssetCatalogSummary Summary() => new(
@@ -92,6 +94,7 @@ public sealed class AssetCatalogsControllerTests
         public CancellationToken SearchToken { get; private set; }
         public string? ItemKind { get; private set; }
         public string? ItemName { get; private set; }
+        public string? ItemSourceKey { get; private set; }
 
         public Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(string gameVersion, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<AssetCatalogSummary>>([]);
@@ -116,10 +119,12 @@ public sealed class AssetCatalogsControllerTests
             return Task.FromResult(SearchResult);
         }
 
-        public Task<JsonElement?> GetAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken)
+        public Task<JsonElement?> GetAsync(
+            string gameVersion, string kind, string name, string? sourceKey, CancellationToken cancellationToken)
         {
             ItemKind = kind;
             ItemName = name;
+            ItemSourceKey = sourceKey;
             return Task.FromResult(ItemResult);
         }
 

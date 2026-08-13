@@ -40,11 +40,20 @@ export function buildMapWorldGrid(
     const coordinate = parseMapWorldCoordinate(map.name)
     return coordinate ? [{ map, ...coordinate }] : []
   })
-  const unpositioned = maps.filter(
-    (map) => !parseMapWorldCoordinate(map.name)
+  const coordinateCounts = new Map<string, number>()
+  for (const entry of positioned) {
+    const key = `${entry.x}_${entry.y}`
+    coordinateCounts.set(key, (coordinateCounts.get(key) ?? 0) + 1)
+  }
+  const uniquelyPositioned = positioned.filter(
+    entry => coordinateCounts.get(`${entry.x}_${entry.y}`) === 1
   )
+  const unpositioned = maps.filter((map) => {
+    const coordinate = parseMapWorldCoordinate(map.name)
+    return !coordinate || coordinateCounts.get(`${coordinate.x}_${coordinate.y}`)! > 1
+  })
 
-  if (!positioned.length) {
+  if (!uniquelyPositioned.length) {
     return {
       minX: 0,
       maxX: 0,
@@ -57,12 +66,12 @@ export function buildMapWorldGrid(
     }
   }
 
-  const minX = Math.min(...positioned.map(({ x }) => x))
-  const maxX = Math.max(...positioned.map(({ x }) => x))
-  const minY = Math.min(...positioned.map(({ y }) => y))
-  const maxY = Math.max(...positioned.map(({ y }) => y))
+  const minX = Math.min(...uniquelyPositioned.map(({ x }) => x))
+  const maxX = Math.max(...uniquelyPositioned.map(({ x }) => x))
+  const minY = Math.min(...uniquelyPositioned.map(({ y }) => y))
+  const maxY = Math.max(...uniquelyPositioned.map(({ y }) => y))
   const byCoordinate = new Map(
-    positioned.map((entry) => [`${entry.x}_${entry.y}`, entry.map])
+    uniquelyPositioned.map((entry) => [`${entry.x}_${entry.y}`, entry.map])
   )
   const cells: MapWorldCell[] = []
 

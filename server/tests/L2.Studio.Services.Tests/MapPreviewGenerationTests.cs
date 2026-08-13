@@ -11,8 +11,8 @@ public sealed class MapPreviewGenerationTests
     {
         var root = Path.Combine(Path.GetTempPath(), $"l2-maps-{Guid.NewGuid():N}");
 
-        Assert.Null(MapPreviewGeneration.RequestedMapName(root, root));
-        Assert.Null(MapPreviewGeneration.RequestedMapName(
+        Assert.Null(MapPreviewGeneration.RequestedMapSourceKey(root, root));
+        Assert.Null(MapPreviewGeneration.RequestedMapSourceKey(
             root + Path.DirectorySeparatorChar,
             root));
     }
@@ -21,9 +21,9 @@ public sealed class MapPreviewGenerationTests
     public void ExtractsTheNameOfATargetedWorldMap()
     {
         var root = Path.Combine(Path.GetTempPath(), $"l2-maps-{Guid.NewGuid():N}");
-        var source = Path.Combine(root, "17_25.UNR");
+        var source = Path.Combine(root, "Maps", "17_25.UNR");
 
-        Assert.Equal("17_25", MapPreviewGeneration.RequestedMapName(root, source));
+        Assert.Equal("Maps/17_25.UNR", MapPreviewGeneration.RequestedMapSourceKey(root, source));
     }
 
     [Fact]
@@ -32,14 +32,13 @@ public sealed class MapPreviewGenerationTests
         var root = Path.Combine(Path.GetTempPath(), $"l2-maps-{Guid.NewGuid():N}");
         foreach (var relativePath in new[]
                  {
-                     "nested/17_25.unr",
-                     "17_25.txt",
-                     "../17_25.unr"
+                    "17_25.txt",
+                    "../17_25.unr"
                  })
         {
             var source = Path.Combine(root, relativePath);
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                MapPreviewGeneration.RequestedMapName(root, source));
+                MapPreviewGeneration.RequestedMapSourceKey(root, source));
             Assert.Contains(".unr file", exception.Message, StringComparison.Ordinal);
         }
     }

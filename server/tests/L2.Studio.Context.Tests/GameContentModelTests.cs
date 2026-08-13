@@ -66,7 +66,10 @@ public sealed class GameContentModelTests
             key.Properties.Select(property => property.Name).SequenceEqual(
                 [nameof(Npc.GameVersion), nameof(Npc.NpcSexName)]));
 
-        Assert.Contains(Entity<NpcLookupImportRun>(context).GetIndexes(), index =>
+        var importRun = Entity<NpcLookupImportRun>(context);
+        Assert.Equal("add_missing", importRun.FindProperty(nameof(NpcLookupImportRun.Mode))!.GetDefaultValue());
+        Assert.Equal("restored_count", importRun.FindProperty(nameof(NpcLookupImportRun.RestoredCount))!.GetColumnName());
+        Assert.Contains(importRun.GetIndexes(), index =>
             index.IsUnique && index.GetFilter() == "status IN ('queued', 'running')");
     }
 
@@ -85,6 +88,9 @@ public sealed class GameContentModelTests
         Assert.Equal(DeleteBehavior.Cascade, workItemRun.DeleteBehavior);
         Assert.Equal(DeleteBehavior.Cascade, diagnosticRun.DeleteBehavior);
         Assert.Equal(DeleteBehavior.Cascade, catalogSource.DeleteBehavior);
+        Assert.Contains(Entity<AssetCatalogGroup>(context).GetIndexes(), index =>
+            !index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(AssetCatalogGroup.CatalogId), nameof(AssetCatalogGroup.Name)]));
     }
 
     [Fact]

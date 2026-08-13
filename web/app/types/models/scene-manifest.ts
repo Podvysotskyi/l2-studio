@@ -21,6 +21,7 @@ export interface SceneCatalogEntry {
   sha256: string
   status: 'resolved' | 'skipped'
   error: string | null
+  sourceKey: string
 }
 
 export interface SceneObjectManifestEntry {

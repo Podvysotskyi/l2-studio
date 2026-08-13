@@ -82,14 +82,15 @@ public sealed partial class AssetImportJobProcessor
                         sound.SampleRate,
                         sound.Channels,
                         sound.WaveData.LongLength,
-                        hash));
+                        hash,
+                        job.SourceKey));
                     job.ProcessedCount++;
                     await SaveProgressAsync(context, job, cancellationToken);
                 }
             }
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, 111, Array.Empty<string>(), entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 2, 111, Array.Empty<string>(), entries,
                 group => group, item => item.ObjectName, item => item.PackageName, _ => "resolved", new { }, cancellationToken);
             job.Status = AssetImportJobValues.Succeeded;
             job.FinishedAt = timeProvider.GetUtcNow();
@@ -171,7 +172,8 @@ public sealed partial class AssetImportJobProcessor
                         track.Data.LongLength,
                         hash,
                         "resolved",
-                        null));
+                        null,
+                        job.SourceKey));
                 }
                 catch (InvalidDataException exception)
                 {
@@ -186,7 +188,8 @@ public sealed partial class AssetImportJobProcessor
                         new FileInfo(source.Path).Length,
                         null,
                         "skipped",
-                        exception.Message));
+                        exception.Message,
+                        job.SourceKey));
                     job.SkippedCount++;
                 }
 
@@ -197,7 +200,7 @@ public sealed partial class AssetImportJobProcessor
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 1, null, Array.Empty<string>(), entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 2, null, Array.Empty<string>(), entries,
                 group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded

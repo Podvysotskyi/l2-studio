@@ -342,7 +342,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.HasIndex("SourceId");
 
                     b.HasIndex("CatalogId", "Name")
-                        .IsUnique()
                         .HasDatabaseName("ix_asset_catalog_groups_catalog_name");
 
                     b.ToTable("asset_catalog_groups", "content");
@@ -1207,9 +1206,21 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("kind");
 
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("add_missing")
+                        .HasColumnName("mode");
+
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
+
+                    b.Property<int>("RestoredCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("restored_count");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone")

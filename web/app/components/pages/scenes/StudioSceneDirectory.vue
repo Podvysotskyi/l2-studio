@@ -7,11 +7,14 @@ import {
   getAssetImportJobs,
   startAssetImport
 } from '../../../services/studio-api'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 const jobs = ref<AssetImportJob[]>([])
 const catalog = ref<AssetCatalogPage<SceneCatalogEntry>>()
 const queueing = ref(false)
 const error = ref<string>()
+const progressJobId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -19,6 +22,10 @@ const activeJob = computed(() =>
     ['queued', 'discovering', 'running'].includes(job.status)
   )
 )
+const progressItems = computed(() => {
+  const job = jobs.value.find(item => item.id === progressJobId.value)
+  return job ? [assetImportProgressItem(job, 'Scenes')] : []
+})
 
 async function loadCatalog() {
   try {
@@ -34,6 +41,10 @@ async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
     jobs.value = await getAssetImportJobs('scenes')
+    if (activeJob.value && activeJob.value.id !== progressJobId.value) {
+      progressJobId.value = activeJob.value.id
+      importDrawerOpen.value = true
+    }
     error.value = undefined
     if (!activeJob.value) await loadCatalog()
   } catch {
@@ -46,7 +57,9 @@ async function loadJobs(schedule = true) {
 async function queueImport() {
   queueing.value = true
   try {
-    await startAssetImport('scenes')
+    const job = await startAssetImport('scenes')
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value = 'The scene import could not be queued.'
@@ -88,15 +101,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Scenes unavailable"
       :description="error"
     />
-    <UCard v-if="activeJob" variant="subtle">
-      <p class="text-sm font-medium text-highlighted">
-        Import {{ activeJob.status }} · {{ activeJob.completedFileCount }} /
-        {{ activeJob.discoveredFileCount || '…' }}
-      </p>
-    </UCard>
-
     <div v-if="catalog?.items.length" class="grid gap-4 lg:grid-cols-2">
-      <UCard v-for="scene in catalog.items" :key="scene.name">
+      <UCard v-for="scene in catalog.items" :key="scene.sourceKey">
         <div class="flex items-start gap-4">
           <span
             class="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"
@@ -113,7 +119,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                 {{ scene.status }}
               </UBadge>
             </div>
-            <p class="mt-1 text-xs text-muted">{{ scene.fileName }}</p>
+            <p class="mt-1 text-xs text-muted">{{ scene.sourceKey }}</p>
             <p class="mt-3 text-sm text-muted">
               {{ scene.actorCount.toLocaleString() }} meshes ·
               {{ scene.cinematicObjectCount.toLocaleString() }} cinematic
@@ -132,7 +138,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
             :disabled="!scene.manifestUrl"
             :to="
               scene.manifestUrl
-                ? { name: 'library-scenes-name', params: { name: scene.name } }
+                ? { name: 'library-scenes-name', params: { name: scene.name }, query: { source: scene.sourceKey } }
                 : undefined
             "
           />
@@ -144,5 +150,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         No generated scene catalog is available. Queue the first import.
       </p>
     </UCard>
+
+    <StudioImportProgressDrawer
+      v-model:open="importDrawerOpen"
+      :items="progressItems"
+    />
   </div>
 </template>

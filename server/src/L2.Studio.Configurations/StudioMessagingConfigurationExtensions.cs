@@ -57,8 +57,8 @@ public static class StudioMessagingConfigurationExtensions
             {
                 options.Discovery.IncludeAssembly(handlerAssembly
                     ?? throw new InvalidOperationException("A Worker handler assembly is required."));
-                options.ListenToPostgresqlQueue(ControlQueue).Sequential().MaximumMessagesToReceive(1);
-                options.ListenToPostgresqlQueue(FileQueue).Sequential().MaximumMessagesToReceive(1);
+                options.ListenToPostgresqlQueue(ControlQueue).Sequential();
+                options.ListenToPostgresqlQueue(FileQueue).Sequential();
             }
         });
     }
@@ -83,6 +83,9 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<ImportC1NpcRaces>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC4NpcRaces>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportInterludeNpcRaces>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1NpcSexes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC4NpcSexes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportInterludeNpcSexes>().ToPostgresqlQueue(ControlQueue);
     }
 
     private static void RouteFileMessages(WolverineOptions options)

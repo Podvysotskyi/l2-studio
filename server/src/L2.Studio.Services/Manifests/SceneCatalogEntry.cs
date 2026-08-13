@@ -9,4 +9,5 @@ internal sealed record SceneCatalogEntry(
     int CinematicObjectCount,
     string Sha256,
     string Status,
-    string? Error);
+    string? Error,
+    string SourceKey = "");

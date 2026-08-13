@@ -61,11 +61,19 @@ public sealed class AssetCatalogsController(IAssetCatalogRepository repository) 
     }
 
     [HttpGet("{kind}/catalog/{name}")]
-    public async Task<ActionResult<JsonElement>> Get(string gameVersion, string kind, string name, CancellationToken token)
+    public async Task<ActionResult<JsonElement>> Get(
+        string gameVersion, string kind, string name, [FromQuery] string? sourceKey, CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        var result = await repository.GetAsync(gameVersion, kind, name, token);
-        return result is null ? NotFound() : Ok(result.Value);
+        try
+        {
+            var result = await repository.GetAsync(gameVersion, kind, name, sourceKey, token);
+            return result is null ? NotFound() : Ok(result.Value);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(new { message = exception.Message });
+        }
     }
 
     private BadRequestObjectResult ValidationError(string key, string message) =>

@@ -44,14 +44,18 @@ internal static class StaticMeshMaterialCatalogLoader
             return new StaticMeshMaterialCatalog(
                 new StaticMeshMaterialResolver([], []),
                 gpuTextureFormats,
-                0);
+                0,
+                []);
         }
 
-        var allMaterials = catalogs
+        var materialGroups = catalogs
             .SelectMany(catalog => JsonSerializer.Deserialize<TextureCatalogMetadata>(catalog.MetadataJson, JsonOptions)?.Materials ?? [])
-            .Concat(embeddedMaterials)
             .GroupBy(material => Key(material.PackageName, material.ObjectName), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            .ToArray();
+        var allMaterials = materialGroups.Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
+        foreach (var material in embeddedMaterials)
+            allMaterials[Key(material.PackageName, material.ObjectName)] = material;
         var reachableMaterials = new Dictionary<string, TextureMaterialManifestEntry>(StringComparer.OrdinalIgnoreCase);
         var requiredTextures = new Dictionary<string, TextureMaterialReference>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in rootReferences)
@@ -59,15 +63,28 @@ internal static class StaticMeshMaterialCatalogLoader
             CollectDependencies(root, string.Empty, allMaterials, reachableMaterials, requiredTextures);
         }
 
-        var textureEntries = await LoadTextureEntriesAsync(
+        var loadedTextureEntries = await LoadTextureEntriesAsync(
             context,
             catalogs,
             requiredTextures.Values.ToArray(),
             cancellationToken);
+        var textureGroups = loadedTextureEntries
+            .GroupBy(texture => Key(texture.PackageName, texture.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var textureEntries = textureGroups.Where(group => group.Count() == 1).Select(group => group.Single()).ToArray();
+        var embeddedKeys = embeddedMaterials.Select(material => Key(material.PackageName, material.ObjectName))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var warnings = materialGroups.Where(group => group.Count() > 1 && !embeddedKeys.Contains(group.Key))
+            .Select(group => $"Material '{DisplayKey(group.Key)}' is ambiguous across multiple uploaded source files.")
+            .Concat(textureGroups.Where(group => group.Count() > 1)
+                .Select(group => $"Texture '{DisplayKey(group.Key)}' is ambiguous across multiple uploaded source files."))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         return new StaticMeshMaterialCatalog(
             new StaticMeshMaterialResolver(textureEntries, reachableMaterials.Values),
             gpuTextureFormats,
-            textureEntries.Count);
+            textureEntries.Length,
+            warnings);
     }
 
     internal static IReadOnlyCollection<TextureMaterialReference> RequiredTextures(
@@ -76,7 +93,8 @@ internal static class StaticMeshMaterialCatalogLoader
     {
         var allMaterials = materials
             .GroupBy(material => Key(material.PackageName, material.ObjectName), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
         var reachableMaterials = new Dictionary<string, TextureMaterialManifestEntry>(StringComparer.OrdinalIgnoreCase);
         var requiredTextures = new Dictionary<string, TextureMaterialReference>(StringComparer.OrdinalIgnoreCase);
         foreach (var root in rootReferences)
@@ -179,8 +197,6 @@ internal static class StaticMeshMaterialCatalogLoader
         return catalogs
             .SelectMany(catalog => rows.Where(row => row.CatalogId == catalog.Id))
             .Select(row => JsonSerializer.Deserialize<TextureManifestEntry>(row.MetadataJson, JsonOptions)!)
-            .GroupBy(texture => Key(texture.PackageName, texture.ObjectName), StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
             .ToArray();
     }
 
@@ -190,6 +206,7 @@ internal static class StaticMeshMaterialCatalogLoader
             : reference;
 
     private static string Key(string packageName, string objectName) => $"{packageName}\n{objectName}";
+    private static string DisplayKey(string key) => key.Replace('\n', '.');
 
     private sealed record TextureCatalogHeader(Guid Id, string Kind, int SchemaVersion, string MetadataJson);
 }

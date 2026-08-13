@@ -60,10 +60,21 @@ public sealed class NpcLookupImportHandlers(
             var now = timeProvider.GetUtcNow();
             run.Status = NpcLookupImportJobValues.Running;
             run.StartedAt ??= now;
-            var existingNames = await ExistingNamesAsync(context, kind, run.GameVersion, cancellationToken);
-            var missing = definitions.Where(definition => !existingNames.Contains(definition.Name)).ToArray();
+            NpcLookupDefinition[] missing;
+            int existingCount;
+            int restoredCount;
             if (kind == NpcLookupImportJobValues.NpcTypes)
             {
+                var existing = await context.NpcTypes.Where(item => item.GameVersion == run.GameVersion)
+                    .ToDictionaryAsync(item => item.Name, StringComparer.Ordinal, cancellationToken);
+                var reconciliation = Reconcile(definitions,
+                    existing.ToDictionary(item => item.Key, item => item.Value.DisplayName, StringComparer.Ordinal),
+                    run.Mode == NpcLookupImportJobValues.RestoreDefaults);
+                missing = reconciliation.Missing;
+                existingCount = definitions.Count - missing.Length;
+                restoredCount = reconciliation.Restored.Count;
+                foreach (var restored in reconciliation.Restored)
+                    existing[restored.Key].DisplayName = restored.Value;
                 context.NpcTypes.AddRange(missing.Select(definition => new NpcType
                 {
                     GameVersion = run.GameVersion,
@@ -73,6 +84,16 @@ public sealed class NpcLookupImportHandlers(
             }
             else if (kind == NpcLookupImportJobValues.NpcRaces)
             {
+                var existing = await context.NpcRaces.Where(item => item.GameVersion == run.GameVersion)
+                    .ToDictionaryAsync(item => item.Name, StringComparer.Ordinal, cancellationToken);
+                var reconciliation = Reconcile(definitions,
+                    existing.ToDictionary(item => item.Key, item => item.Value.DisplayName, StringComparer.Ordinal),
+                    run.Mode == NpcLookupImportJobValues.RestoreDefaults);
+                missing = reconciliation.Missing;
+                existingCount = definitions.Count - missing.Length;
+                restoredCount = reconciliation.Restored.Count;
+                foreach (var restored in reconciliation.Restored)
+                    existing[restored.Key].DisplayName = restored.Value;
                 context.NpcRaces.AddRange(missing.Select(definition => new NpcRace
                 {
                     GameVersion = run.GameVersion,
@@ -82,6 +103,16 @@ public sealed class NpcLookupImportHandlers(
             }
             else
             {
+                var existing = await context.NpcSexes.Where(item => item.GameVersion == run.GameVersion)
+                    .ToDictionaryAsync(item => item.Name, StringComparer.Ordinal, cancellationToken);
+                var reconciliation = Reconcile(definitions,
+                    existing.ToDictionary(item => item.Key, item => item.Value.DisplayName, StringComparer.Ordinal),
+                    run.Mode == NpcLookupImportJobValues.RestoreDefaults);
+                missing = reconciliation.Missing;
+                existingCount = definitions.Count - missing.Length;
+                restoredCount = reconciliation.Restored.Count;
+                foreach (var restored in reconciliation.Restored)
+                    existing[restored.Key].DisplayName = restored.Value;
                 context.NpcSexes.AddRange(missing.Select(definition => new NpcSex
                 {
                     GameVersion = run.GameVersion,
@@ -92,7 +123,8 @@ public sealed class NpcLookupImportHandlers(
 
             run.TotalCount = definitions.Count;
             run.InsertedCount = missing.Length;
-            run.ExistingCount = definitions.Count - missing.Length;
+            run.ExistingCount = existingCount;
+            run.RestoredCount = restoredCount;
             run.Status = NpcLookupImportJobValues.Succeeded;
             run.FinishedAt = timeProvider.GetUtcNow();
             await context.SaveChangesAsync(cancellationToken);
@@ -104,26 +136,19 @@ public sealed class NpcLookupImportHandlers(
         }
     }
 
-    private static Task<HashSet<string>> ExistingNamesAsync(
-        GameContentDbContext context,
-        string kind,
-        string gameVersion,
-        CancellationToken cancellationToken) => kind switch
+    internal static (NpcLookupDefinition[] Missing, Dictionary<string, string> Restored) Reconcile(
+        IReadOnlyList<NpcLookupDefinition> definitions,
+        IReadOnlyDictionary<string, string> existing,
+        bool restoreDefaults)
     {
-        NpcLookupImportJobValues.NpcTypes => context.NpcTypes.AsNoTracking()
-            .Where(item => item.GameVersion == gameVersion)
-            .Select(item => item.Name)
-            .ToHashSetAsync(StringComparer.Ordinal, cancellationToken),
-        NpcLookupImportJobValues.NpcRaces => context.NpcRaces.AsNoTracking()
-            .Where(item => item.GameVersion == gameVersion)
-            .Select(item => item.Name)
-            .ToHashSetAsync(StringComparer.Ordinal, cancellationToken),
-        NpcLookupImportJobValues.NpcSexes => context.NpcSexes.AsNoTracking()
-            .Where(item => item.GameVersion == gameVersion)
-            .Select(item => item.Name)
-            .ToHashSetAsync(StringComparer.Ordinal, cancellationToken),
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
+        var missing = definitions.Where(definition => !existing.ContainsKey(definition.Name)).ToArray();
+        var restored = restoreDefaults
+            ? definitions.Where(definition => existing.TryGetValue(definition.Name, out var displayName) &&
+                    displayName != definition.DisplayName)
+                .ToDictionary(definition => definition.Name, definition => definition.DisplayName, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        return (missing, restored);
+    }
 
     private async Task MarkFailedAsync(Guid runId, Exception exception, CancellationToken cancellationToken)
     {

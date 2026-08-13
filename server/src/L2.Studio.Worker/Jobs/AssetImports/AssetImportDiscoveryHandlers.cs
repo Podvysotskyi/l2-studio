@@ -56,8 +56,6 @@ public sealed class AssetImportDiscoveryHandlers(
         {
             sources = kind == AssetImportJobValues.MapPreviews
                 ? await DiscoverPreviewSourcesAsync(gameVersion, cancellationToken)
-                : kind == AssetImportJobValues.Textures
-                    ? await DiscoverTextureSourcesAsync(gameVersion, cancellationToken)
                 : await DiscoverFileSourcesAsync(gameVersion, kind, cancellationToken);
         }
         catch (Exception exception) when (IsDiscoveryFailure(exception))
@@ -148,22 +146,9 @@ public sealed class AssetImportDiscoveryHandlers(
         string kind,
         CancellationToken cancellationToken)
     {
-        var root = Path.GetFullPath(VersionRoot(gameVersion, kind));
-        if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"The configured source directory does not exist: {root}");
-        var extension = ExpectedExtension(kind);
-        var paths = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-            .Where(path => string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
-            .Where(path => kind switch
-            {
-                AssetImportJobValues.Maps => UnrealPackageKindClassifier.IsWorldMap(path),
-                AssetImportJobValues.Scenes => UnrealPackageKindClassifier.IsScene(path),
-                _ => true
-            })
-            .OrderBy(path => RelativeSourceKey(root, path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var duplicate = paths.GroupBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1);
-        if (duplicate is not null) throw new InvalidDataException($"Source filename '{duplicate.Key}' is duplicated ignoring case.");
-        var result = new List<DiscoveredSource>(paths.Length);
+        var root = VersionRoot(gameVersion);
+        var paths = AssetImportFileDiscovery.Paths(root, kind);
+        var result = new List<DiscoveredSource>(paths.Count);
         foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -182,42 +167,6 @@ public sealed class AssetImportDiscoveryHandlers(
         return result;
     }
 
-    private async Task<IReadOnlyList<DiscoveredSource>> DiscoverTextureSourcesAsync(
-        string gameVersion,
-        CancellationToken cancellationToken)
-    {
-        var root = Path.GetFullPath(VersionRoot(gameVersion, AssetImportJobValues.Textures));
-        if (!Directory.Exists(root)) throw new DirectoryNotFoundException($"The configured source directory does not exist: {root}");
-        var sources = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-            .Where(path => string.Equals(Path.GetExtension(path), ".utx", StringComparison.OrdinalIgnoreCase))
-            .Select(path => (Folder: Path.GetDirectoryName(RelativeSourceKey(root, path))?.Replace('\\', '/') ?? string.Empty, Path: Path.GetFullPath(path)))
-            .ToArray();
-
-        var duplicatePackage = sources.GroupBy(source => Path.GetFileNameWithoutExtension(source.Path), StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Count() > 1);
-        if (duplicatePackage is not null)
-            throw new InvalidDataException($"Texture package '{duplicatePackage.Key}' is duplicated across texture source folders.");
-
-        var result = new List<DiscoveredSource>(sources.Length);
-        foreach (var source in sources.OrderBy(item => item.Folder, StringComparer.Ordinal).ThenBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var sourceKey = RelativeSourceKey(root, source.Path);
-            try
-            {
-                if (HasSymbolicLink(root, sourceKey))
-                    throw new InvalidDataException("Symbolic-link sources are not supported.");
-                result.Add(new DiscoveredSource(sourceKey, source.Path,
-                    await AssetImportSourceHash.FileAsync(source.Path, cancellationToken), null));
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                result.Add(new DiscoveredSource(sourceKey, source.Path, null, exception.Message));
-            }
-        }
-        return result;
-    }
-
     private async Task<IReadOnlyList<DiscoveredSource>> DiscoverPreviewSourcesAsync(
         string gameVersion,
         CancellationToken cancellationToken)
@@ -229,7 +178,7 @@ public sealed class AssetImportDiscoveryHandlers(
             .OrderBy(source => source.SourceKey)
             .Select(source => new { source.SourceKey, source.SourceHash })
             .ToListAsync(cancellationToken);
-        var root = Path.GetFullPath(VersionRoot(gameVersion, AssetImportJobValues.Maps));
+        var root = VersionRoot(gameVersion);
         return sources.Select(source => new DiscoveredSource(
             source.SourceKey,
             Path.Combine(root, source.SourceKey),
@@ -259,28 +208,8 @@ public sealed class AssetImportDiscoveryHandlers(
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private string VersionRoot(string gameVersion, string kind) => Path.Combine(
-        options.Value.SourceRootPath,
-        SourceFolder(gameVersion),
-        AssetImportJobProcessor.SourceKindFolder(kind));
-
-    private static string SourceFolder(string gameVersion) => gameVersion switch
-    {
-        "c1" => "C1",
-        "c4" => "C4",
-        "interlude" => "Interlude",
-        _ => throw new ArgumentOutOfRangeException(nameof(gameVersion))
-    };
-
-    private static string ExpectedExtension(string kind) => kind switch
-    {
-        AssetImportJobValues.Textures => ".utx",
-        AssetImportJobValues.StaticMeshes => ".usx",
-        AssetImportJobValues.Sounds => ".uax",
-        AssetImportJobValues.Music => ".ogg",
-        AssetImportJobValues.Maps or AssetImportJobValues.Scenes => ".unr",
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
+    private string VersionRoot(string gameVersion) =>
+        AssetImportSourcePaths.VersionRoot(options.Value.SourceRootPath, gameVersion);
 
     private static object FileCommand(string kind, Guid id) => kind switch
     {

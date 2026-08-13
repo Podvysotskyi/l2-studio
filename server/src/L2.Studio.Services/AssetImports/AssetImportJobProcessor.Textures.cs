@@ -27,7 +27,8 @@ public sealed partial class AssetImportJobProcessor
     {
         var sourcePath = Path.GetFullPath(job.ConversionSourcePath ?? job.SourcePath);
         var originalFolder = Path.GetDirectoryName(job.SourceKey)?.Replace('\\', '/') ?? string.Empty;
-        RequireSafeSegment(originalFolder, "texture source folder");
+        foreach (var segment in originalFolder.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            RequireSafeSegment(segment, "texture source folder");
         var assetRootPath = AssetRoot(job);
         var packagePaths = SourceFiles(sourcePath, ".utx", "texture");
         if (packagePaths.Length == 0)
@@ -151,7 +152,8 @@ public sealed partial class AssetImportJobProcessor
                                 result.GpuImage is not null,
                                 texture.MipLevels.Count,
                                 OriginalFolder: package.OriginalFolder,
-                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}"));
+                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}",
+                                SourceKey: job.SourceKey));
                         }
                         else
                         {
@@ -171,7 +173,8 @@ public sealed partial class AssetImportJobProcessor
                                 result.Error,
                                 MipCount: export.MipCount,
                                 OriginalFolder: package.OriginalFolder,
-                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}"));
+                                Path: $"/{package.OriginalFolder}/{package.Name}/{export.Name}",
+                                SourceKey: job.SourceKey));
                             job.SkippedCount++;
                         }
 
@@ -193,12 +196,13 @@ public sealed partial class AssetImportJobProcessor
                     package.TextureCount,
                     package.MaterialCount,
                     package.OriginalFolder,
-                    $"/{package.OriginalFolder}/{package.Name}")).ToArray();
+                    $"/{package.OriginalFolder}/{package.Name}",
+                    job.SourceKey)).ToArray();
 
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 7, 121, catalogGroups, entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 8, 121, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new TextureCatalogMetadata(materialEntries), cancellationToken);
             job.Status = warnings.Count == 0

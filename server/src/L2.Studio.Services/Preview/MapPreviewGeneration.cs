@@ -10,18 +10,19 @@ internal static class MapPreviewGeneration
     public static string ComputeSourceHash(string mapCatalogSourceHash) =>
         AssetImportSourceHash.MapPreview(mapCatalogSourceHash);
 
-    public static string? RequestedMapName(string mapsSourcePath, string jobSourcePath)
+    public static string? RequestedMapSourceKey(string gameVersionSourcePath, string jobSourcePath)
     {
-        var mapsPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(mapsSourcePath));
+        var mapsPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(gameVersionSourcePath));
         var sourcePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(jobSourcePath));
         if (string.Equals(mapsPath, sourcePath, StringComparison.OrdinalIgnoreCase)) return null;
-        if (!string.Equals(Path.GetDirectoryName(sourcePath), mapsPath, StringComparison.OrdinalIgnoreCase) ||
+        var relative = Path.GetRelativePath(mapsPath, sourcePath);
+        if (Path.IsPathRooted(relative) || relative.StartsWith("..", StringComparison.Ordinal) ||
             !string.Equals(Path.GetExtension(sourcePath), ".unr", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("A targeted map-preview job must reference an .unr file in the configured map directory.");
+            throw new InvalidOperationException("A targeted map-preview job must reference an .unr file in the configured game-version directory.");
         }
 
-        return Path.GetFileNameWithoutExtension(sourcePath);
+        return relative.Replace('\\', '/');
     }
 
     public static bool CanReuse(

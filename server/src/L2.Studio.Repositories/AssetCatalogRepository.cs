@@ -65,14 +65,22 @@ public sealed class AssetCatalogRepository(
         string gameVersion,
         string kind,
         string name,
+        string? sourceKey,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var json = await context.AssetCatalogItems.AsNoTracking()
+        var items = context.AssetCatalogItems.AsNoTracking()
             .Where(item => item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind &&
-                item.Catalog.IsActive && item.Name == name)
-            .Select(item => item.MetadataJson).FirstOrDefaultAsync(cancellationToken);
-        return json is null ? null : Parse(json);
+                item.Catalog.IsActive && item.Name == name);
+        if (!string.IsNullOrWhiteSpace(sourceKey))
+        {
+            var normalizedSourceKey = sourceKey.Trim().ToLowerInvariant();
+            items = items.Where(item => item.Source.NormalizedSourceKey == normalizedSourceKey);
+        }
+        var json = await items.Select(item => item.MetadataJson).Take(2).ToArrayAsync(cancellationToken);
+        if (json.Length > 1)
+            throw new InvalidOperationException($"Catalog entry '{name}' is ambiguous; provide its source key.");
+        return json.Length == 0 ? null : Parse(json[0]);
     }
 
     public async Task<AssetArtifactPage> GetArtifactsAsync(

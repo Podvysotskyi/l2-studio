@@ -86,7 +86,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
             return ValidationError("packageName", "A package name is required.");
         try
         {
-            var run = await repository.QueueResourceAsync(gameVersion, kind, request.ResourceName, request.PackageName, request.Force, token);
+            var run = await repository.QueueResourceAsync(
+                gameVersion, kind, request.ResourceName, request.PackageName, request.SourceKey, request.Force, token);
             return run is null
                 ? Conflict(new { message = $"The requested '{kind}' resource conflicts with an active run." })
                 : Accepted($"/api/game-versions/{gameVersion}/assets/{kind}/imports/{run.Id}", run);

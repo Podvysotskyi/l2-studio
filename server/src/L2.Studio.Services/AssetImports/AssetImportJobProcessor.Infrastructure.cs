@@ -198,12 +198,12 @@ public sealed partial class AssetImportJobProcessor
             .ToArrayAsync(cancellationToken);
         foreach (var reference in requested)
         {
-            var source = sources.FirstOrDefault(candidate => candidate.Groups.Any(group =>
-                string.Equals(group.Name, reference.Package, StringComparison.OrdinalIgnoreCase)));
-            dependencyHints.Add(source is null
+            var matches = sources.Where(candidate => candidate.Groups.Any(group =>
+                string.Equals(group.Name, reference.Package, StringComparison.OrdinalIgnoreCase))).ToArray();
+            dependencyHints.Add(matches.Length != 1
                 ? new AssetCatalogDependencyPublication(AssetImportJobValues.Textures, reference.Key, null, null, false, null)
                 : new AssetCatalogDependencyPublication(AssetImportJobValues.Textures, reference.Key,
-                    source.NormalizedSourceKey, source.ArtifactFingerprint ?? source.SourceHash, true, source.OutputRoot));
+                    matches[0].NormalizedSourceKey, matches[0].ArtifactFingerprint ?? matches[0].SourceHash, true, matches[0].OutputRoot));
         }
     }
 
@@ -381,27 +381,8 @@ public sealed partial class AssetImportJobProcessor
     private string AssetWorkRoot(AssetImportJob job) =>
         Path.GetFullPath(options.Value.AssetWorkRootPath);
 
-    private string SourceRoot(AssetImportJob job, string kind) => Path.Combine(
-        Path.GetFullPath(options.Value.SourceRootPath),
-        job.GameVersion switch
-        {
-            "c1" => "C1",
-            "c4" => "C4",
-            "interlude" => "Interlude",
-            _ => throw new InvalidOperationException($"Unknown game version '{job.GameVersion}'.")
-        },
-        SourceKindFolder(kind));
-
-    internal static string SourceKindFolder(string kind) => kind switch
-    {
-        AssetImportJobValues.Textures => "textures",
-        AssetImportJobValues.StaticMeshes => "staticmeshes",
-        AssetImportJobValues.Sounds => "sounds",
-        AssetImportJobValues.Music => "music",
-        AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews => "maps",
-        AssetImportJobValues.Scenes => "scenes",
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
+    private string VersionRoot(AssetImportJob job) =>
+        AssetImportSourcePaths.VersionRoot(options.Value.SourceRootPath, job.GameVersion);
 
     private static void Promote(string stagingPath, string finalPath)
     {

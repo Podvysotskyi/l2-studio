@@ -1,4 +1,5 @@
 using L2.Studio.Contracts;
+using L2.Studio.Contracts.Requests;
 using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Repositories.Interfaces.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -13,10 +14,19 @@ public sealed class NpcLookupImportsController(INpcLookupImportRepository reposi
     public async Task<ActionResult<NpcLookupImportRunSummary>> Queue(
         string gameVersion,
         string kind,
+        [FromBody] NpcLookupImportRequest? request,
         CancellationToken token)
     {
         if (!Supported(gameVersion, kind)) return NotFound();
-        var run = await repository.QueueAsync(gameVersion, kind, token);
+        var mode = request?.Mode ?? NpcLookupImportJobValues.AddMissing;
+        if (!NpcLookupImportJobValues.SupportedModes.Contains(mode))
+        {
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["mode"] = ["Import mode is invalid."]
+            }));
+        }
+        var run = await repository.QueueAsync(gameVersion, kind, mode, token);
         return run is null
             ? Conflict(new { message = $"An import for '{kind}' is already active for '{gameVersion}'." })
             : Accepted($"/api/game-versions/{gameVersion}/content/{kind}/imports/{run.Id}", run);

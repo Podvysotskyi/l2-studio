@@ -23,7 +23,7 @@ const props = defineProps<{
   reimportingMapName?: string
 }>()
 const emit = defineEmits<{
-  generatePreview: [mapName: string]
+  generatePreview: [map: MapCatalogEntry]
   reimport: [map: MapCatalogEntry]
 }>()
 
@@ -53,7 +53,7 @@ const mapStyle = computed(() => ({
   transform: `translate3d(${transform.value.x}px, ${transform.value.y}px, 0) scale(${transform.value.scale})`
 }))
 const selectedPreview = computed(() =>
-  selectedMap.value ? props.previews.get(selectedMap.value.name) : undefined
+  selectedMap.value ? props.previews.get(selectedMap.value.sourceKey) : undefined
 )
 const zoomLabel = computed(() => `${Math.round(transform.value.scale * 100)}%`)
 
@@ -228,8 +228,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
               @click="selectCell(cell)"
             >
               <img
-                v-if="previews.get(cell.map.name)?.imageUrl"
-                :src="previews.get(cell.map.name)?.imageUrl ?? undefined"
+                v-if="previews.get(cell.map.sourceKey)?.imageUrl"
+                :src="previews.get(cell.map.sourceKey)?.imageUrl ?? undefined"
                 :alt="`Top-down preview of ${cell.map.name}`"
                 loading="lazy"
                 decoding="async"
@@ -420,7 +420,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
             block
             :loading="queueingPreviewName === selectedMap.name"
             :disabled="previewJobActive || !selectedMap.manifestUrl"
-            @click="emit('generatePreview', selectedMap.name)"
+            @click="emit('generatePreview', selectedMap)"
           />
           <UButton
             label="Open map"
@@ -431,7 +431,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
               selectedMap.manifestUrl
                 ? {
                     name: 'library-maps-name',
-                    params: { name: selectedMap.name }
+                    params: { name: selectedMap.name },
+                    query: { source: selectedMap.sourceKey }
                   }
                 : undefined
             "

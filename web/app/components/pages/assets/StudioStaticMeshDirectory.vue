@@ -12,6 +12,7 @@ import {
   startAssetImport,
   startAssetResourceImport
 } from '../../../services/studio-api'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 const jobs = ref<AssetImportJob[]>([])
 const catalog =
@@ -26,6 +27,8 @@ const pageSize = ref(50)
 const queueing = ref(false)
 const error = ref<string>()
 const reimporting = ref<string>()
+const progressJobId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -46,6 +49,18 @@ const materialCounts = computed(() =>
     { resolved: 0, available: 0 }
   )
 )
+const progressItems = computed(() => {
+  const job = jobs.value.find(item => item.id === progressJobId.value)
+  return job ? [assetImportProgressItem(job, 'Static meshes')] : []
+})
+const selectedPackageEntry = computed(() => packages.value.find(
+  item => item.sourceKey === selectedPackage.value
+))
+
+function sourceDirectory(sourceKey: string) {
+  const separator = sourceKey.lastIndexOf('/')
+  return separator < 0 ? undefined : sourceKey.slice(0, separator)
+}
 
 watch([query, selectedPackage, pageSize], () => {
   page.value = 1
@@ -67,8 +82,10 @@ async function loadCatalog() {
       StaticMeshPackage
     >('staticmeshes', {
         query: query.value,
-        packageName:
-          selectedPackage.value === 'all' ? undefined : selectedPackage.value,
+        packageName: selectedPackageEntry.value?.name,
+        originalFolder: selectedPackageEntry.value
+          ? sourceDirectory(selectedPackageEntry.value.sourceKey)
+          : undefined,
         page: page.value,
         pageSize: pageSize.value
       })
@@ -81,6 +98,10 @@ async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
     jobs.value = await getAssetImportJobs('staticmeshes')
+    if (activeJob.value && activeJob.value.id !== progressJobId.value) {
+      progressJobId.value = activeJob.value.id
+      importDrawerOpen.value = true
+    }
     error.value = undefined
     if (!activeJob.value) await loadCatalog()
   } catch {
@@ -95,7 +116,9 @@ async function queueImport() {
   queueing.value = true
   error.value = undefined
   try {
-    await startAssetImport('staticmeshes')
+    const job = await startAssetImport('staticmeshes')
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value =
@@ -106,10 +129,17 @@ async function queueImport() {
 }
 
 async function reimportMesh(mesh: StaticMeshManifestEntry) {
-  reimporting.value = `${mesh.packageName}/${mesh.objectName}`
+  reimporting.value = `${mesh.sourceKey}/${mesh.objectName}`
   error.value = undefined
   try {
-    await startAssetResourceImport('staticmeshes', mesh.objectName, mesh.packageName)
+    const job = await startAssetResourceImport(
+      'staticmeshes',
+      mesh.objectName,
+      mesh.packageName,
+      mesh.sourceKey
+    )
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value = 'The static-mesh package re-import could not be queued.'
@@ -156,30 +186,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Static-mesh import unavailable"
       :description="error"
     />
-    <UCard v-if="activeJob" variant="subtle">
-      <div class="flex items-center gap-4">
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-5 animate-spin text-primary"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="font-medium text-highlighted">
-            Import {{ activeJob.status }}
-          </p>
-          <p class="truncate text-xs text-muted">{{ activeJob.requestedSourceKey ?? 'Full scan' }}</p>
-        </div>
-        <UBadge color="info" variant="subtle">
-          {{ activeJob.completedFileCount }} /
-          {{ activeJob.discoveredFileCount || '…' }}
-        </UBadge>
-      </div>
-      <UProgress
-        class="mt-4"
-        :model-value="activeJob.completedFileCount"
-        :max="activeJob.discoveredFileCount || 1"
-      />
-    </UCard>
-
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -225,17 +231,20 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           >
             <button
               v-for="item in packages"
-              :key="item.name"
+              :key="item.sourceKey"
               type="button"
               class="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm"
               :class="
-                selectedPackage === item.name
+                selectedPackage === item.sourceKey
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted hover:bg-elevated'
               "
-              @click="selectedPackage = item.name"
+              @click="selectedPackage = item.sourceKey"
             >
-              <span class="truncate">{{ item.name }}</span
+              <span class="min-w-0 truncate">
+                <span class="block truncate">{{ item.name }}</span>
+                <span class="block truncate text-xs opacity-70">{{ item.sourceKey }}</span>
+              </span
               ><span class="shrink-0 text-xs">{{ item.meshCount }}</span>
             </button>
           </div>
@@ -246,7 +255,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           >
             <div
               v-for="mesh in visibleMeshes"
-              :key="`${mesh.packageName}/${mesh.objectName}`"
+              :key="`${mesh.sourceKey}/${mesh.objectName}`"
               class="flex w-full items-center gap-4 p-4 text-left hover:bg-elevated"
             >
               <button type="button" class="flex min-w-0 flex-1 items-center gap-4 text-left disabled:cursor-not-allowed" :disabled="!mesh.url" @click="showPreview(mesh)">
@@ -259,7 +268,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                   class="block truncate text-sm font-medium text-highlighted"
                   >{{ mesh.objectName }}</span
                 ><span class="mt-1 block truncate text-xs text-muted"
-                  >{{ mesh.packageName }} ·
+                  >{{ mesh.packageName }} · {{ mesh.sourceKey }} ·
                   {{ mesh.vertexCount.toLocaleString() }} vertices ·
                   {{ mesh.triangleCount.toLocaleString() }} triangles ·
                   {{ mesh.sectionCount }} sections ·
@@ -292,7 +301,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
                 class="size-4 text-muted"
               />
               </button>
-              <UButton label="Re-import" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting === `${mesh.packageName}/${mesh.objectName}`" @click="reimportMesh(mesh)" />
+              <UButton label="Re-import" icon="i-lucide-rotate-cw" size="xs" color="neutral" variant="outline" :loading="reimporting === `${mesh.sourceKey}/${mesh.objectName}`" @click="reimportMesh(mesh)" />
             </div>
             <div
               v-if="visibleMeshes.length === 0"
@@ -346,5 +355,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </p>
       </template>
     </UModal>
+
+    <StudioImportProgressDrawer
+      v-model:open="importDrawerOpen"
+      :items="progressItems"
+    />
   </div>
 </template>

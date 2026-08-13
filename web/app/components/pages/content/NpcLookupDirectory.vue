@@ -12,8 +12,12 @@ import type {
   NpcLookupKind,
   NpcLookupRecord
 } from '../../../types/models/content-directory'
-import type { NpcLookupImportRun } from '../../../types/models/npc-lookup-import'
+import type {
+  NpcLookupImportMode,
+  NpcLookupImportRun
+} from '../../../types/models/npc-lookup-import'
 import { paginate } from '../../../utils/directory'
+import { npcLookupImportProgressItem } from '../../../utils/import-progress'
 
 const props = defineProps<{
   kind: NpcLookupKind
@@ -35,7 +39,9 @@ const error = computed(() => store.errors[props.kind])
 const actionError = ref<string>()
 const savingName = ref<string>()
 const latestRun = ref<NpcLookupImportRun>()
-const queueing = ref(false)
+const queueingMode = ref<NpcLookupImportMode>()
+const progressRunId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const columns: TableColumn<NpcLookupRecord>[] = [
@@ -53,8 +59,13 @@ const filteredRecords = computed(() => {
 })
 const visibleRecords = computed(() => paginate(filteredRecords.value, page.value, pageSize.value))
 const importKind = computed(() => props.kind)
-const importLabel = computed(() => `Import ${props.title}`)
+const importLabel = computed(() => `Import missing ${props.title}`)
 const activeRun = computed(() => latestRun.value && ['queued', 'running'].includes(latestRun.value.status))
+const progressItems = computed(() => {
+  const run = latestRun.value
+  if (!run || run.id !== progressRunId.value) return []
+  return [npcLookupImportProgressItem(run, props.title)]
+})
 
 watch([query, pageSize], () => { page.value = 1 })
 
@@ -66,7 +77,12 @@ async function loadLatestRun(schedule = true) {
   if (!props.importable || !importKind.value) return
   try {
     const runs = await getNpcLookupImportJobs(importKind.value, 1)
-    latestRun.value = runs[0]
+    const latest = runs[0]
+    latestRun.value = latest
+    if (latest && ['queued', 'running'].includes(latest.status) && latest.id !== progressRunId.value) {
+      progressRunId.value = latest.id
+      importDrawerOpen.value = true
+    }
     actionError.value = undefined
     if (schedule && activeRun.value) schedulePoll()
   } catch {
@@ -90,17 +106,30 @@ async function pollRun() {
   }
 }
 
-async function queueImport() {
+async function queueImport(mode: NpcLookupImportMode) {
   if (!importKind.value) return
-  queueing.value = true
+  if (mode === 'restore_defaults') {
+    const confirmed = await dialogs.confirm({
+      title: `Restore default ${props.title.toLowerCase()}?`,
+      description: `Edited display names for built-in ${props.itemLabel.toLowerCase()} will be overwritten with their version defaults. Extra records will be preserved.`,
+      confirmLabel: 'Restore defaults',
+      confirmColor: 'warning'
+    })
+    if (!confirmed) return
+  }
+  queueingMode.value = mode
   actionError.value = undefined
   try {
-    latestRun.value = await startNpcLookupImport(importKind.value)
+    latestRun.value = await startNpcLookupImport(importKind.value, mode)
+    progressRunId.value = latestRun.value.id
+    importDrawerOpen.value = true
     schedulePoll()
   } catch {
-    actionError.value = `The ${props.itemLabel.toLowerCase()} import could not be queued.`
+    actionError.value = mode === 'restore_defaults'
+      ? `The default ${props.itemLabel.toLowerCase()} could not be restored.`
+      : `The ${props.itemLabel.toLowerCase()} import could not be queued.`
   } finally {
-    queueing.value = false
+    queueingMode.value = undefined
   }
 }
 
@@ -139,31 +168,25 @@ onUnmounted(() => clearTimeout(pollTimer))
           v-if="importable"
           :label="importLabel"
           icon="i-lucide-play"
-          :loading="queueing || Boolean(activeRun)"
-          :disabled="Boolean(activeRun)"
-          @click="queueImport"
+          :loading="queueingMode === 'add_missing'"
+          :disabled="Boolean(activeRun) || Boolean(queueingMode)"
+          @click="queueImport('add_missing')"
+        />
+        <UButton
+          v-if="importable"
+          label="Restore defaults"
+          icon="i-lucide-rotate-ccw"
+          color="warning"
+          variant="outline"
+          :loading="queueingMode === 'restore_defaults'"
+          :disabled="Boolean(activeRun) || Boolean(queueingMode)"
+          @click="queueImport('restore_defaults')"
         />
         <UButton label="Refresh" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="loading" @click="loadRecords" />
       </template>
     </StudioPageHeader>
 
     <UAlert v-if="error || actionError" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Catalog action failed" :description="error ?? actionError" />
-
-    <UCard v-if="latestRun" variant="subtle">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-sm font-medium text-highlighted">Latest import: {{ latestRun.status.replaceAll('_', ' ') }}</p>
-          <p v-if="latestRun.status === 'succeeded'" class="text-xs text-muted">
-            {{ latestRun.insertedCount }} inserted · {{ latestRun.existingCount }} already existed · {{ latestRun.totalCount }} total
-          </p>
-          <p v-else-if="latestRun.error" class="text-xs text-error">{{ latestRun.error }}</p>
-          <p v-else class="text-xs text-muted">Requested {{ new Date(latestRun.requestedAt).toLocaleString() }}</p>
-        </div>
-        <UBadge :color="latestRun.status === 'failed' ? 'error' : latestRun.status === 'succeeded' ? 'success' : 'info'" variant="subtle">
-          {{ latestRun.status }}
-        </UBadge>
-      </div>
-    </UCard>
 
     <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <div class="flex flex-wrap items-center justify-between gap-4 border-b border-default px-4 py-3">
@@ -184,5 +207,10 @@ onUnmounted(() => clearTimeout(pollTimer))
       </div>
       <StudioTableFooter v-model:page="page" v-model:page-size="pageSize" :total="filteredRecords.length" />
     </UCard>
+
+    <StudioImportProgressDrawer
+      v-model:open="importDrawerOpen"
+      :items="progressItems"
+    />
   </div>
 </template>

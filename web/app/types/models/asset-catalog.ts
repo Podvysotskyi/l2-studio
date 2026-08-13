@@ -88,6 +88,7 @@ export interface TexturePackage {
   materialCount: number
   originalFolder: string
   path: string
+  sourceKey: string
 }
 
 export interface TextureMaterialReference {
@@ -169,6 +170,7 @@ export interface TextureManifestEntry {
   animation: TextureAnimationManifestEntry | null
   originalFolder: string
   path: string
+  sourceKey: string
 }
 
 export interface TextureAnimationManifestEntry {
@@ -188,6 +190,7 @@ export interface MusicManifestEntry {
   sha256: string | null
   status: 'resolved' | 'skipped'
   error: string | null
+  sourceKey: string
 }
 
 export interface SoundManifestEntry {
@@ -199,6 +202,7 @@ export interface SoundManifestEntry {
   channels: number
   sizeBytes: number
   sha256: string
+  sourceKey: string
 }
 
 export interface StaticMeshPackage {
@@ -206,6 +210,7 @@ export interface StaticMeshPackage {
   fileName: string
   sha256: string
   meshCount: number
+  sourceKey: string
 }
 
 export interface StaticMeshManifestEntry {
@@ -222,4 +227,5 @@ export interface StaticMeshManifestEntry {
   sha256: string | null
   status: 'resolved' | 'skipped'
   error: string | null
+  sourceKey: string
 }

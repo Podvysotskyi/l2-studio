@@ -5,21 +5,14 @@ using L2.Studio.Context;
 using L2.Studio.Context.Entities;
 using L2.Studio.Messages;
 using L2.Studio.Repositories.Interfaces.Models;
-using L2.Studio.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Hosting;
-using Wolverine;
 using Wolverine.Attributes;
-using Wolverine.EntityFrameworkCore;
-using Wolverine.Runtime;
 
 namespace L2.Studio.Worker;
 
 [WolverineHandler]
 public sealed class AssetImportRunHandlers(
     IDbContextFactory<GameContentDbContext> contextFactory,
-    IDbContextOutbox outbox,
     TimeProvider timeProvider)
 {
     public async Task Handle(AssetImportWorkItemCompleted message, CancellationToken cancellationToken)
@@ -34,10 +27,10 @@ public sealed class AssetImportRunHandlers(
             return;
         }
         ApplyCounts(run);
-        outbox.Enroll(context);
-        if (run.DiscoveryFinishedAt is not null && run.CompletedFileCount == run.DiscoveredFileCount)
-            await outbox.PublishAsync(new FinalizeAssetImportRun(run.Id));
-        await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
+        if (IsReadyToFinalize(run))
+            await FinalizeAsync(context, run, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task Handle(FinalizeAssetImportRun message, CancellationToken cancellationToken)
@@ -52,13 +45,27 @@ public sealed class AssetImportRunHandlers(
             return;
         }
         ApplyCounts(run);
-        if (run.DiscoveryFinishedAt is null || run.CompletedFileCount != run.DiscoveredFileCount)
+        if (!IsReadyToFinalize(run))
         {
             await transaction.CommitAsync(cancellationToken);
             return;
         }
 
-        outbox.Enroll(context);
+        await FinalizeAsync(context, run, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    internal static bool IsReadyToFinalize(AssetImportRun run) =>
+        !AssetImportJobValues.TerminalStatuses.Contains(run.Status) &&
+        run.DiscoveryFinishedAt is not null &&
+        run.CompletedFileCount == run.DiscoveredFileCount;
+
+    private async Task FinalizeAsync(
+        GameContentDbContext context,
+        AssetImportRun run,
+        CancellationToken cancellationToken)
+    {
         if (run.TriggerType == AssetImportJobValues.FullScan)
         {
             var discovered = run.WorkItems.Select(item => item.NormalizedSourceKey).ToHashSet(StringComparer.Ordinal);
@@ -83,13 +90,13 @@ public sealed class AssetImportRunHandlers(
                 catalog.PublishedAt = timeProvider.GetUtcNow();
             }
         }
+
         run.Status = run.FailedFileCount > 0
             ? AssetImportJobValues.Failed
             : run.WarningFileCount > 0
                 ? AssetImportJobValues.SucceededWithWarnings
                 : AssetImportJobValues.Succeeded;
         run.FinishedAt = timeProvider.GetUtcNow();
-        await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
     }
 
     internal static void ApplyCounts(AssetImportRun run)

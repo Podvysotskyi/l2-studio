@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using L2.Studio.Context;
 using L2.Studio.Context.Entities;
 using L2.Studio.Contracts;
@@ -13,15 +12,12 @@ using Wolverine.Runtime;
 
 namespace L2.Studio.Repositories;
 
-public sealed partial class AssetImportRepository(
+public sealed class AssetImportRepository(
     IDbContextFactory<GameContentDbContext> contextFactory,
     IDbContextOutbox outbox,
     IOptions<AssetImportOptions> options,
     TimeProvider timeProvider) : IAssetImportRepository
 {
-    [GeneratedRegex("^[0-9]{2}_[0-9]{2}$", RegexOptions.CultureInvariant)]
-    private static partial Regex WorldMapNamePattern();
-
     public async Task<AssetImportRunSummary?> QueueFullScanAsync(
         string gameVersion,
         string kind,
@@ -117,6 +113,7 @@ public sealed partial class AssetImportRepository(
         string kind,
         string resourceName,
         string? packageName,
+        string? sourceKey,
         bool force,
         CancellationToken cancellationToken)
     {
@@ -127,6 +124,11 @@ public sealed partial class AssetImportRepository(
             item.Name == resourceName.Trim());
         if (kind is AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes)
             items = items.Where(item => item.GroupName == packageName!.Trim());
+        if (!string.IsNullOrWhiteSpace(sourceKey))
+        {
+            var normalizedSourceKey = NormalizeSourceKey(sourceKey);
+            items = items.Where(item => item.Source.NormalizedSourceKey == normalizedSourceKey);
+        }
         var sourceKeys = await items.Select(item => item.Source.SourceKey).Distinct().Take(2).ToArrayAsync(cancellationToken);
         if (sourceKeys.Length == 0)
             throw new AssetImportTargetNotFoundException(resourceName);
@@ -309,23 +311,15 @@ public sealed partial class AssetImportRepository(
     {
         var normalizedFileName = fileName.Replace('\\', '/');
         var extension = Path.GetExtension(normalizedFileName);
-        var expected = kind == AssetImportJobValues.Music ? ".ogg" : kind switch
-        {
-            AssetImportJobValues.Textures => ".utx",
-            AssetImportJobValues.StaticMeshes => ".usx",
-            AssetImportJobValues.Sounds => ".uax",
-            AssetImportJobValues.Maps or AssetImportJobValues.Scenes or AssetImportJobValues.MapPreviews => ".unr",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind))
-        };
+        var expected = AssetImportSourcePaths.ExpectedExtension(kind);
         if (!string.Equals(extension, expected, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"The '{kind}' import requires a {expected} file.", nameof(fileName));
-        var stem = Path.GetFileNameWithoutExtension(fileName);
-        if (kind is AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews && !WorldMapNamePattern().IsMatch(stem))
+        if (kind is AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews && !AssetImportSourcePaths.MatchesKind(kind, normalizedFileName))
             throw new ArgumentException("The file is not a coordinate-named world map.", nameof(fileName));
-        if (kind == AssetImportJobValues.Scenes && WorldMapNamePattern().IsMatch(stem))
+        if (kind == AssetImportJobValues.Scenes && !AssetImportSourcePaths.MatchesKind(kind, normalizedFileName))
             throw new ArgumentException("The file is a world map, not a client scene.", nameof(fileName));
 
-        var root = Path.GetFullPath(VersionRoot(gameVersion, kind));
+        var root = VersionRoot(gameVersion);
         string fullPath;
         try
         {
@@ -357,29 +351,8 @@ public sealed partial class AssetImportRepository(
         return new ValidatedSource(sourceKey, fullPath, sourceHash);
     }
 
-    private string VersionRoot(string gameVersion, string kind) => Path.Combine(
-        options.Value.SourceRootPath,
-        SourceFolder(gameVersion),
-        SourceKindFolder(kind));
-
-    private static string SourceKindFolder(string kind) => kind switch
-    {
-        AssetImportJobValues.Textures => "textures",
-        AssetImportJobValues.StaticMeshes => "staticmeshes",
-        AssetImportJobValues.Sounds => "sounds",
-        AssetImportJobValues.Music => "music",
-        AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews => "maps",
-        AssetImportJobValues.Scenes => "scenes",
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    };
-
-    private static string SourceFolder(string gameVersion) => gameVersion switch
-    {
-        "c1" => "C1",
-        "c4" => "C4",
-        "interlude" => "Interlude",
-        _ => throw new ArgumentOutOfRangeException(nameof(gameVersion))
-    };
+    private string VersionRoot(string gameVersion) =>
+        AssetImportSourcePaths.VersionRoot(options.Value.SourceRootPath, gameVersion);
 
     private static async Task AcquireKindLockAsync(
         GameContentDbContext context,

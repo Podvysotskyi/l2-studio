@@ -9,10 +9,12 @@ import { computed, onBeforeUnmount } from 'vue'
 import {
   getAssetCatalog,
   getAssetImportJobs,
+  startAssetFileImport,
   startAssetImport,
   startAssetResourceImport
 } from '../../../services/studio-api'
 import { buildMapWorldGrid } from '../../../utils/map-world-grid'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 const jobs = ref<AssetImportJob[]>([])
 const previewJobs = ref<AssetImportJob[]>([])
@@ -24,6 +26,9 @@ const queueingPreviewName = ref<string>()
 const jobsError = ref<string>()
 const catalogError = ref<string>()
 const reimportingMap = ref<string>()
+const progressJobId = ref<string>()
+const progressPreviewJobId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -37,11 +42,19 @@ const activePreviewJob = computed(() =>
   )
 )
 const previews = computed(
-  () => new Map(previewCatalog.value?.items.map((item) => [item.name, item]))
+  () => new Map(previewCatalog.value?.items.map((item) => [item.sourceKey, item]))
 )
 const worldGrid = computed(() =>
   buildMapWorldGrid(catalog.value?.items ?? [])
 )
+const progressItems = computed(() => {
+  const items = []
+  const job = jobs.value.find(item => item.id === progressJobId.value)
+  const previewJob = previewJobs.value.find(item => item.id === progressPreviewJobId.value)
+  if (job) items.push(assetImportProgressItem(job, 'Maps'))
+  if (previewJob) items.push(assetImportProgressItem(previewJob, 'Map previews'))
+  return items
+})
 
 async function loadCatalog() {
   try {
@@ -68,6 +81,14 @@ async function loadJobs(schedule = true) {
   try {
     jobs.value = await getAssetImportJobs('maps')
     previewJobs.value = await getAssetImportJobs('mappreviews')
+    if (activeJob.value && activeJob.value.id !== progressJobId.value) {
+      progressJobId.value = activeJob.value.id
+      importDrawerOpen.value = true
+    }
+    if (activePreviewJob.value && activePreviewJob.value.id !== progressPreviewJobId.value) {
+      progressPreviewJobId.value = activePreviewJob.value.id
+      importDrawerOpen.value = true
+    }
     jobsError.value = undefined
     if (!activeJob.value && !activePreviewJob.value) await loadCatalog()
   } catch {
@@ -78,19 +99,20 @@ async function loadJobs(schedule = true) {
     pollTimer = setTimeout(() => void loadJobs(), 1000)
 }
 
-async function queuePreviews(mapName?: string) {
+async function queuePreviews(map?: MapCatalogEntry) {
   queueingPreviews.value = true
-  queueingPreviewName.value = mapName
+  queueingPreviewName.value = map?.name
   jobsError.value = undefined
   try {
-    await startAssetImport(
-      'mappreviews',
-      mapName ? { mapName } : undefined
-    )
+    const job = map
+      ? await startAssetFileImport('mappreviews', map.sourceKey)
+      : await startAssetImport('mappreviews')
+    progressPreviewJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
-    jobsError.value = mapName
-      ? `The preview for ${mapName} could not be queued.`
+    jobsError.value = map
+      ? `The preview for ${map.name} could not be queued.`
       : 'The map previews could not be queued.'
   } finally {
     queueingPreviews.value = false
@@ -102,7 +124,9 @@ async function queueImport() {
   queueing.value = true
   jobsError.value = undefined
   try {
-    await startAssetImport('maps')
+    const job = await startAssetImport('maps')
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     jobsError.value = 'The map import could not be queued.'
@@ -115,7 +139,9 @@ async function reimportMap(map: MapCatalogEntry) {
   reimportingMap.value = map.name
   jobsError.value = undefined
   try {
-    await startAssetResourceImport('maps', map.name)
+    const job = await startAssetResourceImport('maps', map.name, undefined, map.sourceKey)
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     jobsError.value = `The map re-import for ${map.name} could not be queued.`
@@ -173,40 +199,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Map imports unavailable"
       :description="jobsError"
     />
-    <UCard v-if="activeJob" variant="subtle">
-      <div class="flex items-center gap-4">
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-5 animate-spin text-primary"
-        />
-        <div class="flex-1">
-          <p class="font-medium text-highlighted">
-            Import {{ activeJob.status }}
-          </p>
-          <p class="text-xs text-muted">
-            {{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}
-          </p>
-        </div>
-      </div>
-    </UCard>
-    <UCard v-if="activePreviewJob" variant="subtle">
-      <div class="flex items-center gap-4">
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-5 animate-spin text-primary"
-        />
-        <div class="flex-1">
-          <p class="font-medium text-highlighted">
-            Preview generation {{ activePreviewJob.status }}
-          </p>
-          <p class="text-xs text-muted">
-            {{ activePreviewJob.completedFileCount }} /
-            {{ activePreviewJob.discoveredFileCount || '…' }}
-          </p>
-        </div>
-      </div>
-    </UCard>
-
     <UAlert
       v-if="catalogError"
       color="error"
@@ -258,15 +250,15 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         <h2 class="font-semibold text-highlighted">Other maps</h2>
       </template>
       <div class="flex flex-wrap gap-2">
-        <div v-for="map in worldGrid.unpositioned" :key="map.name" class="flex items-center gap-1">
+        <div v-for="map in worldGrid.unpositioned" :key="map.sourceKey" class="flex items-center gap-1">
         <UButton
-          :label="map.name"
+          :label="`${map.name} · ${map.sourceKey}`"
           color="neutral"
           variant="outline"
           :disabled="!map.manifestUrl"
           :to="
             map.manifestUrl
-              ? { name: 'library-maps-name', params: { name: map.name } }
+              ? { name: 'library-maps-name', params: { name: map.name }, query: { source: map.sourceKey } }
               : undefined
           "
         />
@@ -279,5 +271,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         No generated map manifest is available. Queue the first import.
       </p>
     </UCard>
+
+    <StudioImportProgressDrawer
+      v-model:open="importDrawerOpen"
+      :items="progressItems"
+    />
   </div>
 </template>

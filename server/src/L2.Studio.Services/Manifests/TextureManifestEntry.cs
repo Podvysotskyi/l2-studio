@@ -16,4 +16,5 @@ internal sealed record TextureManifestEntry(
     int MipCount = 0,
     TextureAnimationManifestEntry? Animation = null,
     string OriginalFolder = "",
-    string Path = "");
+    string Path = "",
+    string SourceKey = "");

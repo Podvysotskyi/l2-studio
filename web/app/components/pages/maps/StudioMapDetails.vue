@@ -75,6 +75,9 @@ const routeName = computed(() =>
     ? (route.params.name[0] ?? '')
     : (route.params.name ?? '')
 )
+const routeSourceKey = computed(() =>
+  typeof route.query.source === 'string' ? route.query.source : undefined
+)
 const unresolvedActors = computed(
   () => manifest.value?.actors.filter((actor) => !actor.meshUrl).length ?? 0
 )
@@ -160,7 +163,7 @@ const terrainLayerVisibility = computed(() =>
 )
 
 watch([query, pageSize], () => (page.value = 1))
-watch(routeName, () => void loadMap(), { immediate: true })
+watch([routeName, routeSourceKey], () => void loadMap(), { immediate: true })
 
 function selectActor(actor: MapActorManifestEntry) {
   selectedActorName.value = actor.name
@@ -287,7 +290,8 @@ async function loadMap() {
   try {
     const entry = await getAssetCatalogEntry<MapCatalogEntry>(
       'maps',
-      routeName.value
+      routeName.value,
+      routeSourceKey.value
     )
     catalogEntry.value = entry
     if (!entry.manifestUrl) {

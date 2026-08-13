@@ -112,6 +112,20 @@ describe('Studio API service', () => {
       '/api/game-versions/c1/assets/textures/imports/resources',
       { method: 'POST', body: { resourceName: 'Texture', packageName: 'Package', force: false } }
     )
+
+    await startAssetResourceImport('textures', 'Texture', 'Package', 'Textures/Package.utx')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/textures/imports/resources',
+      {
+        method: 'POST',
+        body: {
+          resourceName: 'Texture',
+          packageName: 'Package',
+          sourceKey: 'Textures/Package.utx',
+          force: false
+        }
+      }
+    )
   })
 
   it('supports forced and stale rebuild controls', async () => {
@@ -183,6 +197,16 @@ describe('Studio API service', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/content/npc-sexes/imports',
       { method: 'POST' }
+    )
+    await startNpcLookupImport('npc-types', 'add_missing')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-types/imports',
+      { method: 'POST', body: { mode: 'add_missing' } }
+    )
+    await startNpcLookupImport('npc-types', 'restore_defaults')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-types/imports',
+      { method: 'POST', body: { mode: 'restore_defaults' } }
     )
   })
 })

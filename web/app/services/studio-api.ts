@@ -26,7 +26,10 @@ import type {
 } from '../types/responses/content-directory-response'
 import type { StudioServiceInfo } from '../types/responses/studio-service-info'
 import type { GameVersionSummary } from '../types/models/game-version'
-import type { NpcLookupImportRun } from '../types/models/npc-lookup-import'
+import type {
+  NpcLookupImportMode,
+  NpcLookupImportRun
+} from '../types/models/npc-lookup-import'
 import type {
   AssetReleaseDetail,
   AssetReleasePage,
@@ -34,6 +37,7 @@ import type {
   AssetReleaseStatus
 } from '../types/models/asset-release'
 import { selectedGameVersionKey } from '../utils/game-version'
+import { resolvePublishedAssetUrls } from '../utils/published-asset-url'
 
 function versionPath(path: string) {
   return `/api/game-versions/${encodeURIComponent(selectedGameVersionKey())}${path}`
@@ -99,10 +103,12 @@ export function getNpcLookupImportJob(
 }
 
 export function startNpcLookupImport(
-  kind: NpcLookupKind
+  kind: NpcLookupKind,
+  mode?: NpcLookupImportMode
 ): Promise<NpcLookupImportRun> {
   return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports`), {
-    method: 'POST'
+    method: 'POST',
+    ...(mode ? { body: { mode } } : {})
   })
 }
 
@@ -237,7 +243,7 @@ function releaseAction(id: string, action: string): Promise<AssetReleaseDetail> 
   })
 }
 
-export function getAssetCatalog<T, TPackage = never>(
+export async function getAssetCatalog<T, TPackage = never>(
   kind: AssetImportKind,
   request: {
     query?: string
@@ -248,7 +254,7 @@ export function getAssetCatalog<T, TPackage = never>(
   } = {}
 ): Promise<AssetCatalogPage<T, TPackage>> {
   const query = request.query?.trim()
-  return $fetch<AssetCatalogPage<T, TPackage>>(
+  const catalog = await $fetch<AssetCatalogPage<T, TPackage>>(
     versionPath(`/assets/${kind}/catalog`),
     {
       query: {
@@ -260,15 +266,19 @@ export function getAssetCatalog<T, TPackage = never>(
       }
     }
   )
+  return resolvePublishedAssetUrls(catalog, String(useRuntimeConfig().public.assetBaseUrl))
 }
 
-export function getAssetCatalogEntry<T>(
+export async function getAssetCatalogEntry<T>(
   kind: 'maps' | 'scenes',
-  name: string
+  name: string,
+  sourceKey?: string
 ): Promise<T> {
-  return $fetch<T>(
-    versionPath(`/assets/${kind}/catalog/${encodeURIComponent(name)}`)
-  ) as Promise<T>
+  const entry = await $fetch<T>(
+    versionPath(`/assets/${kind}/catalog/${encodeURIComponent(name)}`),
+    { query: sourceKey ? { sourceKey } : undefined }
+  ) as T
+  return resolvePublishedAssetUrls(entry, String(useRuntimeConfig().public.assetBaseUrl))
 }
 
 export function getAssetImportJobs(
@@ -305,11 +315,12 @@ export function startAssetResourceImport(
   kind: 'textures' | 'staticmeshes' | 'maps',
   resourceName: string,
   packageName?: string,
+  sourceKey?: string,
   force = false
 ): Promise<AssetImportJob> {
   return $fetch<AssetImportJob>(versionPath(`/assets/${kind}/imports/resources`), {
     method: 'POST',
-    body: { resourceName, packageName, force }
+    body: { resourceName, packageName, ...(sourceKey ? { sourceKey } : {}), force }
   })
 }
 

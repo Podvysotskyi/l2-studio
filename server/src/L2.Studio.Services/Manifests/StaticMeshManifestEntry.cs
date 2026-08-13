@@ -13,4 +13,5 @@ internal sealed record StaticMeshManifestEntry(
     string? MaterialError,
     string? Sha256,
     string Status,
-    string? Error);
+    string? Error,
+    string SourceKey = "");

@@ -90,6 +90,25 @@ public sealed class WorkerJobTests
     }
 
     [Fact]
+    public void FinalizesOnlyActiveRunsAfterDiscoveryAndAllWorkCompletes()
+    {
+        var run = Run(Item(AssetImportJobValues.Succeeded), Item(AssetImportJobValues.Reused));
+        run.DiscoveredFileCount = 2;
+
+        AssetImportRunHandlers.ApplyCounts(run);
+
+        Assert.False(AssetImportRunHandlers.IsReadyToFinalize(run));
+
+        run.DiscoveryFinishedAt = DateTimeOffset.UtcNow;
+
+        Assert.True(AssetImportRunHandlers.IsReadyToFinalize(run));
+
+        run.Status = AssetImportJobValues.Succeeded;
+
+        Assert.False(AssetImportRunHandlers.IsReadyToFinalize(run));
+    }
+
+    [Fact]
     public void RegistersWorkerJobsAndReconciliationPublisher()
     {
         var apiBuilder = CreateHostBuilder();

@@ -7,4 +7,5 @@ internal sealed record TextureManifestPackage(
     int TextureCount,
     int MaterialCount,
     string OriginalFolder = "",
-    string Path = "");
+    string Path = "",
+    string SourceKey = "");

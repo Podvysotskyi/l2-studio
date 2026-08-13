@@ -78,7 +78,7 @@ public sealed partial class AssetImportJobProcessor
         try
         {
             var entries = new List<StaticMeshManifestEntry>(job.TotalCount);
-            var warnings = new List<string>();
+            var warnings = new List<string>(materialCatalog.Warnings);
             foreach (var package in packages)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -112,7 +112,8 @@ public sealed partial class AssetImportJobProcessor
                             material.Error,
                             hash,
                             "resolved",
-                            null));
+                            null,
+                            job.SourceKey));
                     }
                     catch (InvalidDataException exception)
                     {
@@ -130,7 +131,8 @@ public sealed partial class AssetImportJobProcessor
                             material.Error,
                             null,
                             "skipped",
-                            exception.Message));
+                            exception.Message,
+                            job.SourceKey));
                         job.SkippedCount++;
                     }
 
@@ -143,12 +145,13 @@ public sealed partial class AssetImportJobProcessor
                     package.Name,
                     package.FileName,
                     package.Sha256,
-                    package.MeshCount)).ToArray();
+                    package.MeshCount,
+                    job.SourceKey)).ToArray();
 
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 8, 111, catalogGroups, entries,
+            await PublishCatalogAsync(context, job, finalPath, sourceFolder, 9, 111, catalogGroups, entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new StaticMeshCatalogMetadata(materialCatalog.GpuTextureFormats), cancellationToken);
             job.Status = warnings.Count == 0

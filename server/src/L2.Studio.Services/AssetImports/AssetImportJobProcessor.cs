@@ -34,8 +34,8 @@ public sealed partial class AssetImportJobProcessor(
     ILogger<AssetImportJobProcessor> logger) : IAssetImportWorkItemProcessor
 {
     private readonly List<AssetCatalogDependencyPublication> dependencyHints = [];
-    internal const int MapSchemaVersion = 12;
-    internal const int SceneSchemaVersion = 11;
+    internal const int MapSchemaVersion = 13;
+    internal const int SceneSchemaVersion = 12;
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -120,7 +120,7 @@ public sealed partial class AssetImportJobProcessor(
             else
                 await ImportTexturesAsync(context, item, cancellationToken);
 
-            await PersistWarningsAndCompletionAsync(context, item, cancellationToken);
+            await PersistWarningsAsync(context, item, cancellationToken);
         }
         catch (Exception exception) when (IsConversionFailure(exception))
         {
@@ -158,7 +158,7 @@ public sealed partial class AssetImportJobProcessor(
         return AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash, dependencies);
     }
 
-    private async Task PersistWarningsAndCompletionAsync(
+    private async Task PersistWarningsAsync(
         GameContentDbContext context,
         AssetImportWorkItem item,
         CancellationToken cancellationToken)
@@ -188,9 +188,7 @@ public sealed partial class AssetImportJobProcessor(
             item.Status = AssetImportJobValues.Succeeded;
         }
         item.FinishedAt ??= timeProvider.GetUtcNow();
-        outbox.Enroll(context);
-        await outbox.PublishAsync(new AssetImportWorkItemCompleted(item.RunId, item.Id));
-        await outbox.SaveChangesAndFlushMessagesAsync(MultiFlushMode.AllowMultiples, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private async Task PublishCompletionAsync(AssetImportWorkItem item, CancellationToken cancellationToken)

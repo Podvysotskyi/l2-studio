@@ -101,6 +101,9 @@ const routeName = computed(() =>
     ? (route.params.name[0] ?? '')
     : (route.params.name ?? '')
 )
+const routeSourceKey = computed(() =>
+  typeof route.query.source === 'string' ? route.query.source : undefined
+)
 const frames = computed(() =>
   manifest.value
     ? scenePlaybackFrames(manifest.value, selectedManagerName.value)
@@ -189,7 +192,7 @@ const terrainLayerVisibility = computed(() =>
 )
 
 watch([actorQuery, actorPageSize], () => (actorPage.value = 1))
-watch(routeName, () => void loadScene(), { immediate: true })
+watch([routeName, routeSourceKey], () => void loadScene(), { immediate: true })
 
 function stop() {
   playing.value = false
@@ -343,7 +346,8 @@ async function loadScene() {
   try {
     const entry = await getAssetCatalogEntry<SceneCatalogEntry>(
       'scenes',
-      routeName.value
+      routeName.value,
+      routeSourceKey.value
     )
     if (!entry?.manifestUrl) {
       error.value = entry?.error ?? `Scene “${routeName.value}” is unavailable.`

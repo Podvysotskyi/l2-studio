@@ -47,18 +47,18 @@ public sealed partial class AssetImportJobProcessor
             mapCatalogRecord.SourceHash, mapCatalogRecord.Protocol ?? 0,
             mapCatalogRecord.Items.Select(item => JsonSerializer.Deserialize<MapCatalogEntry>(item.MetadataJson, ManifestJsonOptions)!).ToArray());
         var allMaps = mapCatalog.Maps.OrderBy(map => map.Name, StringComparer.OrdinalIgnoreCase).ToArray();
-        var requestedMapName = MapPreviewGeneration.RequestedMapName(
-            SourceRoot(job, AssetImportJobValues.Maps),
+        var requestedMapSourceKey = MapPreviewGeneration.RequestedMapSourceKey(
+            VersionRoot(job),
             job.SourcePath);
-        if (requestedMapName is not null && !allMaps.Any(map =>
-                string.Equals(map.Name, requestedMapName, StringComparison.OrdinalIgnoreCase)))
+        if (requestedMapSourceKey is not null && !allMaps.Any(map =>
+                string.Equals(map.SourceKey, requestedMapSourceKey, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
-                $"The requested map '{requestedMapName}' does not exist in the active map catalog.");
+                $"The requested map source '{requestedMapSourceKey}' does not exist in the active map catalog.");
         }
-        var maps = requestedMapName is null
+        var maps = requestedMapSourceKey is null
             ? allMaps
-            : allMaps.Where(map => string.Equals(map.Name, requestedMapName, StringComparison.OrdinalIgnoreCase)).ToArray();
+            : allMaps.Where(map => string.Equals(map.SourceKey, requestedMapSourceKey, StringComparison.OrdinalIgnoreCase)).ToArray();
         job.TotalCount = maps.Length;
         await context.SaveChangesAsync(cancellationToken);
 
@@ -77,39 +77,37 @@ public sealed partial class AssetImportJobProcessor
                 cancellationToken.ThrowIfCancellationRequested();
                 RequireSafeSegment(map.Name, "map name");
                 var old = previous?.Previews.FirstOrDefault(item =>
-                    string.Equals(item.Name, map.Name, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(item.SourceKey, map.SourceKey, StringComparison.OrdinalIgnoreCase));
                 var oldImagePath = Path.Combine(finalPath, $"{map.Name}.webp");
-                var isRequestedMap = requestedMapName is null || string.Equals(
-                    map.Name,
-                    requestedMapName,
-                    StringComparison.OrdinalIgnoreCase);
+                var isRequestedMap = requestedMapSourceKey is null || string.Equals(
+                    map.SourceKey, requestedMapSourceKey, StringComparison.OrdinalIgnoreCase);
                 if (!isRequestedMap)
                 {
                     var oldImageExists = File.Exists(oldImagePath);
                     if (MapPreviewGeneration.CanCarryForward(old, oldImageExists) && old!.Status == "resolved")
                     {
                         File.Copy(oldImagePath, Path.Combine(stagingPath, $"{map.Name}.webp"));
-                        entries[map.Name] = old;
+                        entries[map.SourceKey] = old;
                     }
                     else if (MapPreviewGeneration.CanCarryForward(old, oldImageExists))
                     {
-                        entries[map.Name] = old!;
+                        entries[map.SourceKey] = old!;
                     }
                     else
                     {
-                        entries[map.Name] = new MapPreviewCatalogEntry(
+                        entries[map.SourceKey] = new MapPreviewCatalogEntry(
                             map.Name, map.Sha256, null, MapPreviewGeneration.Size, MapPreviewGeneration.Size,
                             "skipped", old is null
                                 ? "Preview has not been generated."
-                                : "The previous preview image is missing.");
+                                : "The previous preview image is missing.", map.SourceKey);
                     }
                     continue;
                 }
                 if (map.Status != "resolved" || map.ManifestUrl is null)
                 {
-                    entries[map.Name] = new MapPreviewCatalogEntry(
+                    entries[map.SourceKey] = new MapPreviewCatalogEntry(
                         map.Name, map.Sha256, null, MapPreviewGeneration.Size, MapPreviewGeneration.Size,
-                        "skipped", map.Error ?? "The map is not resolved.");
+                        "skipped", map.Error ?? "The map is not resolved.", map.SourceKey);
                     job.ProcessedCount++;
                     job.SkippedCount++;
                     continue;
@@ -120,15 +118,15 @@ public sealed partial class AssetImportJobProcessor
                         old,
                         map,
                         File.Exists(oldImagePath),
-                        force: requestedMapName is not null))
+                        force: requestedMapSourceKey is not null))
                 {
                     File.Copy(oldImagePath, Path.Combine(stagingPath, $"{map.Name}.webp"));
-                    entries[map.Name] = old!;
+                    entries[map.SourceKey] = old!;
                     job.ProcessedCount++;
                 }
                 else
                 {
-                    changed.Add(new MapPreviewRenderMap(map.Name, map.Sha256));
+                    changed.Add(new MapPreviewRenderMap(map.Name, map.Sha256, map.SourceKey));
                 }
             }
             await context.SaveChangesAsync(cancellationToken);
@@ -153,21 +151,22 @@ public sealed partial class AssetImportJobProcessor
                     var imagePath = Path.Combine(stagingPath, $"{map.Name}.webp");
                     if (result?.Sha256 is not null && result.Error is null && File.Exists(imagePath))
                     {
-                        entries[map.Name] = new MapPreviewCatalogEntry(
+                        entries[map.SourceKey] = new MapPreviewCatalogEntry(
                             map.Name,
                             map.MapSourceHash,
                             $"/{EscapedUrlRoot(outputUrlRoot)}/{Uri.EscapeDataString(map.Name)}.webp",
                             MapPreviewGeneration.Size,
                             MapPreviewGeneration.Size,
                             "resolved",
-                            null);
+                            null,
+                            map.SourceKey);
                     }
                     else
                     {
                         var error = result?.Error ?? "The renderer did not return a preview image.";
-                        entries[map.Name] = new MapPreviewCatalogEntry(
+                        entries[map.SourceKey] = new MapPreviewCatalogEntry(
                             map.Name, map.MapSourceHash, null, MapPreviewGeneration.Size, MapPreviewGeneration.Size,
-                            "skipped", error);
+                            "skipped", error, map.SourceKey);
                         warnings.Add($"{map.Name}: {error}");
                         job.SkippedCount++;
                     }
@@ -177,7 +176,7 @@ public sealed partial class AssetImportJobProcessor
             job.WarningsJson = JsonSerializer.Serialize(warnings);
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
-            var previewEntries = maps.Select(map => entries[map.Name]).ToArray();
+            var previewEntries = maps.Select(map => entries[map.SourceKey]).ToArray();
             await PublishCatalogAsync(context, job, finalPath, AssetImportJobValues.MapPreviews, 1, null,
                 Array.Empty<string>(), previewEntries, group => group, item => item.Name, _ => null,
                 item => item.Status, new MapPreviewCatalogMetadata(MapPreviewGeneration.RendererVersion), cancellationToken);
@@ -413,15 +412,15 @@ public sealed partial class AssetImportJobProcessor
         job.SourceHash = sources.Single().Sha256;
         await context.SaveChangesAsync(cancellationToken);
 
-        var staticMeshes = await LoadStaticMeshLookupAsync(context, job.GameVersion, cancellationToken);
-        var textures = await LoadTextureLookupAsync(context, job.GameVersion, cancellationToken);
-        var sounds = await LoadSoundLookupAsync(context, job.GameVersion, cancellationToken);
+        var warnings = new List<string>();
+        var staticMeshes = await LoadStaticMeshLookupAsync(context, job.GameVersion, warnings, cancellationToken);
+        var textures = await LoadTextureLookupAsync(context, job.GameVersion, warnings, cancellationToken);
+        var sounds = await LoadSoundLookupAsync(context, job.GameVersion, warnings, cancellationToken);
         var sourceTexturePackages = new Dictionary<string, IReadOnlyDictionary<string, UnrealTexture>>(
             StringComparer.OrdinalIgnoreCase);
         var (finalPath, stagingPath, outputUrlRoot) = OutputPaths(assetRootPath, job);
         Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         Directory.CreateDirectory(stagingPath);
-        var warnings = new List<string>();
         var catalogEntries = new List<MapCatalogEntry>();
         var sceneCatalogEntries = new List<SceneCatalogEntry>();
         IReadOnlyList<UnrealSkyZoneInfo> sharedSkyZones = [];
@@ -655,13 +654,14 @@ public sealed partial class AssetImportJobProcessor
                         catalogEntries.Add(new MapCatalogEntry(
                             source.Name,
                             source.FileName,
-                            $"/maps/{Uri.EscapeDataString(source.Name)}/manifest.json?v={manifestHash[..12]}",
+                            $"/{outputUrlRoot}/{Uri.EscapeDataString(source.Name)}/manifest.json?v={manifestHash[..12]}",
                             terrains.Count,
                             actors.Length,
                             waterVolumes.Count,
                             source.Sha256,
                             "resolved",
-                            null));
+                            null,
+                            job.SourceKey));
                     }
                     else
                     {
@@ -693,13 +693,14 @@ public sealed partial class AssetImportJobProcessor
                         sceneCatalogEntries.Add(new SceneCatalogEntry(
                             source.Name,
                             source.FileName,
-                            $"/scenes/{Uri.EscapeDataString(source.Name)}/manifest.json?v={manifestHash[..12]}",
+                            $"/{outputUrlRoot}/{Uri.EscapeDataString(source.Name)}/manifest.json?v={manifestHash[..12]}",
                             terrains.Count,
                             actors.Length,
                             SceneObjectCount(scene),
                             source.Sha256,
                             "resolved",
-                            null));
+                            null,
+                            job.SourceKey));
                     }
                 }
                 catch (Exception exception) when (exception is InvalidDataException or OverflowException)
@@ -716,7 +717,8 @@ public sealed partial class AssetImportJobProcessor
                             0,
                             source.Sha256,
                             "skipped",
-                            exception.Message));
+                            exception.Message,
+                            job.SourceKey));
                     }
                     else
                     {
@@ -729,7 +731,8 @@ public sealed partial class AssetImportJobProcessor
                             0,
                             source.Sha256,
                             "skipped",
-                            exception.Message));
+                            exception.Message,
+                            job.SourceKey));
                     }
                     job.SkippedCount++;
                 }
@@ -1582,9 +1585,7 @@ public sealed partial class AssetImportJobProcessor
         {
             return cached.GetValueOrDefault(reference.ObjectName);
         }
-        var versionRoot = Path.Combine(
-            Path.GetFullPath(options.Value.SourceRootPath),
-            gameVersion == "c1" ? "C1" : gameVersion == "c4" ? "C4" : "Interlude");
+        var versionRoot = AssetImportSourcePaths.VersionRoot(options.Value.SourceRootPath, gameVersion);
         var matches = Directory.EnumerateFiles(versionRoot, "*", SearchOption.AllDirectories)
             .Where(candidate => string.Equals(Path.GetExtension(candidate), ".utx", StringComparison.OrdinalIgnoreCase))
             .Where(candidate => new FileInfo(candidate).LinkTarget is null)
@@ -1614,6 +1615,7 @@ public sealed partial class AssetImportJobProcessor
     private static async Task<Dictionary<string, PublishedTexture>> LoadTextureLookupAsync(
         GameContentDbContext context,
         string gameVersion,
+        List<string> warnings,
         CancellationToken cancellationToken)
     {
         var catalog = await context.AssetCatalogs.AsNoTracking()
@@ -1623,15 +1625,23 @@ public sealed partial class AssetImportJobProcessor
                 item.Kind == AssetImportJobValues.Textures && item.IsActive, cancellationToken);
         var textures = catalog?.Items.Select(item => JsonSerializer.Deserialize<TextureManifestEntry>(item.MetadataJson, ManifestJsonOptions)!).ToArray() ?? [];
         var metadata = catalog is null ? null : JsonSerializer.Deserialize<TextureCatalogMetadata>(catalog.MetadataJson, ManifestJsonOptions);
-        var lookup = textures
+        var textureGroups = textures
             .Where(texture => texture.Url is not null)
-            .ToDictionary(
-                texture => TextureKey(texture.PackageName, texture.ObjectName),
-                texture => new PublishedTexture(texture.Url!, texture.Width, texture.Height),
+            .GroupBy(texture => TextureKey(texture.PackageName, texture.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        warnings.AddRange(textureGroups.Where(group => group.Count() > 1)
+            .Select(group => $"Texture '{group.Key}' is ambiguous across multiple uploaded source files."));
+        var lookup = textureGroups.Where(group => group.Count() == 1).ToDictionary(
+            group => group.Key,
+            group => new PublishedTexture(group.Single().Url!, group.Single().Width, group.Single().Height),
             StringComparer.OrdinalIgnoreCase);
-        var materials = metadata?.Materials.ToDictionary(
-            material => TextureKey(material.PackageName, material.ObjectName),
-            StringComparer.OrdinalIgnoreCase) ?? [];
+        var materialGroups = metadata?.Materials
+            .GroupBy(material => TextureKey(material.PackageName, material.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+        warnings.AddRange(materialGroups.Where(group => group.Count() > 1)
+            .Select(group => $"Material '{group.Key}' is ambiguous across multiple uploaded source files."));
+        var materials = materialGroups.Where(group => group.Count() == 1).ToDictionary(
+            group => group.Key, group => group.Single(), StringComparer.OrdinalIgnoreCase);
         PublishedTexture? ResolveMaterial(
             TextureMaterialManifestEntry material,
             HashSet<string> visited)
@@ -1666,20 +1676,24 @@ public sealed partial class AssetImportJobProcessor
     private static async Task<Dictionary<string, string>> LoadSoundLookupAsync(
         GameContentDbContext context,
         string gameVersion,
+        List<string> warnings,
         CancellationToken cancellationToken)
     {
         var items = await ActiveCatalogItemJsonAsync(
             context, gameVersion, AssetImportJobValues.Sounds, cancellationToken);
-        return items.Select(item => JsonSerializer.Deserialize<SoundManifestEntry>(item, ManifestJsonOptions)!)
-            .ToDictionary(
-            sound => TextureKey(sound.PackageName, sound.ObjectName),
-            sound => sound.Url,
-            StringComparer.OrdinalIgnoreCase);
+        var groups = items.Select(item => JsonSerializer.Deserialize<SoundManifestEntry>(item, ManifestJsonOptions)!)
+            .GroupBy(sound => TextureKey(sound.PackageName, sound.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        warnings.AddRange(groups.Where(group => group.Count() > 1)
+            .Select(group => $"Sound '{group.Key}' is ambiguous across multiple uploaded source files."));
+        return groups.Where(group => group.Count() == 1).ToDictionary(
+            group => group.Key, group => group.Single().Url, StringComparer.OrdinalIgnoreCase);
     }
 
     private static async Task<StaticMeshLookup> LoadStaticMeshLookupAsync(
         GameContentDbContext context,
         string gameVersion,
+        List<string> warnings,
         CancellationToken cancellationToken)
     {
         var catalog = await context.AssetCatalogs.AsNoTracking().AsSplitQuery().Include(item => item.Items)
@@ -1691,12 +1705,16 @@ public sealed partial class AssetImportJobProcessor
                 new Dictionary<string, PublishedStaticMesh>(StringComparer.OrdinalIgnoreCase),
                 []);
         }
-        var meshes = catalog.Items.Select(item => JsonSerializer.Deserialize<StaticMeshManifestEntry>(item.MetadataJson, ManifestJsonOptions)!)
+        var groups = catalog.Items.Select(item => JsonSerializer.Deserialize<StaticMeshManifestEntry>(item.MetadataJson, ManifestJsonOptions)!)
             .Where(mesh => mesh.Url is not null)
-            .ToDictionary(
-                mesh => MeshKey(mesh.PackageName, mesh.ObjectName),
-                mesh => new PublishedStaticMesh(mesh.Url!, mesh.VertexCount),
-                StringComparer.OrdinalIgnoreCase);
+            .GroupBy(mesh => MeshKey(mesh.PackageName, mesh.ObjectName), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        warnings.AddRange(groups.Where(group => group.Count() > 1)
+            .Select(group => $"Static mesh '{group.Key}' is ambiguous across multiple uploaded source files."));
+        var meshes = groups.Where(group => group.Count() == 1).ToDictionary(
+            group => group.Key,
+            group => new PublishedStaticMesh(group.Single().Url!, group.Single().VertexCount),
+            StringComparer.OrdinalIgnoreCase);
         var metadata = JsonSerializer.Deserialize<StaticMeshCatalogMetadata>(catalog.MetadataJson, ManifestJsonOptions);
         return new StaticMeshLookup(meshes, metadata?.GpuTextureFormats ?? []);
     }

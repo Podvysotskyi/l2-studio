@@ -7,4 +7,5 @@ internal sealed record MapPreviewCatalogEntry(
     int Width,
     int Height,
     string Status,
-    string? Error);
+    string? Error,
+    string SourceKey = "");

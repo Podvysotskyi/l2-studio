@@ -4,4 +4,5 @@ internal sealed record StaticMeshManifestPackage(
     string Name,
     string FileName,
     string Sha256,
-    int MeshCount);
+    int MeshCount,
+    string SourceKey = "");

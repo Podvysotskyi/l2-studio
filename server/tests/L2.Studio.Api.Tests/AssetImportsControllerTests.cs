@@ -64,6 +64,27 @@ public sealed class AssetImportsControllerTests
     }
 
     [Fact]
+    public async Task QueuesAnExactCatalogResourceSource()
+    {
+        var run = Run();
+        var repository = new StubAssetImportRepository { ResourceResult = run };
+        var controller = new AssetImportsController(repository);
+
+        var result = await controller.QueueResource(
+            "textures",
+            "interlude",
+            new AssetResourceImportRequest(
+                "Stone",
+                "Terrain",
+                "Textures/Terrain.utx",
+                true),
+            CancellationToken.None);
+
+        Assert.IsType<AcceptedResult>(result.Result);
+        Assert.Equal("Textures/Terrain.utx", repository.ResourceSourceKey);
+    }
+
+    [Fact]
     public async Task ValidatesRecentImportLimitsBeforeCallingTheRepository()
     {
         var repository = new StubAssetImportRepository();
@@ -132,6 +153,7 @@ public sealed class AssetImportsControllerTests
     private sealed class StubAssetImportRepository : IAssetImportRepository
     {
         public AssetImportRunSummary? FullScanResult { get; init; }
+        public AssetImportRunSummary? ResourceResult { get; init; }
         public Exception? FileException { get; set; }
         public IReadOnlyList<AssetImportRunSummary> RecentResult { get; init; } = [];
         public string? FullScanKind { get; private set; }
@@ -139,6 +161,7 @@ public sealed class AssetImportsControllerTests
         public bool RecentRequested { get; private set; }
         public string? RecentKind { get; private set; }
         public int RecentLimit { get; private set; }
+        public string? ResourceSourceKey { get; private set; }
 
         public Task<AssetImportRunSummary?> QueueFullScanAsync(string gameVersion, string kind, bool force, CancellationToken cancellationToken)
         {
@@ -153,8 +176,11 @@ public sealed class AssetImportsControllerTests
             return Task.FromResult<AssetImportRunSummary?>(null);
         }
 
-        public Task<AssetImportRunSummary?> QueueResourceAsync(string gameVersion, string kind, string resourceName, string? packageName, bool force, CancellationToken cancellationToken) =>
-            Task.FromResult<AssetImportRunSummary?>(null);
+        public Task<AssetImportRunSummary?> QueueResourceAsync(string gameVersion, string kind, string resourceName, string? packageName, string? sourceKey, bool force, CancellationToken cancellationToken)
+        {
+            ResourceSourceKey = sourceKey;
+            return Task.FromResult(ResourceResult);
+        }
 
         public Task<IReadOnlyList<StaleAssetSourceSummary>> GetStaleAsync(string gameVersion, string kind, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StaleAssetSourceSummary>>([]);

@@ -1,5 +1,4 @@
 const studioApiBase = process.env.NUXT_STUDIO_API_BASE?.replace(/\/$/, '')
-
 if (!studioApiBase) {
   throw new Error('NUXT_STUDIO_API_BASE is required')
 }

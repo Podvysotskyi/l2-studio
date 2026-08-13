@@ -7,6 +7,7 @@ import {
   getAssetImportJobs,
   startAssetImport
 } from '../../../services/studio-api'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 const jobs = ref<AssetImportJob[]>([])
 const catalog = ref<AssetCatalogPage<MusicManifestEntry>>()
@@ -17,6 +18,8 @@ const queueing = ref(false)
 const error = ref<string>()
 const selectedTrack = ref<MusicManifestEntry>()
 const audioPlayer = ref<HTMLAudioElement>()
+const progressJobId = ref<string>()
+const importDrawerOpen = ref(false)
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeJob = computed(() =>
@@ -27,6 +30,10 @@ const activeJob = computed(() =>
 const filteredTracks = computed(() => catalog.value?.items ?? [])
 const visibleTracks = computed(() => filteredTracks.value)
 const resolvedCount = computed(() => catalog.value?.summary.resolved ?? 0)
+const progressItems = computed(() => {
+  const job = jobs.value.find(item => item.id === progressJobId.value)
+  return job ? [assetImportProgressItem(job, 'Music')] : []
+})
 
 watch([query, pageSize], () => {
   page.value = 1
@@ -78,6 +85,10 @@ async function loadJobs(schedule = true) {
   clearTimeout(pollTimer)
   try {
     jobs.value = await getAssetImportJobs('music')
+    if (activeJob.value && activeJob.value.id !== progressJobId.value) {
+      progressJobId.value = activeJob.value.id
+      importDrawerOpen.value = true
+    }
     error.value = undefined
     if (!activeJob.value) await loadCatalog()
   } catch {
@@ -93,7 +104,9 @@ async function queueImport() {
   queueing.value = true
   error.value = undefined
   try {
-    await startAssetImport('music')
+    const job = await startAssetImport('music')
+    progressJobId.value = job.id
+    importDrawerOpen.value = true
     await loadJobs()
   } catch {
     error.value =
@@ -141,29 +154,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
       title="Music import unavailable"
       :description="error"
     />
-
-    <UCard v-if="activeJob" variant="subtle">
-      <div class="flex flex-wrap items-center gap-4">
-        <UIcon
-          name="i-lucide-loader-circle"
-          class="size-5 animate-spin text-primary"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="font-medium text-highlighted">
-            Import {{ activeJob.status }}
-          </p>
-          <p class="truncate text-xs text-muted">{{ activeJob.requestedSourceKey ?? 'Full scan' }}</p>
-        </div>
-        <UBadge color="info" variant="subtle">
-          {{ activeJob.completedFileCount }} / {{ activeJob.discoveredFileCount || '…' }}
-        </UBadge>
-      </div>
-      <UProgress
-        class="mt-4"
-        :model-value="activeJob.completedFileCount"
-        :max="activeJob.discoveredFileCount || 1"
-      />
-    </UCard>
 
     <UCard v-if="selectedTrack" variant="subtle">
       <div class="flex flex-wrap items-center gap-4">
@@ -282,5 +272,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         No imported music catalog is available. Queue the first import.
       </div>
     </UCard>
+
+    <StudioImportProgressDrawer
+      v-model:open="importDrawerOpen"
+      :items="progressItems"
+    />
   </div>
 </template>

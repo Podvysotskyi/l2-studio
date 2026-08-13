@@ -15,7 +15,8 @@ function map(name: string): MapCatalogEntry {
     waterVolumeCount: 1,
     sha256: name,
     status: 'resolved',
-    error: null
+    error: null,
+    sourceKey: `Maps/${name}.unr`
   }
 }
 
@@ -56,5 +57,18 @@ describe('map world grid', () => {
     const grid = buildMapWorldGrid([map('17_25'), map('Lobby')])
 
     expect(grid.unpositioned.map(({ name }) => name)).toEqual(['Lobby'])
+  })
+
+  it('keeps duplicate coordinates outside the grid without choosing one', () => {
+    const first = map('17_25')
+    const second = { ...map('17_25'), sourceKey: 'Alternate/17_25.unr' }
+
+    const grid = buildMapWorldGrid([first, second])
+
+    expect(grid.cells).toEqual([])
+    expect(grid.unpositioned.map(item => item.sourceKey)).toEqual([
+      'Maps/17_25.unr',
+      'Alternate/17_25.unr'
+    ])
   })
 })

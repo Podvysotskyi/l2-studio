@@ -10,4 +10,5 @@ namespace L2.Studio.Services;
 internal sealed record StaticMeshMaterialCatalog(
     StaticMeshMaterialResolver Resolver,
     IReadOnlyList<string> GpuTextureFormats,
-    int LoadedTextureCount);
+    int LoadedTextureCount,
+    IReadOnlyList<string> Warnings);
