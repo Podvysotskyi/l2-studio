@@ -29,26 +29,3 @@ public static class StudioPersistenceConfigurationExtensions
     public static IHealthChecksBuilder AddGameContentMigrationHealthCheck(this IHealthChecksBuilder checks) =>
         checks.AddCheck<GameContentMigrationHealthCheck>("game-content-migrations", tags: ["ready"]);
 }
-
-public sealed class GameContentMigrationHealthCheck(
-    IDbContextFactory<GameContentDbContext> contextFactory) : IHealthCheck
-{
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await using var database = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var pending = await database.Database.GetPendingMigrationsAsync(cancellationToken);
-            var migrations = pending.ToArray();
-            return migrations.Length == 0
-                ? HealthCheckResult.Healthy()
-                : HealthCheckResult.Unhealthy($"Pending game content migrations: {string.Join(", ", migrations)}");
-        }
-        catch (Exception exception)
-        {
-            return HealthCheckResult.Unhealthy("Game content migration state could not be checked.", exception);
-        }
-    }
-}

@@ -90,9 +90,3 @@ public static class L2MusicDecoder
             finalGranule / (double)sampleRate);
     }
 }
-
-public sealed record L2MusicTrack(
-    byte[] Data,
-    int SampleRate,
-    int Channels,
-    double DurationSeconds);

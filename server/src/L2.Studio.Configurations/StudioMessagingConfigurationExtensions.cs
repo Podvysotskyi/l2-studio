@@ -1,7 +1,7 @@
 using JasperFx.Resources;
 using L2.Studio.Messages;
-using L2.Studio.Services;
 using Microsoft.Extensions.Hosting;
+using System.Reflection;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Postgresql;
@@ -22,14 +22,19 @@ public static class StudioMessagingConfigurationExtensions
         return builder;
     }
 
-    public static IHostApplicationBuilder AddStudioWorkerMessaging(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddStudioWorkerMessaging(
+        this IHostApplicationBuilder builder,
+        Assembly handlerAssembly)
     {
-        Configure(builder, WorkerEnvelopeSchema, listen: true);
-        builder.Services.AddHostedService<AssetStorageReconciliationPublisher>();
+        Configure(builder, WorkerEnvelopeSchema, listen: true, handlerAssembly);
         return builder;
     }
 
-    private static void Configure(IHostApplicationBuilder builder, string envelopeSchema, bool listen)
+    private static void Configure(
+        IHostApplicationBuilder builder,
+        string envelopeSchema,
+        bool listen,
+        Assembly? handlerAssembly = null)
     {
         var connectionString = builder.Configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
@@ -50,7 +55,8 @@ public static class StudioMessagingConfigurationExtensions
             RouteFileMessages(options);
             if (listen)
             {
-                options.Discovery.IncludeAssembly(typeof(AssetImportDiscoveryHandlers).Assembly);
+                options.Discovery.IncludeAssembly(handlerAssembly
+                    ?? throw new InvalidOperationException("A Worker handler assembly is required."));
                 options.ListenToPostgresqlQueue(ControlQueue).Sequential().MaximumMessagesToReceive(1);
                 options.ListenToPostgresqlQueue(FileQueue).Sequential().MaximumMessagesToReceive(1);
             }

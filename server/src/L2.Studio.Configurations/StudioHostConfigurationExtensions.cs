@@ -112,5 +112,3 @@ public static class StudioHostConfigurationExtensions
         return string.IsNullOrWhiteSpace(value) ? null : new Uri(value, UriKind.Absolute);
     }
 }
-
-public sealed record ServiceIdentity(string Name);

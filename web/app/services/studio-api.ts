@@ -83,7 +83,7 @@ export function updateNpcLookupDisplayName(
 }
 
 export function getNpcLookupImportJobs(
-  kind: Exclude<NpcLookupKind, 'npc-sexes'>,
+  kind: NpcLookupKind,
   limit = 1
 ): Promise<NpcLookupImportRun[]> {
   return $fetch<NpcLookupImportRun[]>(versionPath(`/content/${kind}/imports`), {
@@ -92,14 +92,14 @@ export function getNpcLookupImportJobs(
 }
 
 export function getNpcLookupImportJob(
-  kind: Exclude<NpcLookupKind, 'npc-sexes'>,
+  kind: NpcLookupKind,
   id: string
 ): Promise<NpcLookupImportRun> {
   return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports/${id}`))
 }
 
 export function startNpcLookupImport(
-  kind: Exclude<NpcLookupKind, 'npc-sexes'>
+  kind: NpcLookupKind
 ): Promise<NpcLookupImportRun> {
   return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports`), {
     method: 'POST'

@@ -2,7 +2,13 @@
   <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../L2.Studio.Configurations/L2.Studio.Configurations.csproj" />
+    <ProjectReference Include="../L2.Studio.Context/L2.Studio.Context.csproj" />
+    <ProjectReference Include="../L2.Studio.Messages/L2.Studio.Messages.csproj" />
+    <ProjectReference Include="../L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
+    <ProjectReference Include="../L2.Studio.Services/L2.Studio.Services.csproj" />
     <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
   </ItemGroup>
 </Project>

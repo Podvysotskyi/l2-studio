@@ -179,5 +179,10 @@ describe('Studio API service', () => {
       '/api/game-versions/c1/content/npc-races/imports',
       { method: 'POST' }
     )
+    await startNpcLookupImport('npc-sexes')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npc-sexes/imports',
+      { method: 'POST' }
+    )
   })
 })

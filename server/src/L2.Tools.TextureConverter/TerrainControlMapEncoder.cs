@@ -3,17 +3,6 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace L2.Tools.TextureConverter;
 
-public sealed record PackedTerrainControlMap(
-    int Width,
-    int Height,
-    IReadOnlyList<int> LayerIndices,
-    IReadOnlyList<Rgba32> Pixels);
-
-public sealed record OpaqueTerrainControlMap(
-    int Width,
-    int Height,
-    IReadOnlyList<Rgba32> Pixels);
-
 public static class TerrainControlMapEncoder
 {
     public const int ChannelsPerMap = 4;

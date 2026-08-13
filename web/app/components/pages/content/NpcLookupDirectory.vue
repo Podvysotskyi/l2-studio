@@ -52,8 +52,8 @@ const filteredRecords = computed(() => {
   )
 })
 const visibleRecords = computed(() => paginate(filteredRecords.value, page.value, pageSize.value))
-const importKind = computed(() => props.kind === 'npc-sexes' ? undefined : props.kind)
-const importLabel = computed(() => props.kind === 'npc-types' ? 'Import NPC types' : 'Import NPC races')
+const importKind = computed(() => props.kind)
+const importLabel = computed(() => `Import ${props.title}`)
 const activeRun = computed(() => latestRun.value && ['queued', 'running'].includes(latestRun.value.status))
 
 watch([query, pageSize], () => { page.value = 1 })

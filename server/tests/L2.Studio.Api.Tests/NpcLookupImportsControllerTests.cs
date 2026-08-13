@@ -24,6 +24,19 @@ public sealed class NpcLookupImportsControllerTests
     }
 
     [Fact]
+    public async Task QueuesNpcSexImport()
+    {
+        var repository = new StubRepository { Queued = Summary() };
+        var controller = new NpcLookupImportsController(repository);
+
+        var result = await controller.Queue("interlude", "npc-sexes", CancellationToken.None);
+
+        Assert.IsType<AcceptedResult>(result.Result);
+        Assert.Equal("interlude", repository.GameVersion);
+        Assert.Equal("npc-sexes", repository.Kind);
+    }
+
+    [Fact]
     public async Task ReturnsConflictWhenMatchingImportIsActive()
     {
         var controller = new NpcLookupImportsController(new StubRepository());
@@ -36,7 +49,7 @@ public sealed class NpcLookupImportsControllerTests
     {
         var controller = new NpcLookupImportsController(new StubRepository());
         Assert.IsType<NotFoundResult>((await controller.Queue("high-five", "npc-races", CancellationToken.None)).Result);
-        Assert.IsType<NotFoundResult>((await controller.Queue("c1", "npc-sexes", CancellationToken.None)).Result);
+        Assert.IsType<NotFoundResult>((await controller.Queue("c1", "npc-classes", CancellationToken.None)).Result);
     }
 
     private static NpcLookupImportRunSummary Summary() => new(

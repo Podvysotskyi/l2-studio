@@ -7,11 +7,6 @@ using NpgsqlTypes;
 
 namespace L2.Studio.Services;
 
-internal sealed record StaticMeshMaterialCatalog(
-    StaticMeshMaterialResolver Resolver,
-    IReadOnlyList<string> GpuTextureFormats,
-    int LoadedTextureCount);
-
 internal static class StaticMeshMaterialCatalogLoader
 {
     private const int LookupBatchSize = 1_000;

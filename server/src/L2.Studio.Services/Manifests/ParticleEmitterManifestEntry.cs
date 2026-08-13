@@ -1,0 +1,26 @@
+namespace L2.Studio.Services;
+
+internal sealed record ParticleEmitterManifestEntry(
+    string Kind,
+    bool Enabled,
+    int Capacity,
+    string DrawStyle,
+    float Opacity,
+    ParticleNumberRange Lifetime,
+    ParticleVectorRange StartSize,
+    ParticleVectorRange StartVelocity,
+    ParticleVectorRange StartLocation,
+    MapVector StartLocationOffset,
+    MapVector Acceleration,
+    float ParticlesPerSecond,
+    bool SpinParticles,
+    ParticleNumberRange Spin,
+    MapVector SpinDirection,
+    ParticleTextureSubdivisions TextureSubdivisions,
+    IReadOnlyList<ParticleSizeCurveKey> SizeCurve,
+    IReadOnlyList<ParticleColorCurveKey> ColorCurve,
+    float WarmupTime,
+    float WarmupTicksPerSecond,
+    ParticleSpriteSettings? Sprite,
+    ParticleBeamSettings? Beam,
+    IReadOnlyList<string> Diagnostics);

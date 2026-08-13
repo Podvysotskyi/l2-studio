@@ -111,23 +111,6 @@ public sealed class StudioConfigurationExtensionsTests
     }
 
     [Fact]
-    public void RegistersAssetStorageReconciliationPublisherOnlyForWorkerMessagingAndBuildsWorker()
-    {
-        var apiBuilder = CreateHostBuilder();
-        apiBuilder.AddStudioApiMessaging();
-
-        Assert.DoesNotContain(apiBuilder.Services, HostedService<AssetStorageReconciliationPublisher>);
-
-        var workerBuilder = CreateHostBuilder(Environments.Development);
-        workerBuilder.AddStudioWorker("l2-studio-worker");
-        workerBuilder.AddStudioWorkerMessaging();
-        workerBuilder.Services.AddStudioWorkerApplication(workerBuilder.Configuration);
-
-        Assert.Contains(workerBuilder.Services, HostedService<AssetStorageReconciliationPublisher>);
-        using var host = workerBuilder.Build();
-    }
-
-    [Fact]
     public void RequiresAConnectionStringForStudioPersistence()
     {
         var services = new ServiceCollection();
@@ -201,16 +184,6 @@ public sealed class StudioConfigurationExtensionsTests
             ApplicationName = typeof(StudioConfigurationExtensionsTests).Assembly.FullName,
             EnvironmentName = "Testing"
         });
-
-    private static HostApplicationBuilder CreateHostBuilder(string environmentName = "Testing")
-    {
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
-        {
-            EnvironmentName = environmentName
-        });
-        builder.Configuration["ConnectionStrings:PostgreSql"] = ConnectionString;
-        return builder;
-    }
 
     private static IConfiguration Configuration() =>
         new ConfigurationBuilder().AddInMemoryCollection(

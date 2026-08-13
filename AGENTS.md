@@ -45,3 +45,5 @@ Environment-specific API settings belong in `server/src/L2.Studio.Api/appsetting
 ## Conventions
 
 Use UTF-8 and LF endings. TypeScript and Vue use two-space indentation, single quotes, no semicolons, and no trailing commas. Preserve established C# formatting and nullable-reference-type safety.
+
+Keep each top-level C# class, interface, record, record struct, struct, enum, or delegate in its own same-named `.cs` file across production and test projects. Private nested implementation helpers, generated EF migration files, `Program.cs`, global usings, assembly metadata, and intentional partial-class fragments are exempt. Audit this layout whenever server C# code changes.

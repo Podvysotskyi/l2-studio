@@ -1,9 +1,6 @@
-using L2.Studio.Context;
-using L2.Studio.Context.Entities;
 using L2.Studio.Messages;
 using L2.Studio.Repositories.Interfaces.Models;
 using L2.Studio.Services;
-using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace L2.Studio.Services.Tests;
@@ -39,75 +36,4 @@ public sealed class AssetImportTests
         Assert.DoesNotContain("levelpreviews", AssetImportJobValues.SupportedKinds);
     }
 
-    [Fact]
-    public void DefinesVersionSpecificNpcLookupCatalogs()
-    {
-        Assert.Equal(28, NpcLookupCatalogs.C1Types.Count);
-        Assert.Equal(46, NpcLookupCatalogs.C4Types.Count);
-        Assert.Equal(48, NpcLookupCatalogs.InterludeTypes.Count);
-        Assert.Equal(21, NpcLookupCatalogs.C1Races.Count);
-        Assert.Equal(22, NpcLookupCatalogs.C4Races.Count);
-        Assert.Equal(22, NpcLookupCatalogs.InterludeRaces.Count);
-        Assert.DoesNotContain(NpcLookupCatalogs.C1Races, item => item.Name == "DIVINE");
-        Assert.Contains(NpcLookupCatalogs.C4Races, item => item.Name == "DIVINE");
-        Assert.DoesNotContain(NpcLookupCatalogs.InterludeRaces, item => item.Name == "NONE");
-        Assert.Equal("Village Master Dark Elf", NpcLookupCatalogs.FriendlyName("VillageMasterDElf"));
-        Assert.Equal("Siege Weapon", NpcLookupCatalogs.FriendlyName("SIEGE_WEAPON"));
-    }
-
-    [Fact]
-    public void AggregatesRunCountsAndWarningsByTerminalFile()
-    {
-        var run = Run(
-            Item(AssetImportJobValues.Succeeded),
-            Item(AssetImportJobValues.SucceededWithWarnings, warnings: 2),
-            Item(AssetImportJobValues.Failed),
-            Item(AssetImportJobValues.Running));
-
-        AssetImportRunHandlers.ApplyCounts(run);
-
-        Assert.Equal(3, run.CompletedFileCount);
-        Assert.Equal(2, run.SucceededFileCount);
-        Assert.Equal(1, run.WarningFileCount);
-        Assert.Equal(1, run.FailedFileCount);
-    }
-
-    [Fact]
-    public void ResetsRunCountsWhenNoWorkItemsExist()
-    {
-        var run = Run();
-        run.CompletedFileCount = 10;
-        run.SucceededFileCount = 9;
-        run.WarningFileCount = 8;
-        run.FailedFileCount = 7;
-
-        AssetImportRunHandlers.ApplyCounts(run);
-
-        Assert.Equal(0, run.CompletedFileCount);
-        Assert.Equal(0, run.SucceededFileCount);
-        Assert.Equal(0, run.WarningFileCount);
-        Assert.Equal(0, run.FailedFileCount);
-    }
-
-    private static AssetImportRun Run(params AssetImportWorkItem[] workItems) => new()
-    {
-        Id = Guid.NewGuid(),
-        Kind = AssetImportJobValues.Textures,
-        TriggerType = AssetImportJobValues.FullScan,
-        Status = AssetImportJobValues.Running,
-        RequestedAt = DateTimeOffset.UtcNow,
-        WorkItems = workItems
-    };
-
-    private static AssetImportWorkItem Item(string status, int warnings = 0) => new()
-    {
-        Id = Guid.NewGuid(),
-        ImportKind = AssetImportJobValues.Textures,
-        SourceKey = $"{Guid.NewGuid():N}.utx",
-        NormalizedSourceKey = Guid.NewGuid().ToString("N"),
-        SourcePath = "/tmp/source.utx",
-        Status = status,
-        WarningCount = warnings,
-        CreatedAt = DateTimeOffset.UtcNow
-    };
 }

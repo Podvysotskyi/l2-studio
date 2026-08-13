@@ -81,6 +81,9 @@ public sealed class NpcLookupImportRepository(
         ("c1", NpcLookupImportJobValues.NpcRaces) => new ImportC1NpcRaces(runId),
         ("c4", NpcLookupImportJobValues.NpcRaces) => new ImportC4NpcRaces(runId),
         ("interlude", NpcLookupImportJobValues.NpcRaces) => new ImportInterludeNpcRaces(runId),
+        ("c1", NpcLookupImportJobValues.NpcSexes) => new ImportC1NpcSexes(runId),
+        ("c4", NpcLookupImportJobValues.NpcSexes) => new ImportC4NpcSexes(runId),
+        ("interlude", NpcLookupImportJobValues.NpcSexes) => new ImportInterludeNpcSexes(runId),
         _ => throw new ArgumentOutOfRangeException(nameof(gameVersion))
     };
 

@@ -2,7 +2,7 @@ import type { NpcLookupKind } from './content-directory'
 
 export interface NpcLookupImportRun {
   id: string
-  kind: Exclude<NpcLookupKind, 'npc-sexes'>
+  kind: NpcLookupKind
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   requestedAt: string
   startedAt: string | null
