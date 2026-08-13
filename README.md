@@ -2,6 +2,10 @@
 
 The L2 Studio product: a Nuxt web interface and .NET services for asset conversion, content inspection, validation, and publishing workflows.
 
+See [docs/architecture.md](docs/architecture.md) for product boundaries and
+[docs/asset-pipeline.md](docs/asset-pipeline.md) for the current import,
+artifact, release, and media contracts.
+
 ## Architecture
 
 Studio is organized into focused .NET projects:

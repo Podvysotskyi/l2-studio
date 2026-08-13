@@ -4,6 +4,10 @@
 
 This repository owns the Studio Nuxt frontend plus Studio API, Worker, content authoring, conversion tooling, and Studio content persistence. Authoritative Game Server runtime persistence remains outside this repository.
 
+Keep [docs/architecture.md](docs/architecture.md) and
+[docs/asset-pipeline.md](docs/asset-pipeline.md) aligned when their product or
+published-format boundaries change.
+
 ## Commands
 
 Run development, validation, and builds through Docker from the repository root:
