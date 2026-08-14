@@ -4,6 +4,7 @@ export type AssetImportKind =
   | 'music'
   | 'sounds'
   | 'staticmeshes'
+  | 'animations'
   | 'maps'
   | 'mappreviews'
   | 'scenes'
@@ -224,6 +225,56 @@ export interface StaticMeshManifestEntry {
   resolvedMaterialCount: number
   materialStatus: 'resolved' | 'partial' | 'unresolved' | 'none'
   materialError: string | null
+  sha256: string | null
+  status: 'resolved' | 'skipped'
+  error: string | null
+  sourceKey: string
+}
+
+export interface AnimationManifestPackage {
+  name: string
+  fileName: string
+  sha256: string
+  skeletalMeshCount: number
+  animationSetCount: number
+  clipCount: number
+  notifyCount: number
+  unsupportedVertexMeshCount: number
+  sourceKey: string
+}
+
+export interface AnimationNotifyManifestEntry {
+  normalizedTime: number
+  timeSeconds: number
+  functionName: string
+  objectPath: string | null
+  className: string | null
+  properties: Record<string, string>
+}
+
+export interface AnimationClipManifestEntry {
+  name: string
+  frameCount: number
+  frameRate: number
+  durationSeconds: number
+  groups: string[]
+  notifies: AnimationNotifyManifestEntry[]
+}
+
+export interface AnimationMeshManifestEntry {
+  packageName: string
+  objectName: string
+  url: string | null
+  vertexCount: number
+  triangleCount: number
+  sectionCount: number
+  boneCount: number
+  skeletonSignature: string
+  animationSetName: string | null
+  animationUrl: string | null
+  clips: AnimationClipManifestEntry[]
+  materialCount: number
+  materialStatus: 'referenced' | 'runtime' | 'unavailable'
   sha256: string | null
   status: 'resolved' | 'skipped'
   error: string | null

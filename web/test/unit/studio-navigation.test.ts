@@ -26,6 +26,7 @@ describe('Studio navigation', () => {
       'Textures',
       'Music',
       'Static meshes',
+      'Animations',
       'Maps',
       'Scenes'
     ])
@@ -44,6 +45,7 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/npcs')
     expect(routes).toContain('/authoring/skills/target-types')
     expect(routes).toContain('/library/static-meshes')
+    expect(routes).toContain('/library/animations')
     expect(routes).toContain('/library/maps')
     expect(routes).toContain('/pipeline/storage')
     expect(routes).toContain('/pipeline/releases')

@@ -67,6 +67,7 @@ public static class StudioMessagingConfigurationExtensions
     {
         options.PublishMessage<DiscoverTextures>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverStaticMeshes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<DiscoverAnimations>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverSounds>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverMusic>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverMaps>().ToPostgresqlQueue(ControlQueue);
@@ -92,6 +93,7 @@ public static class StudioMessagingConfigurationExtensions
     {
         options.PublishMessage<ImportTextureFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportStaticMeshFile>().ToPostgresqlQueue(FileQueue);
+        options.PublishMessage<ImportAnimationFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportSoundFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportMusicFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportMapFile>().ToPostgresqlQueue(FileQueue);

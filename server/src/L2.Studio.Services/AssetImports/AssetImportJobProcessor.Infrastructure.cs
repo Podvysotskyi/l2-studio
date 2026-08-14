@@ -142,7 +142,13 @@ public sealed partial class AssetImportJobProcessor
                 source.Catalog.Kind, source.SourceKey, source.NormalizedSourceKey,
                 source.ArtifactFingerprint, source.SourceHash, source.OutputRoot
             }).ToArrayAsync(cancellationToken);
-        var dependencies = sources.Where(source => combined.Contains('/' + source.OutputRoot + '/', StringComparison.Ordinal))
+        var dependencies = sources
+            .Where(source => !IsOwnSourceDependency(
+                job.ImportKind,
+                job.NormalizedSourceKey,
+                source.Kind,
+                source.NormalizedSourceKey))
+            .Where(source => combined.Contains('/' + source.OutputRoot + '/', StringComparison.Ordinal))
             .Select(source => new AssetCatalogDependencyPublication(
                 source.Kind, source.NormalizedSourceKey, source.SourceKey,
                 source.ArtifactFingerprint ?? source.SourceHash, true, source.OutputRoot))
@@ -175,10 +181,24 @@ public sealed partial class AssetImportJobProcessor
                     dependencies.Add(new AssetCatalogDependencyPublication(kind, key, null, null, false, null));
             }
         }
-        return dependencies.GroupBy(item => (item.Kind, item.DependencyKey), StringTupleComparer.Instance)
+        return dependencies
+            .Where(dependency => !IsOwnSourceDependency(
+                job.ImportKind,
+                job.NormalizedSourceKey,
+                dependency.Kind,
+                dependency.ResolvedSourceKey ?? dependency.DependencyKey))
+            .GroupBy(item => (item.Kind, item.DependencyKey), StringTupleComparer.Instance)
             .Select(group => group.OrderByDescending(item => item.IsResolved).First())
             .OrderBy(item => item.Kind).ThenBy(item => item.DependencyKey).ToArray();
     }
+
+    internal static bool IsOwnSourceDependency(
+        string importKind,
+        string normalizedSourceKey,
+        string dependencyKind,
+        string dependencySourceKey) =>
+        string.Equals(importKind, dependencyKind, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(normalizedSourceKey, dependencySourceKey, StringComparison.OrdinalIgnoreCase);
 
     private async Task TrackTextureDependenciesAsync(
         GameContentDbContext context,
@@ -299,16 +319,19 @@ public sealed partial class AssetImportJobProcessor
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', values))));
     }
 
-    private static string FileRole(string path) => Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)
-        ? "manifest"
-        : Path.GetExtension(path).ToLowerInvariant() switch
+    private static string FileRole(string path) => Path.GetFileName(path) switch
+    {
+        var name when name.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) => "manifest",
+        var name when name.EndsWith(".animations.glb", StringComparison.OrdinalIgnoreCase) => "animation",
+        _ => Path.GetExtension(path).ToLowerInvariant() switch
         {
             ".webp" or ".png" or ".jpg" or ".jpeg" or ".ktx2" => "texture",
             ".glb" => "mesh",
             ".ogg" => "audio",
             ".json" => "metadata",
             _ => "asset"
-        };
+        }
+    };
 
     private static string MediaType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {

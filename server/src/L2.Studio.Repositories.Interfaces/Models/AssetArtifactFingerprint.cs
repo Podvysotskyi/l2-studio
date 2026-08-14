@@ -23,6 +23,7 @@ public static class AssetArtifactFingerprint
         {
             AssetImportJobValues.Textures => "textures:10:121",
             AssetImportJobValues.StaticMeshes => "staticmeshes:12:112",
+            AssetImportJobValues.Animations => "animations:1:111",
             AssetImportJobValues.Sounds => "sounds:3:111",
             AssetImportJobValues.Music => "music:5",
             AssetImportJobValues.Maps => "maps:19:111",

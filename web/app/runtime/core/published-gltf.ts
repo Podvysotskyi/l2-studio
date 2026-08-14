@@ -1,5 +1,6 @@
 import { LoadingManager, type Object3D } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 
 const versionPathMarker = '/versions/'
 const placeholderImage =
@@ -43,5 +44,9 @@ export function resolveStudioGltfResourceUrl(url: string) {
 }
 
 export async function loadPublishedGltf(url: string): Promise<Object3D> {
-  return (await createPublishedGltfLoader().loadAsync(url)).scene
+  return (await loadPublishedGltfAsset(url)).scene
+}
+
+export function loadPublishedGltfAsset(url: string): Promise<GLTF> {
+  return createPublishedGltfLoader().loadAsync(url)
 }

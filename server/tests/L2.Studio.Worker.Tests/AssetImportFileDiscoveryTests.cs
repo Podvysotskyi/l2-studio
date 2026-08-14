@@ -21,6 +21,7 @@ public sealed class AssetImportFileDiscoveryTests
         AssertKeys(directory.Path, AssetImportJobValues.Textures,
             "System Textures/UI.UTX", "Textures/World.utx");
         AssertKeys(directory.Path, AssetImportJobValues.StaticMeshes, "Meshes/Object.usx");
+        AssertKeys(directory.Path, AssetImportJobValues.Animations, "Animations/Character.ukx");
         AssertKeys(directory.Path, AssetImportJobValues.Sounds, "Sounds/Ambient.uax");
         AssertKeys(directory.Path, AssetImportJobValues.Music, "Music/Theme.ogg");
         AssertKeys(directory.Path, AssetImportJobValues.Maps, "Maps/17_25.unr");

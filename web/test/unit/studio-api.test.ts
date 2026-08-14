@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getAssetCatalogDiagnostics,
   getAssetImportDiagnostics,
+  getAssetImportJob,
   getAssetArtifact,
   getAssetArtifacts,
   getAssetImportJobs,
@@ -56,6 +57,11 @@ describe('Studio API service', () => {
       method: 'POST',
       body: {}
     })
+
+    await getAssetImportJob('mappreviews', 'preview run')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/mappreviews/imports/preview%20run'
+    )
   })
 
   it('loads per-file progress and filtered diagnostics', async () => {
@@ -138,6 +144,12 @@ describe('Studio API service', () => {
     await startAssetFileImport('scenes', 'Maps/Entry.unr', true)
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/assets/scenes/imports/files/Maps/Entry.unr',
+      { method: 'POST', query: { force: true } }
+    )
+
+    await startAssetFileImport('mappreviews', 'Maps/Entry.unr', true)
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/assets/mappreviews/imports/files/Maps/Entry.unr',
       { method: 'POST', query: { force: true } }
     )
   })

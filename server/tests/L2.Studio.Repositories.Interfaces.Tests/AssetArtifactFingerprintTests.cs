@@ -8,6 +8,7 @@ public sealed class AssetArtifactFingerprintTests
     [Theory]
     [InlineData("textures", "textures:10:121")]
     [InlineData("staticmeshes", "staticmeshes:12:112")]
+    [InlineData("animations", "animations:1:111")]
     [InlineData("sounds", "sounds:3:111")]
     [InlineData("music", "music:5")]
     [InlineData("maps", "maps:19:111")]

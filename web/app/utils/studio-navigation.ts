@@ -122,6 +122,11 @@ export const studioNavigation: NavigationMenuItem[] = [
         to: '/library/static-meshes'
       },
       {
+        label: 'Animations',
+        icon: 'i-lucide-person-standing',
+        to: '/library/animations'
+      },
+      {
         label: 'Maps',
         icon: 'i-lucide-map',
         to: '/library/maps'
@@ -208,6 +213,7 @@ export function studioRouteTitle(path: string) {
   if (path === '/library/textures') return 'Textures'
   if (path === '/library/music') return 'Music assets'
   if (path === '/library/static-meshes') return 'Static meshes'
+  if (path === '/library/animations') return 'Animations'
   if (path === '/library/maps') return 'Maps'
   if (path.startsWith('/library/maps/')) return 'Map'
   if (path === '/library/scenes') return 'Scenes'

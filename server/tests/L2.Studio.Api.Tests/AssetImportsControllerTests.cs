@@ -43,6 +43,20 @@ public sealed class AssetImportsControllerTests
     }
 
     [Fact]
+    public async Task RejectsAnimationImportsOutsideChronicleOne()
+    {
+        var repository = new StubAssetImportRepository();
+        var controller = new AssetImportsController(repository);
+
+        var result = await controller.Queue("interlude", AssetImportJobValues.Animations, null, CancellationToken.None);
+        var problem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+
+        Assert.Equal("Animation imports currently support Chronicle 1 only.", Assert.Single(problem.Errors["gameVersion"]));
+        Assert.Null(repository.FullScanKind);
+    }
+
+    [Fact]
     public async Task MapsSingleFileValidationAndMissingSourceErrors()
     {
         var repository = new StubAssetImportRepository

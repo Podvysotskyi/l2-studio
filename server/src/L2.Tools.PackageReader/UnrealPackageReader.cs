@@ -4,7 +4,7 @@ using System.Text;
 
 namespace L2.Tools.PackageReader;
 
-public sealed class UnrealPackageReader
+public sealed partial class UnrealPackageReader
 {
     public const uint PackageTag = 0x9e2a83c1;
 
@@ -982,7 +982,8 @@ public sealed class UnrealPackageReader
     private ParsedObject ReadObjectProperties(
         ExportEntry export,
         IReadOnlyList<ExportEntry> exports,
-        bool requireComplete)
+        bool requireComplete,
+        int? maximumBlocks = null)
     {
         if (export.SerialSize <= 0 || export.SerialOffset < 0 || export.SerialOffset + export.SerialSize > data.Length)
         {
@@ -1027,6 +1028,7 @@ public sealed class UnrealPackageReader
                 properties[property.Key] = property.Value;
             }
             blockCount++;
+            if (maximumBlocks is not null && blockCount >= maximumBlocks) break;
         }
 
         if (blockCount == 0)

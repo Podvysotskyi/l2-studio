@@ -21,6 +21,7 @@ public sealed class AssetImportFileHandlers(IAssetImportWorkItemProcessor proces
 {
     public Task Handle(ImportTextureFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportStaticMeshFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
+    public Task Handle(ImportAnimationFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportSoundFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportMusicFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);
     public Task Handle(ImportMapFile message, CancellationToken token) => processor.ProcessAsync(message.WorkItemId, token);

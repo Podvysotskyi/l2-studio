@@ -21,11 +21,18 @@ public static partial class AssetImportSourcePaths
     {
         AssetImportJobValues.Textures => ".utx",
         AssetImportJobValues.StaticMeshes => ".usx",
+        AssetImportJobValues.Animations => ".ukx",
         AssetImportJobValues.Sounds => ".uax",
         AssetImportJobValues.Music => ".ogg",
         AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews or AssetImportJobValues.Scenes => ".unr",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
+
+    public static void RequireSupportedVersion(string kind, string gameVersion)
+    {
+        if (kind == AssetImportJobValues.Animations && gameVersion != "c1")
+            throw new ArgumentException("Animation imports currently support Chronicle 1 only.", nameof(gameVersion));
+    }
 
     public static bool MatchesKind(string kind, string path)
     {

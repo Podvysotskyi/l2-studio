@@ -21,9 +21,9 @@ public sealed class AssetImportTests
     public void DefinesTypedDiscoveryAndFileCommandsForEverySupportedKind()
     {
         var assembly = typeof(DiscoverTextures).Assembly;
-        Assert.Equal(7, assembly.GetTypes().Count(type =>
+        Assert.Equal(8, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportDiscoveryCommand).IsAssignableFrom(type)));
-        Assert.Equal(7, assembly.GetTypes().Count(type =>
+        Assert.Equal(8, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportFileCommand).IsAssignableFrom(type)));
     }
 

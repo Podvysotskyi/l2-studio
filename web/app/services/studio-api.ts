@@ -271,7 +271,7 @@ export async function getAssetCatalog<T, TPackage = never>(
 }
 
 export async function getAssetCatalogEntry<T>(
-  kind: 'maps' | 'scenes',
+  kind: 'maps' | 'mappreviews' | 'scenes',
   name: string,
   sourceKey?: string
 ): Promise<T> {
@@ -319,6 +319,15 @@ export function getAssetImportJobs(
   })
 }
 
+export function getAssetImportJob(
+  kind: AssetImportKind,
+  id: string
+): Promise<AssetImportJob> {
+  return $fetch<AssetImportJob>(
+    versionPath(`/assets/${kind}/imports/${encodeURIComponent(id)}`)
+  )
+}
+
 export function startAssetImport(
   kind: AssetImportKind,
   request: { force?: boolean, mapName?: string } = {}
@@ -344,7 +353,7 @@ export function startAssetFileImport(
 }
 
 export function startAssetResourceImport(
-  kind: 'textures' | 'staticmeshes' | 'maps',
+  kind: 'textures' | 'staticmeshes' | 'animations' | 'maps',
   resourceName: string,
   packageName?: string,
   sourceKey?: string,

@@ -5,12 +5,21 @@ import { describe, expect, it } from 'vitest'
 import {
   applyStudioStaticMeshBackFaceTint,
   studioStaticMeshBackFaceBrightness,
-  studioStaticMeshMaterialOptions
+  studioStaticMeshMaterialOptions,
+  studioStaticMeshPreviewBackgrounds
 } from '../../app/runtime/preview/studio-static-mesh-renderer'
 
 describe('Studio static-mesh renderer', () => {
   it('renders both sides with the shared diagnostic material', () => {
     expect(studioStaticMeshMaterialOptions.side).toBe(DoubleSide)
+  })
+
+  it('provides contrast backgrounds for material inspection', () => {
+    expect(studioStaticMeshPreviewBackgrounds).toEqual([
+      { id: 'dark', label: 'Dark slate', color: 0x09101d },
+      { id: 'neutral', label: 'Neutral gray', color: 0x6b7280 },
+      { id: 'light', label: 'Warm light', color: 0xe4e1da }
+    ])
   })
 
   it('darkens only the interior-facing fragments', () => {

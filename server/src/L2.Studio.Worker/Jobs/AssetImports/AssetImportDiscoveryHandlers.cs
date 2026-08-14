@@ -24,6 +24,8 @@ public sealed class AssetImportDiscoveryHandlers(
         DiscoverAsync(message.RunId, AssetImportJobValues.Textures, token);
     public Task Handle(DiscoverStaticMeshes message, CancellationToken token) =>
         DiscoverAsync(message.RunId, AssetImportJobValues.StaticMeshes, token);
+    public Task Handle(DiscoverAnimations message, CancellationToken token) =>
+        DiscoverAsync(message.RunId, AssetImportJobValues.Animations, token);
     public Task Handle(DiscoverSounds message, CancellationToken token) =>
         DiscoverAsync(message.RunId, AssetImportJobValues.Sounds, token);
     public Task Handle(DiscoverMusic message, CancellationToken token) =>
@@ -215,6 +217,7 @@ public sealed class AssetImportDiscoveryHandlers(
     {
         AssetImportJobValues.Textures => new ImportTextureFile(id),
         AssetImportJobValues.StaticMeshes => new ImportStaticMeshFile(id),
+        AssetImportJobValues.Animations => new ImportAnimationFile(id),
         AssetImportJobValues.Sounds => new ImportSoundFile(id),
         AssetImportJobValues.Music => new ImportMusicFile(id),
         AssetImportJobValues.Maps => new ImportMapFile(id),

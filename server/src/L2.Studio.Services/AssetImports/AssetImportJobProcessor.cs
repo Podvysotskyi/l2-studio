@@ -111,6 +111,8 @@ public sealed partial class AssetImportJobProcessor(
                 await ImportSoundsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.StaticMeshes)
                 await ImportStaticMeshesAsync(context, item, cancellationToken);
+            else if (item.ImportKind == AssetImportJobValues.Animations)
+                await ImportAnimationsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.Maps)
                 await ImportMapsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.MapPreviews)

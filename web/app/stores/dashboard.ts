@@ -108,6 +108,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         'textures',
         'music',
         'staticmeshes',
+        'animations',
         'maps',
         'scenes'
       ] as const
@@ -197,6 +198,14 @@ function createEmptyAssetSummaries(): DashboardAssetSummary[] {
       'UE2 world geometry converted to interactive GLB previews.',
       'i-lucide-box',
       '/library/static-meshes',
+      'packages'
+    ),
+    asset(
+      'animations',
+      'Animations',
+      'C1 skeletal meshes and playable UE2 animation clips.',
+      'i-lucide-person-standing',
+      '/library/animations',
       'packages'
     ),
     asset(

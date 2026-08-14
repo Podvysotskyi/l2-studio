@@ -20,8 +20,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { loadPublishedGltf } from '../core/published-gltf.js'
 import {
   prepareStaticMeshMaterials,
-  type StaticMeshMaterialPreparation
+  type StaticMeshMaterialBehavior,
+  type StaticMeshMaterialInspection,
+  type StaticMeshMaterialPreparation,
+  type StaticMeshTextureRole
 } from '../materials/static-mesh-material.js'
+
+export const studioStaticMeshPreviewBackgrounds = [
+  { id: 'dark', label: 'Dark slate', color: 0x09101d },
+  { id: 'neutral', label: 'Neutral gray', color: 0x6b7280 },
+  { id: 'light', label: 'Warm light', color: 0xe4e1da }
+] as const
+
+export type StudioStaticMeshPreviewBackground =
+  (typeof studioStaticMeshPreviewBackgrounds)[number]['id']
 
 export const studioStaticMeshMaterialOptions = {
   color: 0xaab7c8,
@@ -84,6 +96,36 @@ export class StudioStaticMeshRenderer {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
+  }
+
+  setBackground(background: StudioStaticMeshPreviewBackground) {
+    const preset = studioStaticMeshPreviewBackgrounds.find(item => item.id === background)
+      ?? studioStaticMeshPreviewBackgrounds[0]
+    this.renderer.setClearColor(preset.color, 1)
+  }
+
+  materialInspections(): StaticMeshMaterialInspection[] {
+    return this.materials?.materials ?? []
+  }
+
+  setMaterialEnabled(id: string, enabled: boolean) {
+    return this.materials?.setMaterialEnabled(id, enabled) ?? []
+  }
+
+  setTextureEnabled(id: string, role: StaticMeshTextureRole, enabled: boolean) {
+    return this.materials?.setTextureEnabled(id, role, enabled) ?? []
+  }
+
+  setBehaviorEnabled(
+    id: string,
+    behavior: StaticMeshMaterialBehavior,
+    enabled: boolean
+  ) {
+    return this.materials?.setBehaviorEnabled(id, behavior, enabled) ?? []
+  }
+
+  resetMaterialInspections() {
+    return this.materials?.reset() ?? []
   }
 
   async load(url: string): Promise<string[]> {

@@ -65,6 +65,8 @@ Open **Operations → File storage** to upload files or complete folder contents
 
 Open **Operations → Artifact registry** to inspect immutable generated builds. The registry records each build fingerprint, recipe version, aggregate content hash, output file with its SHA-256 and media type, dependencies, active-publication state, and integrity status. Superseded builds remain registered and on disk. Use **Verify file integrity** for a deep hash audit; Worker startup performs a lightweight active-publication reconciliation.
 
+Open **Asset library → Animations** with Chronicle 1 selected to import `.ukx` packages and inspect skeletal meshes, playable clips, and notify timelines. Notify metadata is visualized only; Studio does not execute packaged sounds, effects, or functions.
+
 Open **Operations → Releases** to assemble and validate a version-scoped snapshot of healthy artifacts, select the client entry points, and publish it. Publishing writes an immutable `client-manifest.json` beneath `versions/{version}/releases/{release-id}/`; activating a release atomically updates the non-cached `versions/{version}/current.json` pointer. Only one release is live for a game version, and rolling back is simply activating an earlier published release.
 
 Generated map, scene, and release manifests use compact JSON. The asset server compresses sufficiently large JSON responses with gzip while retaining immutable caching for versioned manifests and revalidation for `current.json`.

@@ -83,7 +83,7 @@ describe('Dashboard store', () => {
       groups: 2,
       available: true
     })
-    expect(store.jobs).toHaveLength(5)
+    expect(store.jobs).toHaveLength(6)
     expect(store.jobs[0]?.id).toBe('textures-job')
     expect(store.loading).toBe(false)
     expect(store.contentError).toBe(false)

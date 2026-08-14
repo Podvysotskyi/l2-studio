@@ -17,8 +17,8 @@ Worker replica processes heavy file work sequentially for the current
 milestone. Diagnostics and discovered, completed, succeeded, warning, and failed
 counts are stored as queryable rows.
 
-Supported asset families currently include textures, static meshes, sounds,
-music, maps, scenes, and generated map previews. Conversion failures are
+Supported asset families currently include textures, static meshes, Chronicle
+1 skeletal animations, sounds, music, maps, scenes, and generated map previews. Conversion failures are
 isolated to their source and remain visible in the catalog and diagnostics.
 
 ## Artifacts and releases
@@ -57,6 +57,12 @@ provides an explicit file.
   control-map contracts are consumed independently by both renderers. Map
   manifests also retain UE2 `LevelSummary` browser metadata (including the raw
   screenshot material reference) without converting it into a preview image.
+- Chronicle 1 `.ukx` packages publish skeletal meshes, skin weights, skeletons,
+  and reusable compatible animation sets as browser-playable GLB. Animation manifests
+  retain sequence groups and typed notify timelines for inspection. Studio
+  visualizes notify timing and metadata but does not execute notify sounds,
+  effects, or functions. Unsupported `VertMesh` exports and malformed skeletal
+  objects are isolated as warnings without invalidating the rest of a package.
 - Embedded UAX PCM payloads are published as RIFF/WAVE without lossy
   transcoding.
 - Music accepts either the proprietary `L2SD` first-page signature or standard

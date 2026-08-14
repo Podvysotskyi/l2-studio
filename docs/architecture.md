@@ -31,8 +31,9 @@ Server discovers that pointer but does not query Studio persistence. Any future
 game-content ingestion uses an explicit receiving contract owned by Server.
 Web owns a local browser representation of published manifests and resolves
 their resources through the configured asset origin. Studio owns a separate
-Three.js renderer for static-mesh material inspection, authored terrain layers,
-and generated map previews. It validates the same published formats without
+Three.js renderer for static-mesh material inspection, skeletal-animation
+playback and notify-timeline inspection, authored terrain layers, and generated
+map previews. It validates the same published formats without
 sharing rendering code or fidelity requirements with Web's Babylon runtime.
 
 See [asset-pipeline.md](asset-pipeline.md) for import, artifact, release, and

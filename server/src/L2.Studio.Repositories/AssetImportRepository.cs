@@ -24,6 +24,7 @@ public sealed class AssetImportRepository(
         bool force,
         CancellationToken cancellationToken)
     {
+        AssetImportSourcePaths.RequireSupportedVersion(kind, gameVersion);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         await AcquireKindLockAsync(context, gameVersion, kind, cancellationToken);
@@ -53,6 +54,7 @@ public sealed class AssetImportRepository(
         bool force,
         CancellationToken cancellationToken)
     {
+        AssetImportSourcePaths.RequireSupportedVersion(kind, gameVersion);
         var source = await ValidateSingleFileAsync(gameVersion, kind, fileName, cancellationToken);
         var normalized = NormalizeSourceKey(source.FileName);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -122,7 +124,7 @@ public sealed class AssetImportRepository(
         var items = context.AssetCatalogItems.AsNoTracking().Where(item =>
             item.Catalog.GameVersion == gameVersion && item.Catalog.Kind == kind && item.Catalog.IsActive &&
             item.Name == resourceName.Trim());
-        if (kind is AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes)
+        if (kind is AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes or AssetImportJobValues.Animations)
             items = items.Where(item => item.GroupName == packageName!.Trim());
         if (!string.IsNullOrWhiteSpace(sourceKey))
         {
@@ -327,6 +329,7 @@ public sealed class AssetImportRepository(
         string fileName,
         CancellationToken cancellationToken)
     {
+        AssetImportSourcePaths.RequireSupportedVersion(kind, gameVersion);
         var normalizedFileName = fileName.Replace('\\', '/');
         var extension = Path.GetExtension(normalizedFileName);
         var expected = AssetImportSourcePaths.ExpectedExtension(kind);
@@ -401,6 +404,7 @@ public sealed class AssetImportRepository(
     {
         AssetImportJobValues.Textures => new DiscoverTextures(runId),
         AssetImportJobValues.StaticMeshes => new DiscoverStaticMeshes(runId),
+        AssetImportJobValues.Animations => new DiscoverAnimations(runId),
         AssetImportJobValues.Sounds => new DiscoverSounds(runId),
         AssetImportJobValues.Music => new DiscoverMusic(runId),
         AssetImportJobValues.Maps => new DiscoverMaps(runId),
@@ -413,6 +417,7 @@ public sealed class AssetImportRepository(
     {
         AssetImportJobValues.Textures => new ImportTextureFile(workItemId),
         AssetImportJobValues.StaticMeshes => new ImportStaticMeshFile(workItemId),
+        AssetImportJobValues.Animations => new ImportAnimationFile(workItemId),
         AssetImportJobValues.Sounds => new ImportSoundFile(workItemId),
         AssetImportJobValues.Music => new ImportMusicFile(workItemId),
         AssetImportJobValues.Maps => new ImportMapFile(workItemId),

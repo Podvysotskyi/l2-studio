@@ -5,14 +5,18 @@ import type {
   MapCatalogEntry,
   MapLightManifestEntry,
   MapManifest,
+  MapPreviewCatalogEntry,
   MapWaterVolumeManifestEntry
 } from '~/types/studio'
-import { computed, nextTick, watch } from 'vue'
+import type { AssetImportJob } from '../../../types/models/asset-import-job'
+import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  getAssetCatalogEntry
+  getAssetCatalogEntry,
+  getAssetImportJob,
+  startAssetFileImport
 } from '../../../services/studio-api'
-import { getPublishedManifest } from '../../../services/published-assets'
+import { getPublishedManifestWithRaw } from '../../../services/published-assets'
 import {
   createTerrainLayerStates,
   enableAllTerrainLayers,
@@ -52,6 +56,9 @@ type InspectorTab =
 const route = useRoute()
 const catalogEntry = ref<MapCatalogEntry>()
 const manifest = ref<MapManifest>()
+const rawManifest = ref<MapManifest>()
+const mapPreview = ref<MapPreviewCatalogEntry>()
+const mapPreviewJob = ref<AssetImportJob>()
 const preview = ref<MapPreviewApi>()
 const selectedActorName = ref<string>()
 const selectedBspName = ref<string>()
@@ -80,6 +87,9 @@ const diagnosticsOpen = ref(false)
 const skyZonePreviewOpen = ref(false)
 const selectedSkyZoneName = ref<string>()
 const skyZonePreviewError = ref<string>()
+const mapPreviewJobError = ref<string>()
+const notifications = useStudioToasts()
+let mapPreviewPollTimer: ReturnType<typeof setTimeout> | undefined
 
 const routeName = computed(() =>
   Array.isArray(route.params.name)
@@ -182,10 +192,16 @@ const idealPlayerCount = computed(() => mapIdealPlayerCount(levelSummary.value))
 const levelSummaryHasData = computed(() =>
   levelSummary.value ? hasMapLevelSummaryData(levelSummary.value) : false
 )
+const mapPreviewJobActive = computed(() =>
+  mapPreviewJob.value
+    ? ['queued', 'discovering', 'running'].includes(mapPreviewJob.value.status)
+    : false
+)
 
 watch([query, pageSize], () => (page.value = 1))
 watch([routeName, routeSourceKey], () => void loadMap(), { immediate: true })
 watch(selectedSkyZoneName, () => (skyZonePreviewError.value = undefined))
+onBeforeUnmount(() => clearTimeout(mapPreviewPollTimer))
 
 function selectActor(actor: MapActorManifestEntry) {
   selectedActorName.value = actor.name
@@ -281,7 +297,73 @@ function openSkyZonePreview() {
   skyZonePreviewOpen.value = true
 }
 
+async function loadMapPreview(entry: MapCatalogEntry) {
+  try {
+    mapPreview.value = await getAssetCatalogEntry<MapPreviewCatalogEntry>(
+      'mappreviews',
+      entry.name,
+      entry.sourceKey
+    )
+  } catch {
+    mapPreview.value = undefined
+  }
+}
+
+function scheduleMapPreviewPoll() {
+  clearTimeout(mapPreviewPollTimer)
+  mapPreviewPollTimer = setTimeout(() => void pollMapPreviewJob(), 1000)
+}
+
+async function pollMapPreviewJob() {
+  const job = mapPreviewJob.value
+  if (!job) return
+
+  try {
+    const latestJob = await getAssetImportJob('mappreviews', job.id)
+    if (mapPreviewJob.value?.id !== latestJob.id) return
+    mapPreviewJob.value = latestJob
+    if (['queued', 'discovering', 'running'].includes(latestJob.status)) {
+      scheduleMapPreviewPoll()
+      return
+    }
+
+    if (catalogEntry.value) await loadMapPreview(catalogEntry.value)
+    if (latestJob.status === 'failed') {
+      mapPreviewJobError.value =
+        latestJob.error ?? 'Map preview generation failed.'
+      return
+    }
+    notifications.success({ title: 'Map preview regenerated' })
+  } catch {
+    mapPreviewJobError.value =
+      'Map preview generation status could not be loaded.'
+  }
+}
+
+async function regenerateMapPreview() {
+  const entry = catalogEntry.value
+  if (!entry || mapPreviewJobActive.value) return
+
+  mapPreviewJobError.value = undefined
+  try {
+    mapPreviewJob.value = await startAssetFileImport(
+      'mappreviews',
+      entry.sourceKey,
+      true
+    )
+    notifications.success({ title: 'Map preview regeneration queued' })
+    await pollMapPreviewJob()
+  } catch {
+    mapPreviewJobError.value = 'Map preview regeneration could not be queued.'
+    notifications.error({
+      title: 'Map preview regeneration could not be queued',
+      description: 'Another preview import may already be active.'
+    })
+  }
+}
+
 async function loadMap() {
+  clearTimeout(mapPreviewPollTimer)
   loading.value = true
   sceneReady.value = false
   error.value = undefined
@@ -293,6 +375,10 @@ async function loadMap() {
   skyZonePreviewError.value = undefined
   catalogEntry.value = undefined
   manifest.value = undefined
+  rawManifest.value = undefined
+  mapPreview.value = undefined
+  mapPreviewJob.value = undefined
+  mapPreviewJobError.value = undefined
   selectedActorName.value = undefined
   selectedBspName.value = undefined
   selectedLightName.value = undefined
@@ -321,8 +407,13 @@ async function loadMap() {
       error.value = entry.error ?? 'Map “' + entry.name + '” was not imported.'
       return
     }
-    manifest.value = await getPublishedManifest<MapManifest>(entry.manifestUrl)
+    const publishedManifest = await getPublishedManifestWithRaw<MapManifest>(
+      entry.manifestUrl
+    )
+    rawManifest.value = publishedManifest.raw
+    manifest.value = publishedManifest.resolved
     terrainLayerStates.value = createTerrainLayerStates(manifest.value.terrains)
+    await loadMapPreview(entry)
   } catch {
     error.value = 'Map “' + routeName.value + '” could not be loaded.'
   } finally {
@@ -1141,95 +1232,175 @@ async function loadMap() {
                 Level summary
               </h2>
               <p class="text-xs text-muted">
-                Authored UE2 map-browser metadata
+                Generated preview, published manifest, and authored UE2 metadata
               </p>
             </div>
-            <div
-              v-if="levelSummary"
-              class="max-h-[58vh] space-y-4 overflow-y-auto p-4"
-            >
-              <div v-if="levelSummary.title">
-                <p class="text-xs text-muted">Title</p>
-                <p class="text-base font-semibold text-highlighted">
-                  {{ levelSummary.title }}
+            <div class="max-h-[58vh] space-y-4 overflow-y-auto p-4">
+              <section aria-label="Generated map preview">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 class="text-sm font-semibold text-highlighted">
+                      Map preview
+                    </h3>
+                    <p class="text-xs text-muted">
+                      Top-down image generated from the published map manifest
+                    </p>
+                  </div>
+                  <UButton
+                    :label="mapPreview?.imageUrl ? 'Regenerate preview' : 'Generate preview'"
+                    icon="i-lucide-image"
+                    size="xs"
+                    color="neutral"
+                    variant="outline"
+                    :loading="mapPreviewJobActive"
+                    :disabled="mapPreviewJobActive"
+                    @click="regenerateMapPreview"
+                  />
+                </div>
+                <UAlert
+                  v-if="mapPreviewJobError"
+                  class="mt-3"
+                  color="error"
+                  variant="subtle"
+                  title="Preview generation failed"
+                  :description="mapPreviewJobError"
+                />
+                <UAlert
+                  v-else-if="mapPreview?.error"
+                  class="mt-3"
+                  color="warning"
+                  variant="subtle"
+                  title="Preview unavailable"
+                  :description="mapPreview.error"
+                />
+                <div
+                  v-if="mapPreview?.imageUrl"
+                  class="mt-3 overflow-hidden rounded-md border border-default bg-muted/30"
+                >
+                  <img
+                    :src="mapPreview.imageUrl"
+                    :alt="`${catalogEntry?.name ?? routeName} map preview`"
+                    class="aspect-square w-full object-cover"
+                  >
+                  <p class="border-t border-default px-3 py-2 text-xs text-muted">
+                    {{ mapPreview.width }} × {{ mapPreview.height }} ·
+                    {{ mapPreview.status }}
+                  </p>
+                </div>
+                <div
+                  v-else-if="mapPreviewJobActive"
+                  class="mt-3 flex min-h-32 items-center justify-center gap-2 rounded-md border border-dashed border-default text-xs text-muted"
+                >
+                  <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" />
+                  Generating preview…
+                </div>
+                <div
+                  v-else
+                  class="mt-3 grid min-h-32 place-items-center rounded-md border border-dashed border-default px-4 text-center text-xs text-muted"
+                >
+                  No generated map preview is available.
+                </div>
+              </section>
+
+              <section class="border-t border-default pt-4" aria-label="Level Summary">
+                <div v-if="levelSummary">
+                  <div v-if="levelSummary.title">
+                    <p class="text-xs text-muted">Title</p>
+                    <p class="text-base font-semibold text-highlighted">
+                      {{ levelSummary.title }}
+                    </p>
+                  </div>
+
+                  <dl class="mt-4 space-y-3 text-sm">
+                    <div v-if="levelSummary.author">
+                      <dt class="text-muted">Author</dt>
+                      <dd class="mt-1 text-highlighted">
+                        {{ levelSummary.author }}
+                      </dd>
+                    </div>
+                    <div v-if="idealPlayerCount">
+                      <dt class="text-muted">Ideal player count</dt>
+                      <dd class="mt-1 text-highlighted">
+                        {{ idealPlayerCount }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.singlePlayerTeamSize !== null">
+                      <dt class="text-muted">Single-player team size</dt>
+                      <dd class="mt-1 text-highlighted">
+                        {{ levelSummary.singlePlayerTeamSize }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.hideFromMenus !== null">
+                      <dt class="text-muted">Menu visibility</dt>
+                      <dd class="mt-1">
+                        <UBadge
+                          :color="levelSummary.hideFromMenus ? 'warning' : 'success'"
+                          variant="subtle"
+                          size="sm"
+                        >
+                          {{ levelSummary.hideFromMenus ? 'Hidden' : 'Visible' }}
+                        </UBadge>
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.description">
+                      <dt class="text-muted">Description</dt>
+                      <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                        {{ levelSummary.description }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.levelEnterText">
+                      <dt class="text-muted">Level entry text</dt>
+                      <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                        {{ levelSummary.levelEnterText }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.extraInfo">
+                      <dt class="text-muted">Extra info</dt>
+                      <dd class="mt-1 whitespace-pre-wrap text-highlighted">
+                        {{ levelSummary.extraInfo }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.decoTextName">
+                      <dt class="text-muted">Deco text name</dt>
+                      <dd class="mt-1 text-highlighted">
+                        {{ levelSummary.decoTextName }}
+                      </dd>
+                    </div>
+                    <div v-if="levelSummary.screenshot">
+                      <dt class="text-muted">Screenshot material</dt>
+                      <dd class="mt-1 break-all font-mono text-xs text-highlighted">
+                        {{ levelSummary.screenshot }}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <p
+                    v-if="!levelSummaryHasData"
+                    class="mt-4 text-sm text-muted"
+                  >
+                    This LevelSummary contains no authored metadata.
+                  </p>
+                </div>
+                <p v-else class="text-sm text-muted">
+                  This map has no readable LevelSummary metadata.
                 </p>
-              </div>
+              </section>
 
-              <dl class="space-y-3 text-sm">
-                <div v-if="levelSummary.author">
-                  <dt class="text-muted">Author</dt>
-                  <dd class="mt-1 text-highlighted">
-                    {{ levelSummary.author }}
-                  </dd>
-                </div>
-                <div v-if="idealPlayerCount">
-                  <dt class="text-muted">Ideal player count</dt>
-                  <dd class="mt-1 text-highlighted">
-                    {{ idealPlayerCount }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.singlePlayerTeamSize !== null">
-                  <dt class="text-muted">Single-player team size</dt>
-                  <dd class="mt-1 text-highlighted">
-                    {{ levelSummary.singlePlayerTeamSize }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.hideFromMenus !== null">
-                  <dt class="text-muted">Menu visibility</dt>
-                  <dd class="mt-1">
-                    <UBadge
-                      :color="levelSummary.hideFromMenus ? 'warning' : 'success'"
-                      variant="subtle"
-                      size="sm"
-                    >
-                      {{ levelSummary.hideFromMenus ? 'Hidden' : 'Visible' }}
-                    </UBadge>
-                  </dd>
-                </div>
-                <div v-if="levelSummary.description">
-                  <dt class="text-muted">Description</dt>
-                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
-                    {{ levelSummary.description }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.levelEnterText">
-                  <dt class="text-muted">Level entry text</dt>
-                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
-                    {{ levelSummary.levelEnterText }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.extraInfo">
-                  <dt class="text-muted">Extra info</dt>
-                  <dd class="mt-1 whitespace-pre-wrap text-highlighted">
-                    {{ levelSummary.extraInfo }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.decoTextName">
-                  <dt class="text-muted">Deco text name</dt>
-                  <dd class="mt-1 text-highlighted">
-                    {{ levelSummary.decoTextName }}
-                  </dd>
-                </div>
-                <div v-if="levelSummary.screenshot">
-                  <dt class="text-muted">Screenshot material</dt>
-                  <dd class="mt-1 break-all font-mono text-xs text-highlighted">
-                    {{ levelSummary.screenshot }}
-                  </dd>
-                </div>
-              </dl>
-
-              <p
-                v-if="!levelSummaryHasData"
-                class="text-sm text-muted"
+              <section
+                v-if="rawManifest"
+                class="border-t border-default pt-4"
+                aria-label="Published map manifest"
               >
-                This LevelSummary contains no authored metadata.
-              </p>
-            </div>
-            <div
-              v-else
-              class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted"
-            >
-              This map has no readable LevelSummary metadata.
+                <h3 class="text-sm font-semibold text-highlighted">
+                  Published manifest
+                </h3>
+                <p class="mt-1 text-xs text-muted">
+                  Raw JSON stored with this generated map artifact
+                </p>
+                <div class="mt-3 overflow-x-auto rounded-md bg-muted/40 p-3">
+                  <StudioJsonTree :value="rawManifest" />
+                </div>
+              </section>
             </div>
           </template>
 

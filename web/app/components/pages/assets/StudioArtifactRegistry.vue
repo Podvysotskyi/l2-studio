@@ -29,6 +29,7 @@ const kinds = [
   { label: 'All kinds', value: 'all' },
   { label: 'Textures', value: 'textures' },
   { label: 'Static meshes', value: 'staticmeshes' },
+  { label: 'Animations', value: 'animations' },
   { label: 'Sounds', value: 'sounds' },
   { label: 'Music', value: 'music' },
   { label: 'Maps', value: 'maps' },

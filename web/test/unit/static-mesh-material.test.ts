@@ -1,5 +1,6 @@
 import {
   ClampToEdgeWrapping,
+  DoubleSide,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
@@ -59,7 +60,7 @@ describe('published static-mesh material', () => {
 
     material.onBeforeCompile(shader as never, {} as never)
 
-    expect(shader.vertexShader).toContain('vec2(0.0 * l2Time, 0.0 * l2Time)')
+    expect(shader.vertexShader).toContain('vec2(0.0 * l2UvTime, 0.0 * l2UvTime)')
     expect(material.emissiveMap).toBeNull()
     expect(warn).not.toHaveBeenCalled()
     preparation.dispose()
@@ -188,6 +189,135 @@ describe('published static-mesh material', () => {
     const material = mesh.material as MeshStandardMaterial
     expect(material.map?.wrapS).toBe(ClampToEdgeWrapping)
     expect(material.map?.wrapT).toBe(ClampToEdgeWrapping)
+    preparation.dispose()
+    fallback.dispose()
+    mesh.geometry.dispose()
+  })
+
+  it('inspects and live-toggles material texture and behavior controls', async () => {
+    vi.spyOn(TextureLoader.prototype, 'load')
+      .mockImplementation((_url, onLoad) => {
+        const texture = new Texture()
+        onLoad(texture)
+        return texture
+      })
+    const fallback = new MeshStandardMaterial()
+    const source = new MeshStandardMaterial({ name: 'diagnostic', side: DoubleSide })
+    source.userData.l2 = {
+      diffuseUrl: '/versions/c1/Textures/town/diffuse.webp',
+      opacityUrl: '/versions/c1/Textures/town/opacity.webp',
+      blendMode: 'alphablend',
+      depthWrite: true,
+      depthTest: true,
+      panRate: 0.5,
+      windMode: 'foliage'
+    }
+    const mesh = new Mesh(new PlaneGeometry(1, 1), source)
+    const preparation = await prepareStaticMeshMaterials(
+      mesh,
+      fallback,
+      'https://assets.test/versions/c1/Meshes/town/house.glb'
+    )
+    const material = mesh.material as MeshStandardMaterial
+    const shader = {
+      uniforms: {} as Record<string, { value: unknown }>,
+      vertexShader: `void main() {
+#include <uv_vertex>
+#include <begin_vertex>
+}`,
+      fragmentShader: `void main() {
+#include <map_fragment>
+#include <emissivemap_fragment>
+#include <lights_fragment_end>
+}`
+    }
+    material.onBeforeCompile(shader as never, {} as never)
+
+    expect(preparation.materials).toMatchObject([{
+      name: 'diagnostic',
+      sections: [0],
+      blendMode: 'alphablend',
+      textures: [
+        { role: 'diffuse', enabled: true },
+        { role: 'opacity', enabled: true }
+      ]
+    }])
+    const [inspection] = preparation.materials
+    expect(inspection).toBeDefined()
+    preparation.setMaterialEnabled(inspection!.id, false)
+    preparation.setTextureEnabled(inspection!.id, 'diffuse', false)
+    preparation.setBehaviorEnabled(inspection!.id, 'uvEffects', false)
+    preparation.setBehaviorEnabled(inspection!.id, 'twoSided', false)
+
+    expect(material.visible).toBe(false)
+    expect(shader.uniforms.l2DiffuseEnabled?.value).toBe(0)
+    expect(shader.uniforms.l2UvEffectsEnabled?.value).toBe(0)
+
+    preparation.reset()
+
+    expect(material.visible).toBe(true)
+    expect(shader.uniforms.l2DiffuseEnabled?.value).toBe(1)
+    expect(shader.uniforms.l2UvEffectsEnabled?.value).toBe(1)
+    expect(preparation.materials[0]?.behaviors.find(item => item.behavior === 'twoSided')?.enabled).toBe(true)
+    preparation.dispose()
+    fallback.dispose()
+    mesh.geometry.dispose()
+  })
+
+  it('keeps the Cave43 skeleton sections and their authored render modes inspectable', async () => {
+    vi.spyOn(TextureLoader.prototype, 'load')
+      .mockImplementation((_url, onLoad) => {
+        const texture = new Texture()
+        onLoad(texture)
+        return texture
+      })
+    const fallback = new MeshStandardMaterial()
+    const materials = [
+      ['d_vally_skeleton02', 'opaque'],
+      ['d_vally_skeleton03', 'opaque'],
+      ['d_vally_skeleton06', 'alphablend']
+    ].map(([name, blendMode]) => {
+      const material = new MeshStandardMaterial({ name })
+      material.userData.l2 = {
+        diffuseUrl: `/versions/c1/Textures/Giran_antaras_t/${name}.webp`,
+        blendMode
+      }
+      return material
+    })
+    const mesh = new Mesh(new PlaneGeometry(1, 1), materials)
+
+    const preparation = await prepareStaticMeshMaterials(
+      mesh,
+      fallback,
+      'https://assets.test/versions/c1/Meshes/Giran_antaras_s/Giran_antaras_cave43.glb'
+    )
+
+    expect(preparation.materials.map(({ name, sections, blendMode, textures }) => ({
+      name,
+      sections,
+      blendMode,
+      diffuse: textures.find(texture => texture.role === 'diffuse')?.url
+    }))).toEqual([
+      {
+        name: 'd_vally_skeleton02',
+        sections: [0],
+        blendMode: 'opaque',
+        diffuse: 'https://assets.test/versions/c1/Textures/Giran_antaras_t/d_vally_skeleton02.webp'
+      },
+      {
+        name: 'd_vally_skeleton03',
+        sections: [1],
+        blendMode: 'opaque',
+        diffuse: 'https://assets.test/versions/c1/Textures/Giran_antaras_t/d_vally_skeleton03.webp'
+      },
+      {
+        name: 'd_vally_skeleton06',
+        sections: [2],
+        blendMode: 'alphablend',
+        diffuse: 'https://assets.test/versions/c1/Textures/Giran_antaras_t/d_vally_skeleton06.webp'
+      }
+    ])
+
     preparation.dispose()
     fallback.dispose()
     mesh.geometry.dispose()

@@ -21,4 +21,21 @@ describe('Studio map details Sky Zone preview', () => {
     expect(component).not.toContain('skyZoneChunkVisibility')
     expect(component).not.toContain('setSkyZoneChunkVisible')
   })
+
+  it('shows generated previews and the raw manifest tree in the Summary tab', async () => {
+    const component = await readFile(
+      resolve(
+        import.meta.dirname,
+        '../../app/components/pages/maps/StudioMapDetails.vue'
+      ),
+      'utf8'
+    )
+
+    expect(component).toContain('getPublishedManifestWithRaw')
+    expect(component).toContain("'mappreviews'")
+    expect(component).toContain("entry.sourceKey,\n      true")
+    expect(component).toContain('label="Generated map preview"')
+    expect(component).toContain("'Regenerate preview' : 'Generate preview'")
+    expect(component).toContain('<StudioJsonTree :value="rawManifest" />')
+  })
 })

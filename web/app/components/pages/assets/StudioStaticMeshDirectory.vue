@@ -4,6 +4,11 @@ import type {
   StaticMeshManifestEntry,
   StaticMeshPackage
 } from '~/types/studio'
+import type {
+  StaticMeshMaterialBehavior,
+  StaticMeshMaterialInspection,
+  StaticMeshTextureRole
+} from '~/runtime/materials/static-mesh-material'
 import type { AssetImportJob } from '../../../types/models/asset-import-job'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import {
@@ -21,6 +26,13 @@ const selectedPackage = ref<string>('all')
 const selectedMesh = ref<StaticMeshManifestEntry>()
 const previewError = ref<string>()
 const previewMaterialWarning = ref<string>()
+const previewMaterials = ref<StaticMeshMaterialInspection[]>([])
+const preview = ref<{
+  setMaterialEnabled(id: string, enabled: boolean): StaticMeshMaterialInspection[]
+  setTextureEnabled(id: string, role: StaticMeshTextureRole, enabled: boolean): StaticMeshMaterialInspection[]
+  setBehaviorEnabled(id: string, behavior: StaticMeshMaterialBehavior, enabled: boolean): StaticMeshMaterialInspection[]
+  resetMaterialInspections(): StaticMeshMaterialInspection[]
+}>()
 const query = ref('')
 const page = ref(1)
 const pageSize = ref(50)
@@ -103,12 +115,34 @@ function showPreview(mesh: StaticMeshManifestEntry) {
   selectedMesh.value = mesh
   previewError.value = undefined
   previewMaterialWarning.value = undefined
+  previewMaterials.value = []
 }
 
 function closePreview() {
   selectedMesh.value = undefined
   previewError.value = undefined
   previewMaterialWarning.value = undefined
+  previewMaterials.value = []
+}
+
+function setPreviewMaterials(materials: StaticMeshMaterialInspection[]) {
+  previewMaterials.value = materials
+}
+
+function setMaterialEnabled(id: string, enabled: boolean) {
+  previewMaterials.value = preview.value?.setMaterialEnabled(id, enabled) ?? previewMaterials.value
+}
+
+function setTextureEnabled(id: string, role: StaticMeshTextureRole, enabled: boolean) {
+  previewMaterials.value = preview.value?.setTextureEnabled(id, role, enabled) ?? previewMaterials.value
+}
+
+function setBehaviorEnabled(id: string, behavior: StaticMeshMaterialBehavior, enabled: boolean) {
+  previewMaterials.value = preview.value?.setBehaviorEnabled(id, behavior, enabled) ?? previewMaterials.value
+}
+
+function resetPreviewMaterials() {
+  previewMaterials.value = preview.value?.resetMaterialInspections() ?? previewMaterials.value
 }
 
 async function loadCatalog() {
@@ -403,14 +437,96 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
           :description="previewMaterialWarning"
         />
         <StudioStaticMeshPreview
+          ref="preview"
           v-if="selectedMesh?.url"
           :url="selectedMesh.url"
           @error="previewError = $event"
           @material-warning="previewMaterialWarning = $event"
+          @materials="setPreviewMaterials"
         />
         <p class="mt-2 text-center text-xs text-muted">
           Drag to orbit · scroll to zoom · right-drag to pan
         </p>
+        <section v-if="previewMaterials.length" class="mt-5 border-t border-default pt-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">Material inspector</h2>
+              <p class="mt-1 text-xs text-muted">
+                Live preview-only controls. They do not change the published asset.
+              </p>
+            </div>
+            <UButton
+              label="Reset all"
+              icon="i-lucide-rotate-ccw"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              @click="resetPreviewMaterials"
+            />
+          </div>
+          <div class="mt-4 space-y-3">
+            <UCard v-for="material in previewMaterials" :key="material.id" :ui="{ body: 'p-4 sm:p-4' }">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="truncate text-sm font-medium text-highlighted">{{ material.name }}</h3>
+                    <UBadge color="neutral" variant="subtle">{{ material.blendMode }}</UBadge>
+                    <UBadge v-if="material.doubleSided" color="neutral" variant="subtle">two-sided</UBadge>
+                    <UBadge v-if="material.clampU || material.clampV" color="neutral" variant="subtle">
+                      clamp {{ material.clampU ? 'U' : '' }}{{ material.clampU && material.clampV ? '/' : '' }}{{ material.clampV ? 'V' : '' }}
+                    </UBadge>
+                  </div>
+                  <p class="mt-1 text-xs text-muted">
+                    Section{{ material.sections.length === 1 ? '' : 's' }} {{ material.sections.map(section => section + 1).join(', ') }} · alpha cutoff {{ material.alphaCutoff.toFixed(3) }}
+                  </p>
+                </div>
+                <USwitch
+                  :model-value="material.enabled"
+                  :aria-label="`Show ${material.name}`"
+                  label="Show material"
+                  @update:model-value="setMaterialEnabled(material.id, $event)"
+                />
+              </div>
+
+              <div v-if="material.textures.length" class="mt-4 border-t border-default pt-3">
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">Textures</h4>
+                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div v-for="texture in material.textures" :key="texture.role" class="flex min-w-0 items-center gap-3 rounded-md bg-elevated p-2">
+                    <img :src="texture.url" :alt="`${texture.label} texture`" class="size-10 shrink-0 rounded object-cover" loading="lazy">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <a :href="texture.url" target="_blank" rel="noreferrer" class="truncate text-xs font-medium text-highlighted hover:underline">{{ texture.label }}</a>
+                        <UBadge v-if="texture.frameCount > 1" color="neutral" variant="subtle" size="xs">{{ texture.frameCount }} frames</UBadge>
+                      </div>
+                      <p class="truncate text-xs text-dimmed">{{ texture.url }}</p>
+                    </div>
+                    <USwitch
+                      :model-value="texture.enabled"
+                      :aria-label="`Enable ${texture.label} for ${material.name}`"
+                      @update:model-value="setTextureEnabled(material.id, texture.role, $event)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 border-t border-default pt-3">
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">Render behavior</h4>
+                <div class="mt-2 grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <USwitch
+                    v-for="behavior in material.behaviors"
+                    :key="behavior.behavior"
+                    :model-value="behavior.enabled"
+                    :label="behavior.label"
+                    :ui="{ label: behavior.available ? undefined : 'line-through' }"
+                    :disabled="!behavior.available"
+                    :aria-label="`${behavior.label} for ${material.name}`"
+                    @update:model-value="setBehaviorEnabled(material.id, behavior.behavior, $event)"
+                  />
+                </div>
+              </div>
+            </UCard>
+          </div>
+        </section>
       </template>
     </USlideover>
 
