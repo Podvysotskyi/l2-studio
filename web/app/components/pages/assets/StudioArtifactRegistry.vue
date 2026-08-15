@@ -30,6 +30,7 @@ const kinds = [
   { label: 'Textures', value: 'textures' },
   { label: 'Static meshes', value: 'staticmeshes' },
   { label: 'Animations', value: 'animations' },
+  { label: 'NPC appearances', value: 'npcappearances' },
   { label: 'Sounds', value: 'sounds' },
   { label: 'Music', value: 'music' },
   { label: 'Maps', value: 'maps' },

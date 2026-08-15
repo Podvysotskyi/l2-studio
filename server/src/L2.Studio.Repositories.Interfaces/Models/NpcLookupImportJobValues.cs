@@ -2,6 +2,7 @@ namespace L2.Studio.Repositories.Interfaces.Models;
 
 public static class NpcLookupImportJobValues
 {
+    public const string Npcs = "npcs";
     public const string NpcTypes = "npc-types";
     public const string NpcRaces = "npc-races";
     public const string NpcSexes = "npc-sexes";
@@ -12,9 +13,17 @@ public static class NpcLookupImportJobValues
     public const string Succeeded = "succeeded";
     public const string Failed = "failed";
 
-    public static readonly HashSet<string> SupportedKinds = [NpcTypes, NpcRaces, NpcSexes];
+    public static readonly HashSet<string> SupportedKinds = [Npcs, NpcTypes, NpcRaces, NpcSexes];
     public static readonly HashSet<string> SupportedModes = [AddMissing, RestoreDefaults];
     public static readonly HashSet<string> SupportedGameVersions = ["c1", "c4", "interlude"];
     public static readonly string[] ActiveStatuses = [Queued, Running];
     public static readonly string[] TerminalStatuses = [Succeeded, Failed];
+
+    public static bool Supports(string gameVersion, string kind) =>
+        (gameVersion, kind) switch
+        {
+            ("c1", Npcs) => true,
+            ("c1" or "c4" or "interlude", NpcTypes or NpcRaces or NpcSexes) => true,
+            _ => false
+        };
 }

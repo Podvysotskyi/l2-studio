@@ -20,4 +20,26 @@ public sealed class AssetArtifactPathTests
 
         Assert.Equal(expected, actual);
     }
+
+    [Fact]
+    public async Task PromoteCreatesARequiredDestinationParentDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"l2-studio-{Guid.NewGuid():N}");
+        var stagingPath = Path.Combine(root, "work", "job");
+        var finalPath = Path.Combine(root, "public", "versions", "c1", "System", "npcgrp", "fingerprint");
+        Directory.CreateDirectory(stagingPath);
+        await File.WriteAllTextAsync(Path.Combine(stagingPath, "manifest.json"), "{}");
+
+        try
+        {
+            AssetImportJobProcessor.Promote(stagingPath, finalPath);
+
+            Assert.False(Directory.Exists(stagingPath));
+            Assert.Equal("{}", await File.ReadAllTextAsync(Path.Combine(finalPath, "manifest.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
 }

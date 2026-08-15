@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import { getSkillImportRuns, startSkillImport } from '../../../services/studio-api'
 import type { SkillRecord } from '../../../types/models/content-directory'
+import type { SkillImportMode, SkillImportRun } from '../../../types/models/skill-import'
 
 const query = defineModel<string>('query', { required: true })
 const page = defineModel<number>('page', { required: true })
@@ -14,6 +16,32 @@ defineProps<{
 }>()
 
 defineEmits<{ refresh: [] }>()
+
+const run = ref<SkillImportRun>()
+const importing = ref<SkillImportMode>()
+const toast = useStudioToasts()
+
+async function importSkills(mode: SkillImportMode) {
+  importing.value = mode
+  try {
+    run.value = await startSkillImport(mode)
+    toast.success({ title: 'Skill import queued' })
+  } catch {
+    toast.error({ title: 'Skill import could not be queued' })
+  } finally {
+    importing.value = undefined
+  }
+}
+
+async function loadRun() {
+  try {
+    run.value = (await getSkillImportRuns())[0]
+  } catch {
+    // The directory remains available while import history is unavailable.
+  }
+}
+
+onMounted(() => void loadRun())
 
 const columns: TableColumn<SkillRecord>[] = [
   { accessorKey: 'id', header: 'ID' },
@@ -35,6 +63,19 @@ const columns: TableColumn<SkillRecord>[] = [
     >
       <template #actions>
         <UButton
+          label="Import missing"
+          icon="i-lucide-download"
+          :loading="importing === 'add_missing'"
+          @click="importSkills('add_missing')"
+        />
+        <UButton
+          label="Restore defaults"
+          color="neutral"
+          variant="outline"
+          :loading="importing === 'restore_defaults'"
+          @click="importSkills('restore_defaults')"
+        />
+        <UButton
           label="Refresh"
           icon="i-lucide-refresh-cw"
           color="neutral"
@@ -44,6 +85,14 @@ const columns: TableColumn<SkillRecord>[] = [
         />
       </template>
     </StudioPageHeader>
+
+    <UAlert
+      v-if="run"
+      :color="run.status === 'failed' ? 'error' : 'neutral'"
+      variant="subtle"
+      :title="`Latest import: ${run.status}`"
+      :description="run.error || `${run.insertedCount} inserted, ${run.restoredCount} restored of ${run.totalCount}.`"
+    />
 
     <UAlert
       v-if="error"

@@ -7,6 +7,11 @@ import {
   positiveInteger
 } from '../../app/utils/directory'
 import {
+  npcDirectoryRouteQuery,
+  npcDirectoryRouteState,
+  npcRaceNoneValue
+} from '../../app/utils/npc-directory'
+import {
   buildPlayerClassHierarchy,
   flattenPlayerClassHierarchy
 } from '../../app/utils/player-class'
@@ -64,6 +69,38 @@ describe('Studio content utilities', () => {
     expect(positiveInteger('0', 25)).toBe(25)
     expect(positiveInteger('-4', 25)).toBe(25)
     expect(positiveInteger(['10'], 25)).toBe(25)
+  })
+
+  it('serializes and restores NPC directory filters in the route', () => {
+    const state = npcDirectoryRouteState({
+      query: 'Goblin',
+      page: '2',
+      npcTypeName: 'Monster',
+      withoutRace: 'true',
+      npcSexName: 'MALE',
+      hasVisuals: 'without'
+    })
+
+    expect(state).toMatchObject({
+      query: 'Goblin',
+      page: 2,
+      npcTypeName: 'Monster',
+      npcRaceName: npcRaceNoneValue,
+      npcSexName: 'MALE',
+      visualFilter: 'without'
+    })
+    expect(npcDirectoryRouteQuery(state)).toEqual({
+      query: 'Goblin',
+      page: '2',
+      npcTypeName: 'Monster',
+      withoutRace: 'true',
+      npcSexName: 'MALE',
+      hasVisuals: 'without'
+    })
+  })
+
+  it('omits inactive NPC filters from the route', () => {
+    expect(npcDirectoryRouteQuery({ query: '', page: 1, pageSize: 25 })).toEqual({})
   })
 
   it('paginates local catalogs without mutating their records', () => {

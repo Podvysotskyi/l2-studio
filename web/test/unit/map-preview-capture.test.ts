@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('Map preview capture', () => {
-  it('includes water surfaces and resolved water volumes in the generated preview', async () => {
+  it('includes water surfaces without loading or rendering water volumes at an optional fixed C1 phase', async () => {
     const component = await readFile(
       resolve(
         import.meta.dirname,
@@ -12,7 +12,10 @@ describe('Map preview capture', () => {
       'utf8'
     )
 
+    expect(component).toContain('includeWaterVolumes: false')
     expect(component).toContain('waterSurfaces: true')
-    expect(component).toContain('waterVolumes: true')
+    expect(component).toContain('waterVolumes: false')
+    expect(component).toContain('animationTimeSeconds?: number')
+    expect(component).toContain('preview.renderTopDown(props.animationTimeSeconds)')
   })
 })

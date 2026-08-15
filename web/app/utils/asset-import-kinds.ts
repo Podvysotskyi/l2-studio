@@ -6,6 +6,7 @@ export const assetImportKinds: AssetImportKind[] = [
   'sounds',
   'staticmeshes',
   'animations',
+  'npcappearances',
   'maps',
   'mappreviews',
   'scenes'
@@ -18,6 +19,7 @@ export const assetImportKindOptions = [
   { label: 'Sounds', value: 'sounds' },
   { label: 'Static meshes', value: 'staticmeshes' },
   { label: 'Animations', value: 'animations' },
+  { label: 'NPC appearances', value: 'npcappearances' },
   { label: 'Maps', value: 'maps' },
   { label: 'Map previews', value: 'mappreviews' },
   { label: 'Scenes', value: 'scenes' }
@@ -29,6 +31,7 @@ export function assetImportKindLabel(kind: AssetImportKind) {
   if (kind === 'sounds') return 'Sounds'
   if (kind === 'staticmeshes') return 'Static meshes'
   if (kind === 'animations') return 'Animations'
+  if (kind === 'npcappearances') return 'NPC appearances'
   if (kind === 'maps') return 'Maps'
   return kind === 'mappreviews' ? 'Map previews' : 'Scenes'
 }

@@ -21,8 +21,10 @@ public static class StudioApplicationConfigurationExtensions
         services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddScoped<IAssetImportRepository, AssetImportRepository>();
         services.AddScoped<INpcLookupImportRepository, NpcLookupImportRepository>();
+        services.AddScoped<IItemImportRepository, ItemImportRepository>();
+        services.AddScoped<ISkillImportRepository, SkillImportRepository>();
+        services.AddScoped<IPlayerImportRepository, PlayerImportRepository>();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
-        services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddSingleton<GameVersionSeeder>();
         services.TryAddTimeProvider();
         services.AddHostedService<GameContentInitializer>();
@@ -36,6 +38,7 @@ public static class StudioApplicationConfigurationExtensions
         services.AddAssetImportOptions(configuration);
         services.TryAddTimeProvider();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
+        services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddScoped<IAssetImportWorkItemProcessor, AssetImportJobProcessor>();
         return services;
     }

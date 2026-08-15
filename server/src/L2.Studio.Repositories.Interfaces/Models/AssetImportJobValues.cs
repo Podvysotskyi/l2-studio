@@ -7,6 +7,7 @@ public static class AssetImportJobValues
     public const string Sounds = "sounds";
     public const string StaticMeshes = "staticmeshes";
     public const string Animations = "animations";
+    public const string NpcAppearances = "npcappearances";
     public const string Maps = "maps";
     public const string MapPreviews = "mappreviews";
     public const string Scenes = "scenes";
@@ -26,6 +27,6 @@ public static class AssetImportJobValues
     public static readonly string[] WorkItemTerminalStatuses = [Succeeded, SucceededWithWarnings, Failed, Reused];
     public static readonly HashSet<string> SupportedKinds =
     [
-        Textures, Music, Sounds, StaticMeshes, Animations, Maps, MapPreviews, Scenes
+        Textures, Music, Sounds, StaticMeshes, Animations, NpcAppearances, Maps, MapPreviews, Scenes
     ];
 }

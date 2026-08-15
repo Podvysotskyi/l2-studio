@@ -14,6 +14,8 @@ const props = withDefaults(
     selectedActorName?: string
     selectedBspName?: string
     actorsVisible?: boolean
+    playerStartsVisible?: boolean
+    selectedPlayerStartName?: string
     bspVisible?: boolean
     skyZoneVisible?: boolean
     skyZoneChunkVisibility?: Record<string, boolean>
@@ -30,6 +32,8 @@ const props = withDefaults(
     selectedActorName: undefined,
     selectedBspName: undefined,
     actorsVisible: true,
+    playerStartsVisible: true,
+    selectedPlayerStartName: undefined,
     bspVisible: true,
     skyZoneVisible: false,
     skyZoneChunkVisibility: () => ({}),
@@ -65,6 +69,7 @@ function setReady(value: boolean) {
 function applyVisibility() {
   preview?.setVisibility({
     actors: props.actorsVisible,
+    playerStarts: props.playerStartsVisible,
     bsp: props.bspVisible,
     skyZone: props.skyZoneVisible,
     skyZoneChunks: props.skyZoneChunkVisibility,
@@ -78,6 +83,7 @@ function applyVisibility() {
 function applySelection() {
   preview?.setSelection({
     actor: props.selectedActorName,
+    playerStart: props.selectedPlayerStartName,
     bsp: props.selectedBspName,
     light: props.selectedLightName,
     waterSurface: props.selectedWaterSurfaceName,
@@ -119,6 +125,10 @@ function focusActor(name: string) {
   preview?.focusActor(name)
 }
 
+function focusPlayerStart(name: string) {
+  preview?.focusPlayerStart(name)
+}
+
 function focusBsp(name: string) {
   preview?.focusBsp(name)
 }
@@ -153,6 +163,7 @@ function frameBsp() {
 
 defineExpose({
   focusActor,
+  focusPlayerStart,
   focusBsp,
   focusLight,
   focusWater,
@@ -179,6 +190,7 @@ watch(() => props.manifest, () => void loadMap())
 watch(
   () => [
     props.actorsVisible,
+    props.playerStartsVisible,
     props.bspVisible,
     props.skyZoneVisible,
     props.skyZoneChunkVisibility,
@@ -193,6 +205,7 @@ watch(
 watch(
   () => [
     props.selectedActorName,
+    props.selectedPlayerStartName,
     props.selectedBspName,
     props.selectedLightName,
     props.selectedWaterSurfaceName,

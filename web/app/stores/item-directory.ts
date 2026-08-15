@@ -1,0 +1,31 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { getItemDirectory } from '../services/studio-api'
+import type { ItemRecord } from '../types/models/item'
+
+export const useItemDirectoryStore = defineStore('item-directory', () => {
+  const items = ref<ItemRecord[]>([])
+  const total = ref(0)
+  const query = ref('')
+  const page = ref(1)
+  const pageSize = ref(25)
+  const loading = ref(true)
+  const error = ref<string>()
+  let requestVersion = 0
+  async function load() {
+    const version = ++requestVersion
+    loading.value = true
+    error.value = undefined
+    try {
+      const response = await getItemDirectory({ query: query.value, page: page.value, pageSize: pageSize.value })
+      if (version !== requestVersion) return
+      items.value = response.items
+      total.value = response.total
+    } catch {
+      if (version === requestVersion) error.value = 'The item directory could not be loaded from the Studio API.'
+    } finally {
+      if (version === requestVersion) loading.value = false
+    }
+  }
+  return { items, total, query, page, pageSize, loading, error, load }
+})

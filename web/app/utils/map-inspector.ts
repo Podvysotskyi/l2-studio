@@ -157,6 +157,7 @@ export function mapSkyZonePreviewManifest(
     ...manifest,
     terrains: [],
     actors: [],
+    playerStarts: [],
     lights: [],
     waterVolumes: [],
     skyZones: [skyZone],

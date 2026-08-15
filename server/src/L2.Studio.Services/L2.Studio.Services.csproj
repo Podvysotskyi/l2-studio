@@ -8,6 +8,7 @@
     <ProjectReference Include="../L2.Studio.Repositories.Interfaces/L2.Studio.Repositories.Interfaces.csproj" />
     <ProjectReference Include="../L2.Studio.Services.Interfaces/L2.Studio.Services.Interfaces.csproj" />
     <ProjectReference Include="../L2.Tools.AudioConverter/L2.Tools.AudioConverter.csproj" />
+    <ProjectReference Include="../L2.Tools.ClientData/L2.Tools.ClientData.csproj" />
     <ProjectReference Include="../L2.Tools.PackageReader/L2.Tools.PackageReader.csproj" />
     <ProjectReference Include="../L2.Tools.StaticMeshConverter/L2.Tools.StaticMeshConverter.csproj" />
     <ProjectReference Include="../L2.Tools.TextureConverter/L2.Tools.TextureConverter.csproj" />

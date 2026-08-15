@@ -64,6 +64,5 @@ public sealed class NpcLookupImportsController(INpcLookupImportRepository reposi
     }
 
     private static bool Supported(string gameVersion, string kind) =>
-        NpcLookupImportJobValues.SupportedGameVersions.Contains(gameVersion) &&
-        NpcLookupImportJobValues.SupportedKinds.Contains(kind);
+        NpcLookupImportJobValues.Supports(gameVersion, kind);
 }

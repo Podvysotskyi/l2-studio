@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.Globalization;
 using L2.Studio.Context;
 using L2.Studio.Contracts;
 using L2.Studio.Repositories.Interfaces;
@@ -28,6 +29,37 @@ public sealed class AssetCatalogRepository(
                 catalog.Items.Count, catalog.Items.LongCount(item => item.Status == "resolved"),
                 catalog.Items.LongCount(item => item.Status == "skipped"), catalog.Groups.Count, catalog.PublishedAt))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<NpcAppearanceManifestReference?> GetNpcAppearanceManifestAsync(
+        string gameVersion,
+        int npcId,
+        CancellationToken cancellationToken)
+    {
+        if (npcId < 0) return null;
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var catalog = await context.AssetCatalogs.AsNoTracking()
+            .Where(catalog => catalog.GameVersion == gameVersion &&
+                catalog.Kind == AssetImportJobValues.NpcAppearances && catalog.IsActive)
+            .Select(catalog => new { catalog.SchemaVersion, catalog.MetadataJson })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (catalog is null || catalog.SchemaVersion < 6) return null;
+
+        using var document = JsonDocument.Parse(catalog.MetadataJson);
+        var metadata = document.RootElement;
+        if (!metadata.TryGetProperty("npcManifestUrlTemplate", out var manifestUrlTemplate) ||
+            manifestUrlTemplate.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(manifestUrlTemplate.GetString()))
+            return null;
+        if (!metadata.TryGetProperty("npcIds", out var npcIds) ||
+            npcIds.ValueKind != JsonValueKind.Array)
+            return null;
+        if (!npcIds.EnumerateArray().Any(value =>
+                value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var id) && id == npcId))
+            return null;
+
+        return new NpcAppearanceManifestReference(
+            manifestUrlTemplate.GetString()!.Replace("{id}", npcId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
     }
 
     public async Task<AssetCatalogPage?> SearchAsync(

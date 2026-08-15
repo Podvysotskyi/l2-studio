@@ -5,7 +5,7 @@ namespace L2.Studio.Repositories.Interfaces.Models;
 
 public static class AssetImportSourceHash
 {
-    public const int MapPreviewRendererVersion = 8;
+    public const int MapPreviewRendererVersion = 9;
 
     public static async Task<string> FileAsync(string path, CancellationToken cancellationToken)
     {

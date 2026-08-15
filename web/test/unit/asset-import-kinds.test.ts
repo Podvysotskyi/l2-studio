@@ -13,6 +13,7 @@ describe('Asset import kinds', () => {
       'sounds',
       'staticmeshes',
       'animations',
+      'npcappearances',
       'maps',
       'mappreviews',
       'scenes'

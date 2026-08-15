@@ -187,11 +187,11 @@ public sealed partial class UnrealPackageReader
                 if (wedgeIndices.Any(index => index >= wedges.Count))
                     throw new InvalidDataException($"Skeletal mesh '{name}' has a triangle outside its wedge array.");
                 indices.Add(wedgeIndices[0]);
-                indices.Add(wedgeIndices[2]);
                 indices.Add(wedgeIndices[1]);
+                indices.Add(wedgeIndices[2]);
                 var normal = Vector3.Cross(
-                    positions[wedgeIndices[2]] - positions[wedgeIndices[0]],
-                    positions[wedgeIndices[1]] - positions[wedgeIndices[0]]);
+                    positions[wedgeIndices[1]] - positions[wedgeIndices[0]],
+                    positions[wedgeIndices[2]] - positions[wedgeIndices[0]]);
                 if (normal.LengthSquared() > 0)
                 {
                     normals[wedgeIndices[0]] += normal;
@@ -213,8 +213,12 @@ public sealed partial class UnrealPackageReader
         var pointWeights = influences.GroupBy(item => item.PointIndex).ToDictionary(
             group => group.Key,
             group => group.Where(item => item.BoneIndex < bones.Count && item.Weight > 0)
+                .GroupBy(item => item.BoneIndex)
+                .Select(bone => new RawSkeletalInfluence(
+                    bone.Sum(item => item.Weight), group.Key, bone.Key))
                 .OrderByDescending(item => item.Weight).Take(4).ToArray());
-        var weights = wedges.Select(wedge => BuildWeight(pointWeights.GetValueOrDefault(wedge.PointIndex))).ToArray();
+        var weights = wedges.Select(wedge => BuildWeight(
+            pointWeights.GetValueOrDefault(wedge.PointIndex))).ToArray();
         return new UnrealSkeletalMesh(
             name, positions, normals, coordinates, indices, weights, bones, sections,
             animation, meshScale, meshOrigin, rotationOrigin);
@@ -232,6 +236,7 @@ public sealed partial class UnrealPackageReader
             bones[index] = source[index].BoneIndex;
             weights[index] = source[index].Weight / total;
         }
+        weights[0] = 1 - weights[1] - weights[2] - weights[3];
         return new UnrealSkeletalWeight(
             bones[0], bones[1], bones[2], bones[3],
             new Vector4(weights[0], weights[1], weights[2], weights[3]));

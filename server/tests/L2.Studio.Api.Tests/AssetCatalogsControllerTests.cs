@@ -79,6 +79,19 @@ public sealed class AssetCatalogsControllerTests
     }
 
     [Fact]
+    public async Task ReturnsTheRequestedNpcAppearanceManifestReference()
+    {
+        var expected = new NpcAppearanceManifestReference("/versions/c1/npc/npcs/100/manifest.json");
+        var repository = new StubAssetCatalogRepository { NpcAppearanceManifest = expected };
+        var controller = new AssetCatalogsController(repository);
+
+        var result = await controller.GetNpcAppearanceManifest("c1", 100, CancellationToken.None);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(100, repository.NpcAppearanceId);
+    }
+
+    [Fact]
     public async Task ReturnsDiagnosticsForThePublishedCatalogItem()
     {
         var expected = new AssetCatalogDiagnosticPage(
@@ -137,6 +150,7 @@ public sealed class AssetCatalogsControllerTests
         public AssetCatalogPage? SearchResult { get; init; }
         public JsonElement? ItemResult { get; init; }
         public AssetCatalogDiagnosticPage? DiagnosticResult { get; init; }
+        public NpcAppearanceManifestReference? NpcAppearanceManifest { get; init; }
         public string? SearchKind { get; private set; }
         public string? SearchQuery { get; private set; }
         public string? SearchGroupName { get; private set; }
@@ -156,9 +170,19 @@ public sealed class AssetCatalogsControllerTests
         public int DiagnosticPage { get; private set; }
         public int DiagnosticPageSize { get; private set; }
         public CancellationToken DiagnosticToken { get; private set; }
+        public int NpcAppearanceId { get; private set; }
 
         public Task<IReadOnlyList<AssetCatalogSummary>> GetSummariesAsync(string gameVersion, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<AssetCatalogSummary>>([]);
+
+        public Task<NpcAppearanceManifestReference?> GetNpcAppearanceManifestAsync(
+            string gameVersion,
+            int npcId,
+            CancellationToken cancellationToken)
+        {
+            NpcAppearanceId = npcId;
+            return Task.FromResult(NpcAppearanceManifest);
+        }
 
         public Task<AssetCatalogPage?> SearchAsync(
             string gameVersion,

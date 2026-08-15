@@ -3,6 +3,7 @@ import type {
   AssetCatalogSummary,
   AssetArtifactDetail,
   AssetArtifactPage,
+  NpcAppearanceManifestReference,
   AssetImportKind
 } from '../types/models/asset-catalog'
 import type {
@@ -16,11 +17,19 @@ import type {
 import type {
   LookupKind,
   LookupRecord,
+  NpcImportKind,
   NpcLookupKind,
   NpcLookupRecord,
+  NpcRecord,
+  PlayerAppearanceKind,
+  PlayerAppearanceRecord,
   PlayerClassRecord
 } from '../types/models/content-directory'
-import type { DirectoryRequest } from '../types/requests/directory-request'
+import type { DirectoryRequest, NpcDirectoryRequest } from '../types/requests/directory-request'
+import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
+import type { ItemImportMode, ItemImportRun, ItemLookupKind, ItemLookupRecord, ItemPage, ItemRecord } from '../types/models/item'
+import type { SkillImportMode, SkillImportRun } from '../types/models/skill-import'
+import type { PlayerImportMode, PlayerImportRun } from '../types/models/player-import'
 import type {
   NpcPage,
   SkillPage
@@ -53,10 +62,44 @@ export function getStudioServiceInfo(): Promise<StudioServiceInfo> {
 }
 
 export function getNpcDirectory(
-  request: DirectoryRequest = {}
+  request: NpcDirectoryRequest = {}
 ): Promise<NpcPage> {
   return $fetch<NpcPage>(versionPath('/content/npcs'), {
-    query: directoryQuery(request)
+    query: npcDirectoryQuery(request)
+  })
+}
+
+export function getItemDirectory(request: { query?: string; page?: number; pageSize?: number } = {}): Promise<ItemPage> {
+  return $fetch<ItemPage>(versionPath('/content/items'), { query: request })
+}
+
+export function getItemDefinition(id: number): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`)) }
+export function updateItemDefinition(id: number, request: {
+  name: string; itemTypeName: string; itemActionName?: string | null; itemBodyPartName?: string | null
+  itemMaterialName?: string | null; itemCrystalTypeName?: string | null; icon?: string | null
+  weight?: number | null; price?: number | null; weaponType?: string | null; armorType?: string | null
+  etcItemType?: string | null; damageRange?: string | null
+}): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`), { method: 'PATCH', body: request }) }
+export function getItemLookups(kind: ItemLookupKind): Promise<ItemLookupRecord[]> { return $fetch<ItemLookupRecord[]>(versionPath(`/content/${kind}`)) }
+export function updateItemLookupDisplayName(kind: ItemLookupKind, name: string, displayName: string): Promise<ItemLookupRecord> {
+  return $fetch<ItemLookupRecord>(versionPath(`/content/${kind}/${encodeURIComponent(name)}`), { method: 'PATCH', body: { displayName } })
+}
+export function getItemImportRuns(limit = 1): Promise<ItemImportRun[]> { return $fetch<ItemImportRun[]>(versionPath('/content/items/imports'), { query: { limit } }) }
+export function startItemImport(mode?: ItemImportMode): Promise<ItemImportRun> {
+  return $fetch<ItemImportRun>(versionPath('/content/items/imports'), { method: 'POST', ...(mode ? { body: { mode } } : {}) })
+}
+
+export function getNpcDefinition(id: number): Promise<NpcRecord> {
+  return $fetch<NpcRecord>(versionPath(`/content/npcs/${id}`))
+}
+
+export function updateNpcDefinition(
+  id: number,
+  request: UpdateNpcRequest
+): Promise<NpcRecord> {
+  return $fetch<NpcRecord>(versionPath(`/content/npcs/${id}`), {
+    method: 'PATCH',
+    body: request
   })
 }
 
@@ -65,6 +108,17 @@ export function getSkillDirectory(
 ): Promise<SkillPage> {
   return $fetch<SkillPage>(versionPath('/content/skills'), {
     query: directoryQuery(request)
+  })
+}
+
+export function getSkillImportRuns(limit = 1): Promise<SkillImportRun[]> {
+  return $fetch<SkillImportRun[]>(versionPath('/content/skills/imports'), { query: { limit } })
+}
+
+export function startSkillImport(mode?: SkillImportMode): Promise<SkillImportRun> {
+  return $fetch<SkillImportRun>(versionPath('/content/skills/imports'), {
+    method: 'POST',
+    ...(mode ? { body: { mode } } : {})
   })
 }
 
@@ -88,7 +142,7 @@ export function updateNpcLookupDisplayName(
 }
 
 export function getNpcLookupImportJobs(
-  kind: NpcLookupKind,
+  kind: NpcImportKind,
   limit = 1
 ): Promise<NpcLookupImportRun[]> {
   return $fetch<NpcLookupImportRun[]>(versionPath(`/content/${kind}/imports`), {
@@ -97,14 +151,14 @@ export function getNpcLookupImportJobs(
 }
 
 export function getNpcLookupImportJob(
-  kind: NpcLookupKind,
+  kind: NpcImportKind,
   id: string
 ): Promise<NpcLookupImportRun> {
   return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports/${id}`))
 }
 
 export function startNpcLookupImport(
-  kind: NpcLookupKind,
+  kind: NpcImportKind,
   mode?: NpcLookupImportMode
 ): Promise<NpcLookupImportRun> {
   return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports`), {
@@ -117,8 +171,35 @@ export function getPlayerClasses(): Promise<PlayerClassRecord[]> {
   return $fetch<PlayerClassRecord[]>(versionPath('/content/player-classes'))
 }
 
+export function getPlayerAppearanceDirectory(
+  kind: PlayerAppearanceKind
+): Promise<PlayerAppearanceRecord[]> {
+  return $fetch<PlayerAppearanceRecord[]>(versionPath(`/content/${kind}`))
+}
+
+export function getPlayerImportRuns(limit = 1): Promise<PlayerImportRun[]> {
+  return $fetch<PlayerImportRun[]>(versionPath('/content/players/imports'), { query: { limit } })
+}
+
+export function getPlayerImportRun(id: string): Promise<PlayerImportRun> {
+  return $fetch<PlayerImportRun>(versionPath(`/content/players/imports/${id}`))
+}
+
+export function startPlayerImport(mode?: PlayerImportMode): Promise<PlayerImportRun> {
+  return $fetch<PlayerImportRun>(versionPath('/content/players/imports'), {
+    method: 'POST',
+    ...(mode ? { body: { mode } } : {})
+  })
+}
+
 export function getAssetCatalogs(): Promise<AssetCatalogSummary[]> {
   return $fetch<AssetCatalogSummary[]>(versionPath('/assets/catalogs'))
+}
+
+export async function getNpcAppearanceManifest(id: number): Promise<NpcAppearanceManifestReference> {
+  return $fetch<NpcAppearanceManifestReference>(
+    versionPath(`/assets/npcappearances/npcs/${id}/manifest`)
+  )
 }
 
 export function getAssetArtifacts(request: {
@@ -439,5 +520,19 @@ function directoryQuery(request: DirectoryRequest) {
     ...(query ? { query } : {}),
     page: request.page ?? 1,
     pageSize: request.pageSize ?? 25
+  }
+}
+
+function npcDirectoryQuery(request: NpcDirectoryRequest) {
+  const npcTypeName = request.npcTypeName?.trim()
+  const npcRaceName = request.npcRaceName?.trim()
+  const npcSexName = request.npcSexName?.trim()
+  return {
+    ...directoryQuery(request),
+    ...(npcTypeName ? { npcTypeName } : {}),
+    ...(npcRaceName ? { npcRaceName } : {}),
+    ...(request.withoutRace ? { withoutRace: true } : {}),
+    ...(npcSexName ? { npcSexName } : {}),
+    ...(request.hasVisuals !== undefined ? { hasVisuals: request.hasVisuals } : {})
   }
 }

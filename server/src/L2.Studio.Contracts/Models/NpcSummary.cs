@@ -2,6 +2,7 @@ namespace L2.Studio.Contracts;
 
 public sealed record NpcSummary(
     int Id,
+    int? AppearanceId,
     short Level,
     string? Name,
     string NpcTypeName,
@@ -9,4 +10,11 @@ public sealed record NpcSummary(
     string? NpcRaceName,
     string? NpcRaceDisplayName,
     string NpcSexName,
-    string NpcSexDisplayName);
+    string NpcSexDisplayName,
+    bool HasVisuals,
+    NpcStatusSummary? Status = null,
+    NpcStatsSummary? Stats = null,
+    NpcStatsVitalsSummary? StatsVitals = null,
+    NpcStatsAttackSummary? StatsAttack = null,
+    NpcStatsDefenceSummary? StatsDefence = null,
+    NpcStatsSpeedSummary? StatsSpeed = null);

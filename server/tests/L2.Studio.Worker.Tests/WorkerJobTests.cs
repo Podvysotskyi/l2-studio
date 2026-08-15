@@ -1,5 +1,6 @@
 using L2.Studio.Configurations;
 using L2.Studio.Context.Entities;
+using L2.Studio.Context.Identifiers;
 using L2.Studio.Repositories.Interfaces.Models;
 using L2.Studio.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,110 @@ public sealed class WorkerJobTests
         Assert.DoesNotContain(interlude.Races, item => item.Name == "NONE");
     }
 
+    [Fact]
+    public void DefinesCompleteImportableC1NpcCatalog()
+    {
+        NpcLookupCatalog catalog = new C1NpcLookupCatalog();
+
+        Assert.Equal(1893, catalog.Npcs.Count);
+        Assert.Equal(catalog.Npcs.Count, catalog.Npcs.Select(npc => npc.Id).Distinct().Count());
+        Assert.Contains(catalog.Npcs, npc => npc is
+        {
+            Id: 20003, Level: 5, Name: "Goblin", TypeName: "Monster", RaceName: "HUMANOID", SexName: "MALE"
+        });
+        Assert.Contains(catalog.Npcs, npc => npc is
+        {
+            Id: 80000, Level: 78, Name: "Evi", TypeName: "Folk", RaceName: "DARK_ELF", SexName: "FEMALE"
+        });
+        Assert.Contains(catalog.Npcs, npc => npc is
+        {
+            Id: 500, AppearanceId: 7115, Level: 85, Name: "Jurek", TypeName: "Folk", RaceName: "HUMAN", SexName: "MALE"
+        });
+        Assert.Contains(catalog.Npcs, npc => npc is
+        {
+            Id: 900100, AppearanceId: 432, Level: 1, Name: "Elpy", TypeName: "EventMonster", RaceName: null, SexName: "ETC"
+        });
+        Assert.All(catalog.Npcs, npc =>
+        {
+            Assert.InRange(npc.Level, (short)1, (short)255);
+            Assert.Contains(catalog.Types, type => type.Name == npc.TypeName);
+            if (npc.RaceName is not null) Assert.Contains(catalog.Races, race => race.Name == npc.RaceName);
+            Assert.Contains(catalog.Sexes, sex => sex.Name == npc.SexName);
+        });
+    }
+
+    [Fact]
+    public void DefinesCompleteImportableC1SkillCatalog()
+    {
+        var catalog = new C1SkillCatalog();
+
+        Assert.Equal(584, catalog.Skills.Count);
+        Assert.Equal(catalog.Skills.Count, catalog.Skills.Select(skill => skill.Id).Distinct().Count());
+        Assert.Equal(7, catalog.OperateTypes.Count);
+        Assert.Equal(27, catalog.TargetTypes.Count);
+        Assert.Contains(catalog.Skills, skill => skill is
+        {
+            Id: 1, Levels: 37, Name: "Triple Slash", Icons.Count: 37
+        });
+        Assert.Contains(catalog.Skills, skill => skill is
+        {
+            Id: 4071, Name: "Resist Archery", Icons.Count: 5
+        });
+        Assert.All(catalog.Skills, skill =>
+        {
+            Assert.InRange(skill.Levels, (short)1, (short)255);
+            Assert.All(skill.Icons, icon => Assert.InRange(icon.Level, (short)1, skill.Levels));
+        });
+    }
+
+    [Fact]
+    public void DefinesCompleteImportableC1PlayerCatalog()
+    {
+        var catalog = new C1PlayerCatalog();
+
+        Assert.Equal(5, catalog.Races.Count);
+        Assert.Equal(2, catalog.Sexes.Count);
+        Assert.Equal(89, catalog.Classes.Count);
+        Assert.Equal(30, catalog.Faces.Count);
+        Assert.Equal(60, catalog.HairStyles.Count);
+        Assert.Equal(40, catalog.HairColors.Count);
+        Assert.Contains(catalog.Classes, value => value is
+        {
+            Id: PlayerClassId.HumanFighter, RaceId: PlayerRaceId.Human, IsMage: false, ParentClassId: null
+        });
+        Assert.Contains(catalog.Classes, value => value is
+        {
+            Id: PlayerClassId.Archmage, RaceId: PlayerRaceId.Human, IsMage: true, ParentClassId: PlayerClassId.Sorcerer
+        });
+    }
+
+    [Fact]
+    public void ImportsOnlyNpcIdsMissingFromTheCatalog()
+    {
+        var definitions = new[]
+        {
+            new NpcDefinition(1, 1, 1, "Gremlin", "Monster", "FAIRY", "MALE", null),
+            new NpcDefinition(2, 2, 2, "Fox", "Monster", "ANIMAL", "MALE", null)
+        };
+
+        var missing = NpcImportHandlers.Missing(definitions, new HashSet<int> { 1, 99 });
+
+        Assert.Equal(2, Assert.Single(missing).Id);
+    }
+
+    [Fact]
+    public void IdentifiesMissingC1LookupPrerequisites()
+    {
+        var missing = NpcImportHandlers.MissingC1Lookups(
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(["HUMAN"], StringComparer.Ordinal),
+            new HashSet<string>(["MALE", "FEMALE", "ETC"], StringComparer.Ordinal));
+
+        Assert.Contains(missing, value => value.StartsWith("NPC types (", StringComparison.Ordinal));
+        Assert.Contains(missing, value => value.Contains("NPC races (ANIMAL", StringComparison.Ordinal));
+        Assert.DoesNotContain(missing, value => value.StartsWith("NPC sexes (", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("SIEGE_WEAPON", "Siege Weapon")]
     [InlineData("HUMAN", "Human")]
@@ -49,7 +154,7 @@ public sealed class WorkerJobTests
             .Where(type => type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0)
             .ToArray();
 
-        Assert.Equal(6, handlerTypes.Length);
+        Assert.Equal(10, handlerTypes.Length);
         Assert.All(handlerTypes, type => Assert.Equal("L2.Studio.Worker", type.Namespace));
         Assert.DoesNotContain(typeof(AssetImportJobProcessor).Assembly.GetTypes(), type =>
             type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0);

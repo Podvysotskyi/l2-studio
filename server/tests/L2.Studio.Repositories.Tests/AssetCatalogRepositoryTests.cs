@@ -10,6 +10,72 @@ namespace L2.Studio.Repositories.Tests;
 public sealed class AssetCatalogRepositoryTests
 {
     [Fact]
+    public async Task ReturnsTheRequestedActiveNpcAppearanceManifestReference()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            context.AssetCatalogs.Add(new AssetCatalog
+            {
+                Id = Guid.NewGuid(),
+                GameVersion = "c1",
+                Kind = "npcappearances",
+                SourceFolder = "system",
+                SourceHash = "catalog-hash",
+                SchemaVersion = 6,
+                MetadataJson = """
+                    {"npcManifestUrlTemplate":"/versions/c1/system/npcgrp/npcs/{id}/manifest.json","npcIds":[7],"npcCount":7,"resolvedReferenceCount":20,"unresolvedReferenceCount":3}
+                    """,
+                IsActive = true,
+                PublishedAt = DateTimeOffset.UnixEpoch
+            });
+            await context.SaveChangesAsync();
+        }
+        var repository = new AssetCatalogRepository(
+            new TestContextFactory(options),
+            Options.Create(new AssetImportOptions()),
+            TimeProvider.System);
+
+        var result = await repository.GetNpcAppearanceManifestAsync("c1", 7, CancellationToken.None);
+
+        Assert.Equal("/versions/c1/system/npcgrp/npcs/7/manifest.json", result?.ManifestUrl);
+
+        Assert.Null(await repository.GetNpcAppearanceManifestAsync("c1", 8, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IgnoresLegacyNpcAppearanceIndexesWithoutMaterialSlots()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            context.AssetCatalogs.Add(new AssetCatalog
+            {
+                Id = Guid.NewGuid(),
+                GameVersion = "c1",
+                Kind = "npcappearances",
+                SourceFolder = "system",
+                SourceHash = "legacy-hash",
+                SchemaVersion = 5,
+                MetadataJson = "{\"npcManifestUrlTemplate\":\"/legacy/npcs/{id}/manifest.json\",\"npcIds\":[501]}",
+                IsActive = true,
+                PublishedAt = DateTimeOffset.UnixEpoch
+            });
+            await context.SaveChangesAsync();
+        }
+        var repository = new AssetCatalogRepository(
+            new TestContextFactory(options),
+            Options.Create(new AssetImportOptions()),
+            TimeProvider.System);
+
+        Assert.Null(await repository.GetNpcAppearanceManifestAsync("c1", 501, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ReturnsDiagnosticsFromTheWorkItemThatPublishedTheDisplayedArtifact()
     {
         var options = new DbContextOptionsBuilder<GameContentDbContext>()

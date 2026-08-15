@@ -7,13 +7,14 @@ public sealed class AssetArtifactFingerprintTests
 {
     [Theory]
     [InlineData("textures", "textures:10:121")]
-    [InlineData("staticmeshes", "staticmeshes:12:112")]
-    [InlineData("animations", "animations:1:111")]
+    [InlineData("staticmeshes", "staticmeshes:14:112")]
+    [InlineData("animations", "animations:5:111")]
+    [InlineData("npcappearances", "npcappearances:7:211")]
     [InlineData("sounds", "sounds:3:111")]
     [InlineData("music", "music:5")]
-    [InlineData("maps", "maps:19:111")]
+    [InlineData("maps", "maps:20:111")]
     [InlineData("scenes", "scenes:18:111")]
-    [InlineData("mappreviews", "mappreviews:4:8")]
+    [InlineData("mappreviews", "mappreviews:4:9")]
     public void UsesCurrentManifestRecipeVersions(string kind, string expected)
     {
         Assert.Equal(expected, AssetArtifactFingerprint.RecipeVersion(kind));

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -28,7 +29,17 @@ public sealed partial class AssetImportJobProcessor
         RequireSafeSegment(packageName, "package name");
         var encrypted = await File.ReadAllBytesAsync(packagePath, cancellationToken);
         var fileHash = Convert.ToHexStringLower(SHA256.HashData(encrypted));
-        var package = new UnrealPackageReader(LineagePackageDecoder.DecodeProtocol111(encrypted)).ReadAnimationPackage();
+        var decoded = LineagePackageDecoder.DecodeProtocol111(encrypted);
+        var package = new UnrealPackageReader(decoded).ReadAnimationPackage();
+        var embeddedMaterials = new UnrealPackageReader(decoded).ReadMaterialExports()
+            .Select(material => MaterialManifest(packageName, material)).ToArray();
+        var materialReferences = package.SkeletalMeshes.SelectMany(mesh => mesh.Sections)
+            .Select(section => MaterialReference(packageName, section.Material))
+            .OfType<TextureMaterialReference>()
+            .ToArray();
+        var materialCatalog = await StaticMeshMaterialCatalogLoader.LoadAsync(
+            context, job.GameVersion, materialReferences, embeddedMaterials, cancellationToken);
+        await TrackTextureDependenciesAsync(context, job.GameVersion, materialReferences, cancellationToken);
         job.SourceHash = fileHash;
         job.TotalCount = package.SkeletalMeshes.Count;
         await context.SaveChangesAsync(cancellationToken);
@@ -40,7 +51,7 @@ public sealed partial class AssetImportJobProcessor
         Directory.CreateDirectory(stagingPath);
         try
         {
-            var warnings = new List<string>();
+            var warnings = new List<string>(materialCatalog.Warnings);
             if (package.UnsupportedVertexMeshCount > 0)
                 warnings.Add($"{fileName}: skipped {package.UnsupportedVertexMeshCount} unsupported VertMesh exports.");
             var animationByPath = package.AnimationSets.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
@@ -68,26 +79,49 @@ public sealed partial class AssetImportJobProcessor
                 RequireSafeSegment(objectName, "skeletal mesh object name");
                 var animation = ResolveAnimation(mesh.Animation, animationByPath, animationByName);
                 var skeletonSignature = SkeletonSignature(mesh.Bones.Select(item => (item.Name, item.ParentIndex)));
-                var compatible = animation is not null && skeletonSignature ==
-                    SkeletonSignature(animation.Bones.Select(item => (item.Name, item.ParentIndex)));
+                var compatibility = animation is null
+                    ? default
+                    : AnimationSkeletonCompatibility.Evaluate(
+                        mesh.Bones.Select(item => item.Name), animation.Bones.Select(item => item.Name));
+                var compatible = compatibility.IsCompatible;
+                var material = materialCatalog.Resolver.Resolve(mesh, packageName);
+                var defaultMaterials = mesh.Sections.Select((section, sectionIndex) =>
+                {
+                    var reference = MaterialReference(packageName, section.Material);
+                    return new AnimationMeshMaterialSlot(
+                        sectionIndex,
+                        reference,
+                        reference is null ? "none" : material.SectionMaterials[sectionIndex] is null ? "unresolved" : "resolved");
+                }).ToArray();
                 try
                 {
                     if (mesh.Error is not null) throw new InvalidDataException(mesh.Error);
-                    var glb = GlbSkeletalMeshEncoder.Encode(mesh);
+                    var glb = GlbSkeletalMeshEncoder.Encode(mesh, sectionMaterials: material.SectionMaterials);
                     var hash = Convert.ToHexStringLower(SHA256.HashData(glb));
                     var outputName = $"{objectName}.glb";
                     await File.WriteAllBytesAsync(Path.Combine(stagingPath, outputName), glb, cancellationToken);
                     if (animation is not null && !compatible)
-                        warnings.Add($"{fileName}/{objectName}: linked animation set '{animation.Name}' has an incompatible skeleton.");
+                    {
+                        var percentage = compatibility.AnimationBoneCount == 0
+                            ? 0
+                            : compatibility.MatchedBoneCount * 100d / compatibility.AnimationBoneCount;
+                        warnings.Add(string.Format(CultureInfo.InvariantCulture,
+                            "{0}/{1}: linked animation set '{2}' has an incompatible skeleton; " +
+                            "matched {3} of {4} animation bones ({5:0.##}%).",
+                            fileName, objectName, animation.Name, compatibility.MatchedBoneCount,
+                            compatibility.AnimationBoneCount, percentage));
+                    }
                     entries.Add(new AnimationMeshManifestEntry(
                         packageName, objectName, VersionedFileUrl(sourceFolder, outputName, hash),
                         mesh.Positions.Count, mesh.Indices.Count / 3, mesh.Sections.Count, mesh.Bones.Count,
                         skeletonSignature, compatible ? LeafName(animation!.Name) : null,
                         compatible ? animationAssets[animation!.Name].Manifest.Url : null,
                         compatible ? animation!.Clips.Select(AnimationClipManifest).ToArray() : [],
-                        mesh.Sections.Count(item => item.Material is not null),
-                        mesh.Sections.Any(item => item.Material is not null) ? "referenced" : "runtime",
+                        material.MaterialCount, material.ResolvedMaterialCount, material.Status, material.Error,
+                        defaultMaterials,
                         hash, "resolved", null, job.SourceKey));
+                    if (material.Error is not null)
+                        warnings.Add($"{fileName}/{objectName}: {material.Error}");
                 }
                 catch (InvalidDataException exception)
                 {
@@ -95,7 +129,8 @@ public sealed partial class AssetImportJobProcessor
                     entries.Add(new AnimationMeshManifestEntry(
                         packageName, objectName, null, mesh.Positions.Count, mesh.Indices.Count / 3,
                         mesh.Sections.Count, mesh.Bones.Count, skeletonSignature, null, null, [],
-                        mesh.Sections.Count(item => item.Material is not null), "unavailable", null,
+                        material.MaterialCount, material.ResolvedMaterialCount, "unavailable", material.Error,
+                        defaultMaterials, null,
                         "skipped", exception.Message, job.SourceKey));
                     job.SkippedCount++;
                 }
@@ -109,7 +144,7 @@ public sealed partial class AssetImportJobProcessor
                 package.AnimationSets.Sum(item => item.Clips.Sum(clip => clip.Notifies.Count)),
                 package.UnsupportedVertexMeshCount, job.SourceKey);
             var manifest = new AnimationManifest(
-                1, AssetImportJobValues.Animations, sourceFolder, fileHash, 111,
+                2, AssetImportJobValues.Animations, sourceFolder, fileHash, 111,
                 [packageEntry], entries, animationSets);
             await File.WriteAllTextAsync(
                 Path.Combine(stagingPath, "manifest.json"),
@@ -118,7 +153,7 @@ public sealed partial class AssetImportJobProcessor
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), fileHash, cancellationToken);
             Promote(stagingPath, finalPath);
             await PublishCatalogAsync(
-                context, job, finalPath, sourceFolder, 1, 111, [packageEntry], entries,
+                context, job, finalPath, sourceFolder, 2, 111, [packageEntry], entries,
                 group => group.Name, item => item.ObjectName, item => item.PackageName, item => item.Status,
                 new { animationSets, unsupportedVertexMeshes = package.UnsupportedVertexMeshCount }, cancellationToken);
             job.Status = warnings.Count == 0 ? AssetImportJobValues.Succeeded : AssetImportJobValues.SucceededWithWarnings;

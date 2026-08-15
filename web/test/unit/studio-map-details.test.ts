@@ -3,6 +3,20 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('Studio map details Sky Zone preview', () => {
+  it('defaults diagnostic water volumes to hidden while retaining the visibility control', async () => {
+    const component = await readFile(
+      resolve(
+        import.meta.dirname,
+        '../../app/components/pages/maps/StudioMapDetails.vue'
+      ),
+      'utf8'
+    )
+
+    expect(component).toContain('const waterVolumesVisible = ref(false)')
+    expect(component).toContain('waterVolumesVisible.value = false')
+    expect(component).toContain('v-model="waterVolumesVisible"')
+  })
+
   it('uses an isolated modal preview instead of inline Sky Zone visibility controls', async () => {
     const component = await readFile(
       resolve(

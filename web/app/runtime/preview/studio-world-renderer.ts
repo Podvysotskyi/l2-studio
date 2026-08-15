@@ -9,6 +9,7 @@ import {
   Box3,
   Box3Helper,
   Color,
+  ConeGeometry,
   DirectionalLight,
   Group,
   Mesh,
@@ -39,8 +40,8 @@ import {
   type TerrainMaterialController
 } from '../materials/terrain-material.js'
 import {
+  applyStaticMeshMaterialFallback,
   prepareStaticMeshMaterials,
-  publishedStaticMeshMaterial,
   type StaticMeshMaterialPreparation
 } from '../materials/static-mesh-material.js'
 
@@ -53,6 +54,7 @@ export interface StudioWorldRendererOptions {
 export interface StudioWorldLoadOptions {
   includeSkyZoneBsp?: boolean
   includeWorldBaseBsp?: boolean
+  includeWaterVolumes?: boolean
   failOnTerrainMaterialError?: boolean
   onMaterialError?: (message: string) => void
 }
@@ -90,6 +92,7 @@ export class StudioWorldRenderer {
   private readonly waterSurfaceMeshes: ObjectIndex = new Map()
   private readonly waterMeshes: ObjectIndex = new Map()
   private readonly lightMarkers: ObjectIndex = new Map()
+  private readonly playerStartMarkers: ObjectIndex = new Map()
   private readonly terrainMeshes: Object3D[] = []
   private readonly terrainControllers = new Map<string, TerrainMaterialController>()
   private readonly templates = new Map<string, Promise<MaterialTemplate>>()
@@ -110,6 +113,7 @@ export class StudioWorldRenderer {
   private selection?: Box3Helper
   private loadVersion = 0
   private actorsVisible = true
+  private playerStartsVisible = true
   private bspVisible = true
   private skyZoneVisible = false
   private worldBaseVisible = false
@@ -117,6 +121,7 @@ export class StudioWorldRenderer {
   private waterVolumesVisible = true
   private lightHelpersVisible = false
   private selectedActorName?: string
+  private selectedPlayerStartName?: string
   private selectedBspName?: string
   private selectedWaterSurfaceName?: string
   private selectedWaterName?: string
@@ -184,8 +189,8 @@ export class StudioWorldRenderer {
     })
   }
 
-  private updateMaterialState() {
-    const elapsed = this.timer.getElapsed()
+  private updateMaterialState(elapsedSeconds?: number) {
+    const elapsed = elapsedSeconds ?? this.timer.getElapsed()
     this.staticMeshMaterials.forEach(materials => materials.update(elapsed))
   }
 
@@ -231,7 +236,7 @@ export class StudioWorldRenderer {
           : entry.role === 'water-surface'
             ? this.materials.waterSurface
             : this.materials.bsp
-      assignDiagnosticMaterial(instance, material)
+      applyStaticMeshMaterialFallback(instance, material)
       if (entry.role === 'sky-zone') this.skyZoneMeshes.set(entry.name, objects)
       else if (entry.role === 'world-base') this.worldBaseMeshes.set(entry.name, objects)
       else if (entry.role === 'water-surface') this.waterSurfaceMeshes.set(entry.name, objects)
@@ -283,7 +288,7 @@ export class StudioWorldRenderer {
               actor.drawScale3D,
               actor.prePivot
             )
-            assignDiagnosticMaterial(instance, this.materials.actor)
+            applyStaticMeshMaterialFallback(instance, this.materials.actor)
             this.actorMeshes.set(actor.name, renderableObjects(instance))
             this.content.add(instance)
           } catch (error) {
@@ -294,9 +299,12 @@ export class StudioWorldRenderer {
       if (version !== this.loadVersion) return
     }
 
-    for (const volume of manifest.waterVolumes.filter(
-      entry => entry.status === 'resolved' && entry.meshUrl
-    )) {
+    const waterVolumes = options.includeWaterVolumes === false
+      ? []
+      : manifest.waterVolumes.filter(
+          entry => entry.status === 'resolved' && entry.meshUrl
+        )
+    for (const volume of waterVolumes) {
       const instance = await this.loadInstance(volume.meshUrl!, version)
       if (!instance) return
       applyTransform(
@@ -313,6 +321,7 @@ export class StudioWorldRenderer {
     }
 
     this.createLightMarkers(manifest)
+    this.createPlayerStartMarkers(manifest)
     this.applyVisibility()
     this.applySelection()
     if (version === this.loadVersion) this.frameMap()
@@ -359,14 +368,47 @@ export class StudioWorldRenderer {
     }
   }
 
+  private createPlayerStartMarkers(manifest: Manifest) {
+    for (const entry of mapPlayerStarts(manifest)) {
+      const marker = new Group()
+      marker.position.copy(unrealVector(entry.location)).add(new Vector3(0, 160, 0))
+      marker.renderOrder = 1
+
+      const pinMaterial = new MeshStandardMaterial({
+        color: 0x22c55e,
+        emissive: 0x14532d,
+        emissiveIntensity: 0.85,
+        depthTest: false,
+        depthWrite: false
+      })
+      const headMaterial = new MeshStandardMaterial({
+        color: 0x86efac,
+        emissive: 0x22c55e,
+        emissiveIntensity: 0.9,
+        depthTest: false,
+        depthWrite: false
+      })
+      const pin = new Mesh(new ConeGeometry(150, 320, 4), pinMaterial)
+      pin.rotation.x = Math.PI
+      const head = new Mesh(new SphereGeometry(175, 16, 12), headMaterial)
+      head.position.y = 335
+      marker.add(pin, head)
+
+      this.playerStartMarkers.set(entry.name, [marker])
+      this.content.add(marker)
+    }
+  }
+
   setSelection(selection: {
     actor?: string
+    playerStart?: string
     bsp?: string
     light?: string
     waterSurface?: string
     water?: string
   }) {
     this.selectedActorName = selection.actor
+    this.selectedPlayerStartName = selection.playerStart
     this.selectedBspName = selection.bsp
     this.selectedLightName = selection.light
     this.selectedWaterSurfaceName = selection.waterSurface
@@ -376,6 +418,7 @@ export class StudioWorldRenderer {
 
   setVisibility(visibility: {
     actors: boolean
+    playerStarts: boolean
     bsp: boolean
     skyZone: boolean
     skyZoneChunks: Record<string, boolean>
@@ -385,6 +428,7 @@ export class StudioWorldRenderer {
     lightHelpers: boolean
   }) {
     this.actorsVisible = visibility.actors
+    this.playerStartsVisible = visibility.playerStarts
     this.bspVisible = visibility.bsp
     this.skyZoneVisible = visibility.skyZone
     this.skyZoneChunkVisibility = visibility.skyZoneChunks
@@ -406,6 +450,7 @@ export class StudioWorldRenderer {
 
   private applyVisibility() {
     setIndexVisibility(this.actorMeshes, () => this.actorsVisible)
+    setIndexVisibility(this.playerStartMarkers, () => this.playerStartsVisible)
     setIndexVisibility(this.bspMeshes, () => this.bspVisible)
     setIndexVisibility(
       this.skyZoneMeshes,
@@ -446,10 +491,18 @@ export class StudioWorldRenderer {
       const selectedLight = name === this.selectedLightName
       markers.forEach(marker => marker.scale.setScalar(selectedLight ? 1.5 : 1))
     }
+    for (const [name, markers] of this.playerStartMarkers) {
+      const selectedPlayerStart = name === this.selectedPlayerStartName
+      markers.forEach(marker => marker.scale.setScalar(selectedPlayerStart ? 1.5 : 1))
+    }
   }
 
   focusActor(name: string) {
     if (this.actorsVisible) this.focus(this.actorMeshes.get(name))
+  }
+
+  focusPlayerStart(name: string) {
+    if (this.playerStartsVisible) this.focus(this.playerStartMarkers.get(name))
   }
 
   focusBsp(name: string) {
@@ -506,7 +559,7 @@ export class StudioWorldRenderer {
     this.frame([...this.bspMeshes.values()].flat(), false)
   }
 
-  async renderTopDown() {
+  async renderTopDown(animationTimeSeconds?: number) {
     const objects = this.terrainMeshes.length
       ? this.terrainMeshes
       : this.actorMeshes.size
@@ -531,11 +584,11 @@ export class StudioWorldRenderer {
     this.orthographicCamera.lookAt(center)
     this.orthographicCamera.updateProjectionMatrix()
     await this.renderer.compileAsync(this.scene, this.orthographicCamera)
-    this.timer.update()
-    this.updateMaterialState()
+    if (animationTimeSeconds === undefined) this.timer.update()
+    this.updateMaterialState(animationTimeSeconds)
     this.renderer.render(this.scene, this.orthographicCamera)
-    this.timer.update()
-    this.updateMaterialState()
+    if (animationTimeSeconds === undefined) this.timer.update()
+    this.updateMaterialState(animationTimeSeconds)
     this.renderer.render(this.scene, this.orthographicCamera)
   }
 
@@ -577,6 +630,8 @@ export class StudioWorldRenderer {
     this.waterMeshes.clear()
     this.lightMarkers.forEach(objects => disposeOwnedObjects(objects))
     this.lightMarkers.clear()
+    this.playerStartMarkers.forEach(objects => disposeOwnedObjects(objects))
+    this.playerStartMarkers.clear()
     this.terrainMeshes.length = 0
     this.terrainControllers.forEach(controller => controller.dispose())
     this.terrainControllers.clear()
@@ -653,15 +708,6 @@ function assignMaterial(root: Object3D, material: Material) {
   })
 }
 
-function assignDiagnosticMaterial(root: Object3D, material: Material) {
-  root.traverse(object => {
-    if (!(object instanceof Mesh)) return
-    const source = Array.isArray(object.material) ? object.material : [object.material]
-    if (source.some(publishedStaticMeshMaterial)) return
-    object.material = material
-  })
-}
-
 function replaceSourceMaterials(root: Object3D, replacement: Material) {
   const materials = new Set<Material>()
   root.traverse(object => {
@@ -703,6 +749,10 @@ function disposeOwnedObjects(objects: Object3D[]) {
 function setIndexVisibility(index: ObjectIndex, visible: (name: string) => boolean) {
   for (const [name, objects] of index)
     objects.forEach(object => { object.visible = visible(name) })
+}
+
+function mapPlayerStarts(manifest: Manifest) {
+  return 'playerStarts' in manifest ? manifest.playerStarts ?? [] : []
 }
 
 function boundsFor(objects: Object3D[]) {

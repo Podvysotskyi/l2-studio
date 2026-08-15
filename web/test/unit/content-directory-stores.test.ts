@@ -30,13 +30,22 @@ describe('Content directory stores', () => {
     store.query = 'Goblin'
     store.page = 2
     store.pageSize = 50
+    store.npcTypeName = 'Monster'
+    store.npcRaceName = 'HUMANOID'
+    store.npcSexName = 'MALE'
+    store.visualFilter = 'without'
 
     await store.load()
 
     expect(getNpcDirectory).toHaveBeenCalledWith({
       query: 'Goblin',
       page: 2,
-      pageSize: 50
+      pageSize: 50,
+      npcTypeName: 'Monster',
+      npcRaceName: 'HUMANOID',
+      withoutRace: undefined,
+      npcSexName: 'MALE',
+      hasVisuals: false
     })
     expect(store.items[0]?.name).toBe('Goblin')
     expect(store.total).toBe(1)
@@ -80,6 +89,7 @@ describe('Content directory stores', () => {
 function npc(name: string) {
   return {
     id: 1,
+    appearanceId: 1,
     level: 10,
     name,
     npcTypeName: 'Monster',
@@ -87,6 +97,8 @@ function npc(name: string) {
     npcRaceName: 'HUMANOID',
     npcRaceDisplayName: 'Humanoid',
     npcSexName: 'MALE',
-    npcSexDisplayName: 'Male'
+    npcSexDisplayName: 'Male',
+    hasVisuals: true,
+    status: null
   }
 }

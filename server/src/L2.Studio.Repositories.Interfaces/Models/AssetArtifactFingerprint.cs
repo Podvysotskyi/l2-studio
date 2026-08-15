@@ -22,11 +22,12 @@ public static class AssetArtifactFingerprint
     public static string RecipeVersion(string kind) => kind switch
         {
             AssetImportJobValues.Textures => "textures:10:121",
-            AssetImportJobValues.StaticMeshes => "staticmeshes:12:112",
-            AssetImportJobValues.Animations => "animations:1:111",
+            AssetImportJobValues.StaticMeshes => "staticmeshes:14:112",
+            AssetImportJobValues.Animations => "animations:5:111",
+            AssetImportJobValues.NpcAppearances => "npcappearances:7:211",
             AssetImportJobValues.Sounds => "sounds:3:111",
             AssetImportJobValues.Music => "music:5",
-            AssetImportJobValues.Maps => "maps:19:111",
+            AssetImportJobValues.Maps => "maps:20:111",
             AssetImportJobValues.Scenes => "scenes:18:111",
             AssetImportJobValues.MapPreviews => $"mappreviews:4:{AssetImportSourceHash.MapPreviewRendererVersion}",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))

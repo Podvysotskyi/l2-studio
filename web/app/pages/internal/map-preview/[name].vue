@@ -22,6 +22,12 @@ const assetBaseUrl = computed(() => {
     return ''
   }
 })
+const animationTimeSeconds = computed(() => {
+  const value = route.query.animationTimeSeconds
+  if (typeof value !== 'string') return undefined
+  const seconds = Number(value)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
+})
 </script>
 
 <template>
@@ -29,6 +35,7 @@ const assetBaseUrl = computed(() => {
     <MapPreviewCapture
       :manifest-url="manifestUrl"
       :asset-base-url="assetBaseUrl"
+      :animation-time-seconds="animationTimeSeconds"
     />
   </main>
 </template>

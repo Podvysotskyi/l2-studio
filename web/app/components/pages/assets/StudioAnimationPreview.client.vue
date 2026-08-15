@@ -2,21 +2,39 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import {
   StudioAnimationRenderer,
+  studioAnimationPreviewBackgrounds,
+  type StudioAnimationPreviewBackground,
+  type StudioAnimationMaterialBinding,
   type StudioAnimationState
 } from '~/runtime'
+import type { StaticMeshMaterialInspection } from '~/runtime/materials/static-mesh-material'
 
-const props = defineProps<{ url: string, animationUrl?: string | null }>()
-const emit = defineEmits<{ error: [message: string] }>()
+const props = defineProps<{
+  url: string
+  animationUrl?: string | null
+  materialBindings?: StudioAnimationMaterialBinding[]
+}>()
+const emit = defineEmits<{
+  error: [message: string]
+  materialWarning: [message: string | undefined]
+  materials: [materials: StaticMeshMaterialInspection[]]
+}>()
 const canvas = ref<HTMLCanvasElement>()
 const state = ref<StudioAnimationState>({ clipNames: [], duration: 0, time: 0, playing: false })
 const speed = ref(1)
+const background = ref<StudioAnimationPreviewBackground>('dark')
 let preview: StudioAnimationRenderer | undefined
 let resizeObserver: ResizeObserver | undefined
 
 async function load() {
   if (!preview) return
+  emit('materialWarning', undefined)
+  background.value = 'dark'
+  preview.setBackground(background.value)
   try {
-    await preview.load(props.url, props.animationUrl)
+    const warnings = await preview.load(props.url, props.animationUrl, props.materialBindings)
+    emit('materialWarning', warnings.length ? warnings.join(' ') : undefined)
+    emit('materials', preview.materialInspections())
   } catch (error) {
     emit('error', error instanceof Error ? error.message : 'The animation preview could not be loaded.')
   }
@@ -26,6 +44,10 @@ function selectClip(value: string) { preview?.select(value) }
 function togglePlayback() { preview?.setPlaying(!state.value.playing) }
 function seek(value: number) { preview?.seek(value) }
 function updateSpeed(value: number) { speed.value = value; preview?.setSpeed(value) }
+function setBackground(value: StudioAnimationPreviewBackground) {
+  background.value = value
+  preview?.setBackground(value)
+}
 
 onMounted(() => {
   if (!canvas.value) return
@@ -34,13 +56,32 @@ onMounted(() => {
   resizeObserver.observe(canvas.value)
   void load()
 })
-watch(() => [props.url, props.animationUrl], () => void load())
+watch(() => [props.url, props.animationUrl, props.materialBindings], () => void load(), { deep: true })
 onBeforeUnmount(() => { resizeObserver?.disconnect(); preview?.dispose() })
 </script>
 
 <template>
   <div>
-    <canvas ref="canvas" class="h-[55vh] min-h-80 w-full touch-none outline-none" />
+    <div class="relative">
+      <canvas ref="canvas" class="h-[55vh] min-h-80 w-full touch-none outline-none" />
+      <div class="absolute right-3 top-3 flex rounded-md bg-default/90 p-1 shadow-sm backdrop-blur">
+        <UButton
+          v-for="preset in studioAnimationPreviewBackgrounds"
+          :key="preset.id"
+          :aria-label="`Use ${preset.label} preview background`"
+          :title="preset.label"
+          :variant="background === preset.id ? 'soft' : 'ghost'"
+          color="neutral"
+          size="xs"
+          @click="setBackground(preset.id)"
+        >
+          <span
+            class="size-3 rounded-full border border-default"
+            :style="{ backgroundColor: `#${preset.color.toString(16).padStart(6, '0')}` }"
+          />
+        </UButton>
+      </div>
+    </div>
     <div class="space-y-3 border-t border-default p-4">
       <div class="flex flex-wrap items-center gap-3">
         <UButton

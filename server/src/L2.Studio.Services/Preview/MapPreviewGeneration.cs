@@ -10,6 +10,18 @@ internal static class MapPreviewGeneration
     public static string ComputeSourceHash(string mapCatalogSourceHash) =>
         AssetImportSourceHash.MapPreview(mapCatalogSourceHash);
 
+    public static string ArtifactFingerprint(
+        string sourceHash,
+        IEnumerable<(string Kind, string Key, string Fingerprint)> dependencies,
+        bool force,
+        Guid runId) =>
+        AssetArtifactFingerprint.Compute(
+            AssetImportJobValues.MapPreviews,
+            sourceHash,
+            force
+                ? dependencies.Append(("preview-refresh", "run", runId.ToString("N")))
+                : dependencies);
+
     public static string? RequestedMapSourceKey(string gameVersionSourcePath, string jobSourcePath)
     {
         var mapsPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(gameVersionSourcePath));

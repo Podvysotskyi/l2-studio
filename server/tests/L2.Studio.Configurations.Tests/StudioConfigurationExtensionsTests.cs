@@ -154,6 +154,7 @@ public sealed class StudioConfigurationExtensionsTests
         Assert.Same(services, result);
         Assert.Contains(services, Service<IContentDirectoryRepository, ContentDirectoryRepository>);
         Assert.Contains(services, Service<IAssetCatalogRepository, AssetCatalogRepository>);
+        Assert.Contains(services, Service<IAssetReleaseRepository, AssetReleaseRepository>);
         Assert.Contains(services, Service<IAssetImportRepository, AssetImportRepository>);
         Assert.Contains(services, Service<IAssetCatalogStore, AssetCatalogStore>);
         Assert.Contains(services, Service<GameVersionSeeder, GameVersionSeeder>);
@@ -170,6 +171,7 @@ public sealed class StudioConfigurationExtensionsTests
         services.AddStudioWorkerApplication(Configuration());
 
         Assert.DoesNotContain(services, HostedService<GameContentInitializer>);
+        Assert.Contains(services, Service<IAssetReleaseRepository, AssetReleaseRepository>);
     }
 
     [Fact]

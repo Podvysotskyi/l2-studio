@@ -162,6 +162,10 @@ export interface StaticMeshMaterialInspection {
   unlit: boolean
   clampU: boolean
   clampV: boolean
+  panRate: number
+  panRateV: number
+  rotationRate: number
+  uvOscillation?: PublishedUvOscillation
   enabled: boolean
   textures: StaticMeshTextureInspection[]
   behaviors: StaticMeshMaterialBehaviorInspection[]
@@ -344,6 +348,20 @@ export function publishedStaticMeshMaterial(material: Material) {
     : undefined
 }
 
+export function applyStaticMeshMaterialFallback(
+  root: Object3D,
+  fallback: Material
+) {
+  root.traverse(object => {
+    if (!(object instanceof Mesh)) return
+    const source = Array.isArray(object.material)
+      ? object.material
+      : [object.material]
+    if (source.some(publishedStaticMeshMaterial)) return
+    object.material = fallback
+  })
+}
+
 async function createMaterial(
   source: Material,
   definition: PublishedStaticMeshMaterial,
@@ -434,26 +452,44 @@ function injectVertexShader(source: string, material: PublishedStaticMeshMateria
 uniform float l2Time;
 uniform float l2UvEffectsEnabled;
 uniform float l2WindEnabled;
-varying vec2 vL2Uv;
-float l2Oscillation(float kind, float rate, float amplitude, float phase) {
-  float value = l2Time * rate + phase;
-  return kind == 1.0 ? fract(value) * amplitude : sin(value) * amplitude;
-}`
+varying vec2 vL2Uv;`
   const oscillation = material.uvOscillation
   const panU = finite(material.panRate)
   const panV = finite(material.panRateV)
   const rotation = finite(material.rotationRate)
   const wind = material.windMode
+  const oscillationTransform = oscillation
+    ? `float l2UOscillation = sin(6.28318530718 * (l2Time * ${glsl(oscillation.uRate)} + ${glsl(oscillation.uPhase)})) * ${glsl(oscillation.uAmplitude)};
+float l2VOscillation = sin(6.28318530718 * (l2Time * ${glsl(oscillation.vRate)} + ${glsl(oscillation.vPhase)})) * ${glsl(oscillation.vAmplitude)};
+${uvOscillationAxis('x', 'l2UOscillation', oscillation.uType)}
+${uvOscillationAxis('y', 'l2VOscillation', oscillation.vType)}`
+    : ''
   return source
     .replace('void main() {', `${header}\nvoid main() {`)
     .replace('#include <uv_vertex>', `#include <uv_vertex>
 vL2Uv = uv;
 float l2UvTime = l2Time * l2UvEffectsEnabled;
-vL2Uv += vec2(${glsl(panU)} * l2UvTime, ${glsl(panV)} * l2UvTime);
-${oscillation ? `vL2Uv += vec2(l2Oscillation(${glsl(oscillation.uType)}, ${glsl(oscillation.uRate)}, ${glsl(oscillation.uAmplitude)}, ${glsl(oscillation.uPhase)}), l2Oscillation(${glsl(oscillation.vType)}, ${glsl(oscillation.vRate)}, ${glsl(oscillation.vAmplitude)}, ${glsl(oscillation.vPhase)})) * l2UvEffectsEnabled;` : ''}
-${rotation ? `vL2Uv -= 0.5; vL2Uv = mat2(cos(l2UvTime * ${glsl(rotation)}), -sin(l2UvTime * ${glsl(rotation)}), sin(l2UvTime * ${glsl(rotation)}), cos(l2UvTime * ${glsl(rotation)})) * vL2Uv; vL2Uv += 0.5;` : ''}`)
+vec2 l2UvOffset = vec2(${glsl(panU)}, ${glsl(panV)}) * l2UvTime;
+vec2 l2UvScale = vec2(1.0);
+${oscillationTransform}
+vL2Uv = (vL2Uv - vec2(0.5)) * l2UvScale + vec2(0.5) + l2UvOffset;
+${rotation ? `vL2Uv -= vec2(0.5); vL2Uv = mat2(cos(l2UvTime * ${glsl(rotation)}), -sin(l2UvTime * ${glsl(rotation)}), sin(l2UvTime * ${glsl(rotation)}), cos(l2UvTime * ${glsl(rotation)})) * vL2Uv; vL2Uv += vec2(0.5);` : ''}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>
 ${wind ? `float l2Wind = sin(l2Time * ${wind === 'grass' ? '2.8' : '1.4'} + position.x * 0.025 + position.z * 0.018) * ${wind === 'grass' ? '0.16' : '0.06'} * l2WindEnabled; transformed.x += l2Wind * max(position.y, 0.0); transformed.z += l2Wind * 0.45 * max(position.y, 0.0);` : ''}`)
+}
+
+function uvOscillationAxis(
+  axis: 'x' | 'y',
+  value: string,
+  type: number
+) {
+  if (type === 0)
+    return `l2UvOffset.${axis} += ${value} * l2UvEffectsEnabled;`
+  if (type === 1)
+    return `l2UvScale.${axis} = max(0.001, 1.0 + ${value} * l2UvEffectsEnabled);`
+  if (type === 2)
+    return `l2UvScale.${axis} = max(0.001, 1.0 + abs(${value}) * l2UvEffectsEnabled);`
+  return ''
 }
 
 function injectFragmentShader(source: string, material: PublishedStaticMeshMaterial) {
@@ -648,6 +684,10 @@ function inspections(managed: ManagedMaterial[]) {
     unlit: entry.definition.unlit === true,
     clampU: entry.definition.clampU === true,
     clampV: entry.definition.clampV === true,
+    panRate: finite(entry.definition.panRate),
+    panRateV: finite(entry.definition.panRateV),
+    rotationRate: finite(entry.definition.rotationRate),
+    uvOscillation: entry.definition.uvOscillation ?? undefined,
     enabled: entry.controls.material,
     textures: textureRoles
       .map(role => textureInspection(entry, role))

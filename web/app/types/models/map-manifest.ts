@@ -104,6 +104,12 @@ export interface MapActorManifestEntry {
   vertexLighting: MapVertexLightingReference | null
 }
 
+export interface MapPlayerStartManifestEntry {
+  name: string
+  location: MapVector
+  rotation: MapRotation
+}
+
 export interface MapVertexLightingReference {
   url: string
   textureWidth: number
@@ -198,6 +204,7 @@ export interface MapManifest {
   environment: MapEnvironmentManifestEntry
   terrains: MapTerrainManifestEntry[]
   actors: MapActorManifestEntry[]
+  playerStarts?: MapPlayerStartManifestEntry[]
   lights: MapLightManifestEntry[]
   waterVolumes: MapWaterVolumeManifestEntry[]
   skyZones: SkyZoneManifestEntry[]

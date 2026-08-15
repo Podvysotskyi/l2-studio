@@ -7,16 +7,19 @@ public abstract partial class NpcLookupCatalog
     protected NpcLookupCatalog(
         IEnumerable<string> typeNames,
         IEnumerable<string> raceNames,
-        IEnumerable<string>? sexNames = null)
+        IEnumerable<string>? sexNames = null,
+        IEnumerable<NpcDefinition>? npcDefinitions = null)
     {
         Types = Definitions(typeNames);
         Races = Definitions(raceNames);
         Sexes = Definitions(sexNames ?? ["MALE", "FEMALE", "ETC"]);
+        Npcs = (npcDefinitions ?? []).ToArray();
     }
 
     public IReadOnlyList<NpcLookupDefinition> Types { get; }
     public IReadOnlyList<NpcLookupDefinition> Races { get; }
     public IReadOnlyList<NpcLookupDefinition> Sexes { get; }
+    public IReadOnlyList<NpcDefinition> Npcs { get; }
 
     public static string FriendlyName(string sourceName)
     {

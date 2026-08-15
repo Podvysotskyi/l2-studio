@@ -7,6 +7,7 @@ import { nextTick, onBeforeUnmount, onMounted } from 'vue'
 const props = defineProps<{
   manifestUrl: string
   assetBaseUrl?: string
+  animationTimeSeconds?: number
 }>()
 const canvas = ref<HTMLCanvasElement>()
 let preview: StudioWorldRenderer | undefined
@@ -41,19 +42,21 @@ onMounted(async () => {
     await preview.loadManifest(manifest, {
       includeSkyZoneBsp: false,
       includeWorldBaseBsp: false,
+      includeWaterVolumes: false,
       failOnTerrainMaterialError: true
     })
     preview.setVisibility({
       actors: true,
+      playerStarts: false,
       bsp: true,
       skyZone: false,
       skyZoneChunks: {},
       worldBase: false,
       waterSurfaces: true,
-      waterVolumes: true,
+      waterVolumes: false,
       lightHelpers: false
     })
-    await preview.renderTopDown()
+    await preview.renderTopDown(props.animationTimeSeconds)
     publish({ status: 'ready' })
   } catch (error) {
     publish({

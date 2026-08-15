@@ -14,13 +14,25 @@ describe('Studio navigation', () => {
       'Players',
       'NPCs',
       'Skills',
+      'Items',
       'Asset library',
       'Pipeline'
     ])
     expect(group('Players').children?.map(item => item.label)).toEqual([
       'Classes',
       'Races',
-      'Sexes'
+      'Sexes',
+      'Faces',
+      'Hair styles',
+      'Hair colors'
+    ])
+    expect(group('Items').children?.map(item => item.label)).toEqual([
+      'Definitions',
+      'Types',
+      'Actions',
+      'Body parts',
+      'Materials',
+      'Crystal types'
     ])
     expect(group('Asset library').children?.map(item => item.label)).toEqual([
       'Textures',
@@ -42,7 +54,9 @@ describe('Studio navigation', () => {
     const routes = navigationRoutes(studioNavigation)
 
     expect(routes).toContain('/authoring/players/classes')
+    expect(routes).toContain('/authoring/players/hair-styles')
     expect(routes).toContain('/authoring/npcs')
+    expect(routes).toContain('/authoring/items')
     expect(routes).toContain('/authoring/skills/target-types')
     expect(routes).toContain('/library/static-meshes')
     expect(routes).toContain('/library/animations')
@@ -62,6 +76,8 @@ describe('Studio navigation', () => {
       .toBe(studioNavigationGroups.players)
     expect(studioRouteGroup('/authoring/npcs/races'))
       .toBe(studioNavigationGroups.npcs)
+    expect(studioRouteGroup('/authoring/items/materials'))
+      .toBe(studioNavigationGroups.items)
     expect(studioRouteGroup('/authoring/skills'))
       .toBe(studioNavigationGroups.skills)
     expect(studioRouteGroup('/library/maps/17_25'))
@@ -88,8 +104,11 @@ describe('Studio navigation', () => {
 
   it('provides titles for canonical list and detail routes', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
+    expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
+    expect(studioRouteTitle('/authoring/items/1')).toBe('Item definition')
     expect(studioRouteTitle('/authoring/skills/operate-types'))
       .toBe('Skill operate types')
+    expect(studioRouteTitle('/authoring/players/hair-colors')).toBe('Player hair colors')
     expect(studioRouteTitle('/library/maps')).toBe('Maps')
     expect(studioRouteTitle('/library/maps/17_25')).toBe('Map')
     expect(studioRouteTitle('/library/scenes/lobby')).toBe('Client scene')

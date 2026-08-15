@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using L2.Tools.PackageReader;
 
 namespace L2.Tools.StaticMeshConverter;
@@ -11,11 +12,16 @@ public static class GlbSkeletalMeshEncoder
     private const uint GlbMagic = 0x46546c67;
     private const uint JsonChunkType = 0x4e4f534a;
     private const uint BinaryChunkType = 0x004e4942;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public static byte[] Encode(
         UnrealSkeletalMesh mesh,
         UnrealMeshAnimation? animation = null,
-        IReadOnlyDictionary<string, UnrealAnimationClip>? clips = null)
+        IReadOnlyDictionary<string, UnrealAnimationClip>? clips = null,
+        IReadOnlyList<StaticMeshMaterialBinding?>? sectionMaterials = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         if (mesh.Positions.Count == 0 || mesh.Indices.Count == 0 || mesh.Bones.Count == 0)
@@ -61,19 +67,19 @@ public static class GlbSkeletalMeshEncoder
             return accessor;
         }
 
-        var convertedPositions = mesh.Positions.Select(ConvertVector).ToArray();
+        var convertedPositions = mesh.Positions.Select(UnrealGltfTransform.Position).ToArray();
         var positions = AddAccessor(
             convertedPositions, WriteVector3, 12, 5126, "VEC3", 34962,
             minimum: [convertedPositions.Min(v => v.X), convertedPositions.Min(v => v.Y), convertedPositions.Min(v => v.Z)],
             maximum: [convertedPositions.Max(v => v.X), convertedPositions.Max(v => v.Y), convertedPositions.Max(v => v.Z)]);
-        var normals = AddAccessor(mesh.Normals.Select(ConvertVector), WriteVector3, 12, 5126, "VEC3", 34962);
+        var normals = AddAccessor(mesh.Normals.Select(UnrealGltfTransform.Direction), WriteVector3, 12, 5126, "VEC3", 34962);
         var texCoords = AddAccessor(mesh.TextureCoordinates, WriteVector2, 8, 5126, "VEC2", 34962);
         var joints = AddAccessor(mesh.Weights, WriteJoints, 8, 5123, "VEC4", 34962);
         var weights = AddAccessor(mesh.Weights.Select(item => item.Weights), WriteVector4, 16, 5126, "VEC4", 34962);
         var indexBufferView = views.Count;
         var indices = AddAccessor(mesh.Indices, WriteUInt32, 4, 5125, "SCALAR", 34963);
 
-        var localTransforms = mesh.Bones.Select(BoneTransform).ToArray();
+        var localTransforms = mesh.Bones.Select((bone, index) => BoneTransform(bone, index == 0)).ToArray();
         var globalTransforms = new Matrix4x4[localTransforms.Length];
         for (var index = 0; index < localTransforms.Length; index++)
         {
@@ -82,8 +88,7 @@ public static class GlbSkeletalMeshEncoder
                 ? localTransforms[index] * globalTransforms[parent]
                 : localTransforms[index];
         }
-        var inverses = globalTransforms.Select(value =>
-            Matrix4x4.Invert(value, out var inverse) ? inverse : Matrix4x4.Identity).ToArray();
+        var inverses = globalTransforms.Select(InverseBindMatrix).ToArray();
         var inverseBinds = AddAccessor(inverses, WriteMatrix, 64, 5126, "MAT4");
 
         var nodes = new List<object>();
@@ -92,8 +97,8 @@ public static class GlbSkeletalMeshEncoder
             var bone = mesh.Bones[index];
             var children = Enumerable.Range(0, mesh.Bones.Count)
                 .Where(child => child != index && mesh.Bones[child].ParentIndex == index).ToArray();
-            var position = ConvertVector(bone.Position);
-            var rotation = ConvertQuaternion(bone.Orientation);
+            var position = UnrealGltfTransform.Position(bone.Position);
+            var rotation = UnrealGltfTransform.Rotation(bone.Orientation, index == 0);
             nodes.Add(new
             {
                 name = bone.Name,
@@ -107,9 +112,16 @@ public static class GlbSkeletalMeshEncoder
         var roots = Enumerable.Range(0, mesh.Bones.Count)
             .Where(index => mesh.Bones[index].ParentIndex < 0 || mesh.Bones[index].ParentIndex == index).ToArray();
 
-        var primitives = mesh.Sections.Count == 0
-            ? [new { attributes = new { POSITION = positions, NORMAL = normals, TEXCOORD_0 = texCoords, JOINTS_0 = joints, WEIGHTS_0 = weights }, indices }]
-            : mesh.Sections.Select(section =>
+        var materialEncoder = new GltfMaterialEncoder();
+        var attributes = new { POSITION = positions, NORMAL = normals, TEXCOORD_0 = texCoords, JOINTS_0 = joints, WEIGHTS_0 = weights };
+        var primitives = new List<object>();
+        if (mesh.Sections.Count == 0)
+        {
+            primitives.Add(new Dictionary<string, object> { ["attributes"] = attributes, ["indices"] = indices });
+        }
+        else
+        {
+            foreach (var (section, sectionIndex) in mesh.Sections.Select((value, index) => (value, index)))
             {
                 var accessor = accessors.Count;
                 accessors.Add(new
@@ -123,8 +135,19 @@ public static class GlbSkeletalMeshEncoder
                     min = (float[]?)null,
                     max = (float[]?)null
                 });
-                return new { attributes = new { POSITION = positions, NORMAL = normals, TEXCOORD_0 = texCoords, JOINTS_0 = joints, WEIGHTS_0 = weights }, indices = accessor };
-            }).ToArray();
+                var primitive = new Dictionary<string, object>
+                {
+                    ["attributes"] = attributes,
+                    ["indices"] = accessor
+                };
+                if (sectionMaterials is not null && sectionIndex < sectionMaterials.Count &&
+                    sectionMaterials[sectionIndex] is { } binding)
+                {
+                    primitive["material"] = materialEncoder.Add(binding);
+                }
+                primitives.Add(primitive);
+            }
+        }
 
         var gltfAnimations = new List<object>();
         foreach (var clip in includedClips)
@@ -134,8 +157,10 @@ public static class GlbSkeletalMeshEncoder
             for (var boneIndex = 0; boneIndex < mesh.Bones.Count && boneIndex < clip.Tracks.Count; boneIndex++)
             {
                 var track = clip.Tracks[boneIndex];
-                AddAnimationChannel(track.Rotations, track.Times, clip, boneIndex, "rotation", ConvertAnimationQuaternion, WriteVector4, 16, "VEC4");
-                AddAnimationChannel(track.Translations, track.Times, clip, boneIndex, "translation", ConvertVector, WriteVector3, 12, "VEC3");
+                AddAnimationChannel(track.Rotations, track.Times, clip, boneIndex, "rotation",
+                    value => ConvertAnimationQuaternion(value, boneIndex == 0), WriteVector4, 16, "VEC4");
+                AddAnimationChannel(track.Translations, track.Times, clip, boneIndex, "translation",
+                    UnrealGltfTransform.Position, WriteVector3, 12, "VEC3");
             }
             gltfAnimations.Add(new { name = clip.Name, samplers, channels });
 
@@ -151,7 +176,7 @@ public static class GlbSkeletalMeshEncoder
                 string type)
             {
                 if (keys.Count == 0) return;
-                var times = Timeline(keys.Count, keyTimes, sourceClip.FrameCount, sourceClip.FrameRate);
+                var times = Timeline(keys.Count, keyTimes, sourceClip.FrameRate);
                 var input = AddAccessor(times, WriteSingle, 4, 5126, "SCALAR",
                     minimum: [times[0]], maximum: [times[^1]]);
                 var output = AddAccessor(keys.Select(convert), write, elementSize, 5126, type);
@@ -161,42 +186,56 @@ public static class GlbSkeletalMeshEncoder
             }
         }
 
-        var document = new
+        var document = new Dictionary<string, object?>
         {
-            asset = new { version = "2.0", generator = "L2 Studio skeletal converter" },
-            scene = 0,
-            scenes = new[] { new { nodes = roots.Append(meshNode).ToArray() } },
-            nodes,
-            meshes = new[] { new { name = mesh.Name, primitives } },
-            skins = new[] { new { inverseBindMatrices = inverseBinds, joints = Enumerable.Range(0, mesh.Bones.Count).ToArray(), skeleton = roots.FirstOrDefault() } },
-            animations = gltfAnimations.Count == 0 ? null : gltfAnimations,
-            accessors,
-            bufferViews = views,
-            buffers = new[] { new { byteLength = (int)binary.Length } }
+            ["asset"] = new { version = "2.0", generator = "L2 Studio skeletal converter" },
+            ["scene"] = 0,
+            ["scenes"] = new[] { new { nodes = roots.Append(meshNode).ToArray() } },
+            ["nodes"] = nodes,
+            ["meshes"] = new[] { new { name = mesh.Name, primitives } },
+            ["skins"] = new[] { new { inverseBindMatrices = inverseBinds, joints = Enumerable.Range(0, mesh.Bones.Count).ToArray(), skeleton = roots.FirstOrDefault() } },
+            ["accessors"] = accessors,
+            ["bufferViews"] = views,
+            ["buffers"] = new[] { new { byteLength = (int)binary.Length } }
         };
-        return BuildGlb(JsonSerializer.SerializeToUtf8Bytes(document), binary.ToArray());
+        if (gltfAnimations.Count > 0) document["animations"] = gltfAnimations;
+        if (materialEncoder.Materials.Count > 0)
+        {
+            document["materials"] = materialEncoder.Materials;
+            document["samplers"] = materialEncoder.Samplers;
+            document["images"] = materialEncoder.Images;
+            document["textures"] = materialEncoder.Textures;
+        }
+        return BuildGlb(JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions), binary.ToArray());
     }
 
     private static bool SkeletonMatches(UnrealSkeletalMesh mesh, UnrealMeshAnimation animation) =>
         mesh.Bones.Count == animation.Bones.Count && mesh.Bones.Select(item => item.Name)
             .SequenceEqual(animation.Bones.Select(item => item.Name), StringComparer.OrdinalIgnoreCase);
 
-    private static float[] Timeline(int count, IReadOnlyList<float> times, int frames, float rate)
+    private static float[] Timeline(int count, IReadOnlyList<float> times, float rate)
     {
         if (times.Count == count) return times.Select(value => rate > 0 ? value / rate : value).ToArray();
-        if (count == 1) return [0];
-        var duration = rate > 0 ? frames / rate : frames;
-        return Enumerable.Range(0, count).Select(index => duration * index / (count - 1)).ToArray();
+        return Enumerable.Range(0, count).Select(index => rate > 0 ? index / rate : index).ToArray();
     }
 
-    private static Matrix4x4 BoneTransform(UnrealSkeletalBone bone) =>
-        Matrix4x4.CreateFromQuaternion(ConvertQuaternion(bone.Orientation)) * Matrix4x4.CreateTranslation(ConvertVector(bone.Position));
+    private static Matrix4x4 BoneTransform(UnrealSkeletalBone bone, bool conjugateRoot) =>
+        Matrix4x4.CreateFromQuaternion(UnrealGltfTransform.Rotation(bone.Orientation, conjugateRoot)) *
+        Matrix4x4.CreateTranslation(UnrealGltfTransform.Position(bone.Position));
 
-    private static Vector3 ConvertVector(Vector3 value) => new(value.X, value.Z, -value.Y);
-    private static Quaternion ConvertQuaternion(Quaternion value) => Quaternion.Normalize(new(value.X, value.Z, -value.Y, value.W));
-    private static Vector4 ConvertAnimationQuaternion(Quaternion value)
+    private static Matrix4x4 InverseBindMatrix(Matrix4x4 value)
     {
-        var converted = ConvertQuaternion(value);
+        var inverse = Matrix4x4.Invert(value, out var result) ? result : Matrix4x4.Identity;
+        inverse.M14 = 0;
+        inverse.M24 = 0;
+        inverse.M34 = 0;
+        inverse.M44 = 1;
+        return inverse;
+    }
+
+    private static Vector4 ConvertAnimationQuaternion(Quaternion value, bool conjugateRoot)
+    {
+        var converted = UnrealGltfTransform.Rotation(value, conjugateRoot);
         return new Vector4(converted.X, converted.Y, converted.Z, converted.W);
     }
 

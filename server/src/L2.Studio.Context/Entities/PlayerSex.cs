@@ -4,7 +4,7 @@ namespace L2.Studio.Context.Entities;
 
 public sealed class PlayerSex
 {
-    public string GameVersion { get; set; } = "interlude";
+    public required string GameVersion { get; set; }
     public PlayerSexId Id { get; set; }
     public required string Name { get; set; }
     public ICollection<PlayerClass> PlayerClasses { get; set; } = [];

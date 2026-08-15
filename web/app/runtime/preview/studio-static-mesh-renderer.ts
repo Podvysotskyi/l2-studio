@@ -19,6 +19,11 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { loadPublishedGltf } from '../core/published-gltf.js'
 import {
+  studioPreviewBackgroundColor,
+  studioPreviewBackgrounds,
+  type StudioPreviewBackground
+} from './studio-preview-background.js'
+import {
   prepareStaticMeshMaterials,
   type StaticMeshMaterialBehavior,
   type StaticMeshMaterialInspection,
@@ -26,14 +31,9 @@ import {
   type StaticMeshTextureRole
 } from '../materials/static-mesh-material.js'
 
-export const studioStaticMeshPreviewBackgrounds = [
-  { id: 'dark', label: 'Dark slate', color: 0x09101d },
-  { id: 'neutral', label: 'Neutral gray', color: 0x6b7280 },
-  { id: 'light', label: 'Warm light', color: 0xe4e1da }
-] as const
+export const studioStaticMeshPreviewBackgrounds = studioPreviewBackgrounds
 
-export type StudioStaticMeshPreviewBackground =
-  (typeof studioStaticMeshPreviewBackgrounds)[number]['id']
+export type StudioStaticMeshPreviewBackground = StudioPreviewBackground
 
 export const studioStaticMeshMaterialOptions = {
   color: 0xaab7c8,
@@ -72,7 +72,7 @@ export class StudioStaticMeshRenderer {
     this.timer.connect(document)
     this.renderer = new WebGLRenderer({ canvas, antialias: true })
     this.renderer.outputColorSpace = SRGBColorSpace
-    this.renderer.setClearColor(0x09101d, 1)
+    this.renderer.setClearColor(studioPreviewBackgroundColor('dark'), 1)
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.scene.add(new AmbientLight(0xffffff, 1.4))
     const light = new DirectionalLight(0xffffff, 2)
@@ -99,9 +99,7 @@ export class StudioStaticMeshRenderer {
   }
 
   setBackground(background: StudioStaticMeshPreviewBackground) {
-    const preset = studioStaticMeshPreviewBackgrounds.find(item => item.id === background)
-      ?? studioStaticMeshPreviewBackgrounds[0]
-    this.renderer.setClearColor(preset.color, 1)
+    this.renderer.setClearColor(studioPreviewBackgroundColor(background), 1)
   }
 
   materialInspections(): StaticMeshMaterialInspection[] {

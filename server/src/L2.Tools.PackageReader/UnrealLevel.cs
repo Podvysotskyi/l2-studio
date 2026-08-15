@@ -13,8 +13,10 @@ public sealed record UnrealLevel(
     UnrealLevelSummary? Summary = null,
     string? SummaryWarning = null,
     IReadOnlyList<UnrealBspModel>? BspModelData = null,
-    IReadOnlyList<UnrealSkyZoneInfo>? SkyZoneData = null)
+    IReadOnlyList<UnrealSkyZoneInfo>? SkyZoneData = null,
+    IReadOnlyList<UnrealPlayerStart>? PlayerStartData = null)
 {
     public IReadOnlyList<UnrealBspModel> BspModels { get; } = BspModelData ?? [];
     public IReadOnlyList<UnrealSkyZoneInfo> SkyZones { get; } = SkyZoneData ?? [];
+    public IReadOnlyList<UnrealPlayerStart> PlayerStarts { get; } = PlayerStartData ?? [];
 }

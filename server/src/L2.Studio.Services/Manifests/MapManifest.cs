@@ -10,6 +10,7 @@ internal sealed record MapManifest(
     MapEnvironmentManifestEntry Environment,
     IReadOnlyList<MapTerrainManifestEntry> Terrains,
     IReadOnlyList<MapActorManifestEntry> Actors,
+    IReadOnlyList<MapPlayerStartManifestEntry> PlayerStarts,
     IReadOnlyList<MapLightManifestEntry> Lights,
     IReadOnlyList<MapWaterVolumeManifestEntry> WaterVolumes,
     IReadOnlyList<SkyZoneManifestEntry> SkyZones,

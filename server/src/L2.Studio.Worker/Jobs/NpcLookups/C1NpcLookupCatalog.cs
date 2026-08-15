@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace L2.Studio.Worker;
 
-public sealed class C1NpcLookupCatalog() : NpcLookupCatalog(
+public sealed partial class C1NpcLookupCatalog() : NpcLookupCatalog(
     typeNames:
     [
         "Artefact", "Auctioneer", "CastleDoorman", "ClanHallDoorman", "ClanHallManager",
@@ -17,4 +17,5 @@ public sealed class C1NpcLookupCatalog() : NpcLookupCatalog(
         "HUMAN", "ELF", "DARK_ELF", "ORC", "DWARF", "ANIMAL", "BEAST", "BUG",
         "CASTLE_GUARD", "CONSTRUCT", "DEMONIC", "DRAGON", "ELEMENTAL", "ETC", "FAIRY",
         "GIANT", "HUMANOID", "MERCENARY", "PLANT", "SIEGE_WEAPON", "UNDEAD"
-    ]);
+    ],
+    npcDefinitions: Definitions);

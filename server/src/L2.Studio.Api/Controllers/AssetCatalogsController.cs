@@ -15,6 +15,16 @@ public sealed class AssetCatalogsController(IAssetCatalogRepository repository) 
     [HttpGet("catalogs")]
     public Task<IReadOnlyList<AssetCatalogSummary>> GetSummaries(string gameVersion, CancellationToken token) => repository.GetSummariesAsync(gameVersion, token);
 
+    [HttpGet("npcappearances/npcs/{npcId:int}/manifest")]
+    public async Task<ActionResult<NpcAppearanceManifestReference>> GetNpcAppearanceManifest(
+        string gameVersion,
+        int npcId,
+        CancellationToken token)
+    {
+        var result = await repository.GetNpcAppearanceManifestAsync(gameVersion, npcId, token);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpGet("artifacts")]
     public async Task<ActionResult<AssetArtifactPage>> GetArtifacts(
         string gameVersion,

@@ -3,6 +3,7 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 export const studioNavigationGroups = {
   players: 'players',
   npcs: 'npcs',
+  items: 'items',
   skills: 'skills',
   library: 'library',
   pipeline: 'pipeline'
@@ -45,6 +46,21 @@ export const studioNavigation: NavigationMenuItem[] = [
         label: 'Sexes',
         icon: 'i-lucide-tags',
         to: '/authoring/players/sexes'
+      },
+      {
+        label: 'Faces',
+        icon: 'i-lucide-smile',
+        to: '/authoring/players/faces'
+      },
+      {
+        label: 'Hair styles',
+        icon: 'i-lucide-scan-face',
+        to: '/authoring/players/hair-styles'
+      },
+      {
+        label: 'Hair colors',
+        icon: 'i-lucide-palette',
+        to: '/authoring/players/hair-colors'
       }
     ]
   },
@@ -95,6 +111,19 @@ export const studioNavigation: NavigationMenuItem[] = [
         icon: 'i-lucide-crosshair',
         to: '/authoring/skills/target-types'
       }
+    ]
+  },
+  {
+    label: 'Items',
+    value: studioNavigationGroups.items,
+    icon: 'i-lucide-swords',
+    children: [
+      { label: 'Definitions', icon: 'i-lucide-list', to: '/authoring/items' },
+      { label: 'Types', icon: 'i-lucide-workflow', to: '/authoring/items/types' },
+      { label: 'Actions', icon: 'i-lucide-play', to: '/authoring/items/actions' },
+      { label: 'Body parts', icon: 'i-lucide-shirt', to: '/authoring/items/body-parts' },
+      { label: 'Materials', icon: 'i-lucide-gem', to: '/authoring/items/materials' },
+      { label: 'Crystal types', icon: 'i-lucide-sparkles', to: '/authoring/items/crystal-types' }
     ]
   },
   {
@@ -180,6 +209,7 @@ export function studioRouteGroup(path: string): StudioNavigationGroup | undefine
   if (path.startsWith('/authoring/players/')) return studioNavigationGroups.players
   if (path === '/authoring/npcs' || path.startsWith('/authoring/npcs/'))
     return studioNavigationGroups.npcs
+  if (path === '/authoring/items' || path.startsWith('/authoring/items/')) return studioNavigationGroups.items
   if (path === '/authoring/skills' || path.startsWith('/authoring/skills/'))
     return studioNavigationGroups.skills
   if (path.startsWith('/library/')) return studioNavigationGroups.library
@@ -201,12 +231,23 @@ export function withStudioRouteGroup(
 export function studioRouteTitle(path: string) {
   if (path === '/') return 'Dashboard'
   if (path === '/authoring/npcs') return 'NPC definitions'
+  if (/^\/authoring\/npcs\/\d+$/.test(path)) return 'NPC definition'
   if (path === '/authoring/npcs/races') return 'NPC races'
   if (path === '/authoring/npcs/sexes') return 'NPC sexes'
   if (path === '/authoring/npcs/types') return 'NPC types'
+  if (path === '/authoring/items') return 'Item definitions'
+  if (/^\/authoring\/items\/\d+$/.test(path)) return 'Item definition'
+  if (path === '/authoring/items/types') return 'Item types'
+  if (path === '/authoring/items/actions') return 'Item actions'
+  if (path === '/authoring/items/body-parts') return 'Item body parts'
+  if (path === '/authoring/items/materials') return 'Item materials'
+  if (path === '/authoring/items/crystal-types') return 'Item crystal types'
   if (path === '/authoring/players/classes') return 'Player classes'
   if (path === '/authoring/players/races') return 'Player races'
   if (path === '/authoring/players/sexes') return 'Player sexes'
+  if (path === '/authoring/players/faces') return 'Player faces'
+  if (path === '/authoring/players/hair-styles') return 'Player hair styles'
+  if (path === '/authoring/players/hair-colors') return 'Player hair colors'
   if (path === '/authoring/skills') return 'Skill definitions'
   if (path === '/authoring/skills/operate-types') return 'Skill operate types'
   if (path === '/authoring/skills/target-types') return 'Skill target types'

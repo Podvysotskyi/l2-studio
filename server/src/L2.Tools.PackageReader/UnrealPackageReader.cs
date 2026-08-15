@@ -187,6 +187,7 @@ public sealed partial class UnrealPackageReader
         ReadImports(header);
         var exports = ReadExports(header);
         var actors = new List<UnrealLevelActor>();
+        var playerStarts = new List<UnrealPlayerStart>();
         var terrains = new List<UnrealTerrainInfo>();
         var lights = new List<UnrealLevelLight>();
         var waterVolumes = new List<UnrealWaterVolume>();
@@ -242,6 +243,29 @@ public sealed partial class UnrealPackageReader
             }
 
             var name = ResolveObjectPath(export, exports);
+            if (string.Equals(className, "PlayerStart", StringComparison.OrdinalIgnoreCase))
+            {
+                ParsedObject playerStartProperties;
+                try
+                {
+                    playerStartProperties = ReadObjectProperties(export, exports, requireComplete: false);
+                }
+                catch (InvalidDataException)
+                {
+                    unrepresented[className] = unrepresented.GetValueOrDefault(className) + 1;
+                    continue;
+                }
+                if (Bool(playerStartProperties.Values, "bDeleteMe") ||
+                    Bool(playerStartProperties.Values, "bPendingDelete"))
+                {
+                    continue;
+                }
+                playerStarts.Add(new UnrealPlayerStart(
+                    name,
+                    Vector(playerStartProperties.Values, "Location", Vector3.Zero),
+                    Rotator(playerStartProperties.Values, "Rotation")));
+                continue;
+            }
             var supported = className is
                 "TerrainInfo" or
                 "LevelInfo" or
@@ -449,7 +473,8 @@ public sealed partial class UnrealPackageReader
                 summary,
                 summaryWarning,
                 ReadBspModels(exports, skyZones, waterVolumes),
-                skyZones),
+                skyZones,
+                playerStarts),
             skyZones,
             ReadSkyBackdrops(exports),
             cameras,

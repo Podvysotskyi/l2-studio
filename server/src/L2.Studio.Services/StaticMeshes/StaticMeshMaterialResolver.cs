@@ -28,10 +28,18 @@ internal sealed class StaticMeshMaterialResolver
     }
 
     public StaticMeshMaterialResolution Resolve(UnrealStaticMesh mesh, string currentPackage)
+        => Resolve(mesh.Sections.Select(section => section.Material).ToArray(), currentPackage, mesh.Name, applyWind: true);
+
+    public StaticMeshMaterialResolution Resolve(UnrealSkeletalMesh mesh, string currentPackage)
+        => Resolve(mesh.Sections.Select(section => section.Material).ToArray(), currentPackage, mesh.Name, applyWind: false);
+
+    private StaticMeshMaterialResolution Resolve(
+        IReadOnlyList<UnrealObjectReference?> sectionReferences,
+        string currentPackage,
+        string meshName,
+        bool applyWind)
     {
-        var references = mesh.Sections
-            .Select(section => Normalize(section.Material, currentPackage))
-            .ToArray();
+        var references = sectionReferences.Select(reference => Normalize(reference, currentPackage)).ToArray();
         var distinctReferences = references
             .Where(reference => reference is not null)
             .Select(reference => Key(reference!.PackageName, reference.ObjectName))
@@ -40,7 +48,7 @@ internal sealed class StaticMeshMaterialResolver
         if (distinctReferences.Length == 0)
         {
             return new StaticMeshMaterialResolution(
-                Enumerable.Repeat<StaticMeshMaterialBinding?>(null, mesh.Sections.Count).ToArray(),
+                Enumerable.Repeat<StaticMeshMaterialBinding?>(null, sectionReferences.Count).ToArray(),
                 0,
                 0,
                 "none",
@@ -73,7 +81,7 @@ internal sealed class StaticMeshMaterialResolver
             }
         }).Select(binding => binding is null
             ? null
-            : binding with { WindMode = WindMode(mesh.Name, binding) }).ToArray();
+            : applyWind ? binding with { WindMode = WindMode(meshName, binding) } : binding).ToArray();
 
         var status = resolved.Count == distinctReferences.Length
             ? "resolved"
@@ -84,6 +92,12 @@ internal sealed class StaticMeshMaterialResolver
             resolved.Count,
             status,
             errors.Count == 0 ? null : string.Join(" ", errors.Values.Distinct().Take(4)));
+    }
+
+    public StaticMeshMaterialBinding Resolve(TextureMaterialReference reference)
+    {
+        var normalized = Normalize(reference, reference.PackageName)!;
+        return Resolve(normalized, normalized.PackageName, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
     }
 
     private StaticMeshMaterialBinding Resolve(
@@ -191,7 +205,17 @@ internal sealed class StaticMeshMaterialResolver
                 material.PackageName,
                 visited,
                 depth + 1);
-            var opacityUrl = opacity.Url;
+            var usesDiffuseLuminanceOpacity = UsesDiffuseLuminanceOpacity(material) &&
+                inner.DiffuseUrl is not null;
+            var opacityUrl = usesDiffuseLuminanceOpacity
+                ? inner.DiffuseUrl
+                : opacity.Url;
+            var opacityAnimation = usesDiffuseLuminanceOpacity
+                ? inner.DiffuseAnimation
+                : opacity.Animation;
+            var opacityChannel = usesDiffuseLuminanceOpacity
+                ? StaticMeshOpacityChannel.Luminance
+                : opacity.Channel;
             var emissiveUrl = emissive.Url;
             var emissiveAnimation = emissive.Animation;
             var detailUrl = detail.Url;
@@ -209,6 +233,16 @@ internal sealed class StaticMeshMaterialResolver
                 : material.OutputBlending != 0
                     ? OutputBlendMode(material.OutputBlending)
                     : inner.BlendMode;
+            if (material.ClassName == "Shader" &&
+                material.OutputBlending == 0 &&
+                material.Opacity is null &&
+                SameReference(material.Diffuse, material.SpecularityMask, material.PackageName))
+            {
+                // C1 commonly stores a Shader's specularity mask in the diffuse texture's
+                // alpha channel. Decoded pixel transparency must not turn that mask into
+                // surface opacity when the authored Shader output remains normal.
+                blendMode = StaticMeshBlendMode.Opaque;
+            }
             if (material.AlphaTest)
             {
                 blendMode = StaticMeshBlendMode.Masked;
@@ -232,10 +266,10 @@ internal sealed class StaticMeshMaterialResolver
                     : StaticMeshOpacitySource.Texture,
                 OpacityChannel = opacityUrl is null
                     ? inner.OpacityChannel
-                    : StaticMeshOpacityChannel.Alpha,
+                    : opacityChannel,
                 OpacityAnimation = opacityUrl is null
                     ? inner.OpacityAnimation
-                    : opacity.Animation,
+                    : opacityAnimation,
                 EmissiveAnimation = emissiveUrl is null
                     ? inner.EmissiveAnimation
                     : emissiveAnimation,
@@ -301,22 +335,35 @@ internal sealed class StaticMeshMaterialResolver
         int depth)
     {
         var normalized = Normalize(reference, currentPackage);
-        if (normalized is null) return new ResolvedTextureChannel(null, null);
+        if (normalized is null)
+            return new ResolvedTextureChannel(null, null, StaticMeshOpacityChannel.Alpha);
         try
         {
             var resolved = Resolve(normalized, normalized.PackageName, visited, depth);
-            return new ResolvedTextureChannel(resolved.DiffuseUrl, resolved.DiffuseAnimation);
+            var hasAlpha = resolved.DiffuseUrl is not null && textures.Values.Any(texture =>
+                string.Equals(texture.Url, resolved.DiffuseUrl, StringComparison.OrdinalIgnoreCase) &&
+                (texture.AlphaTexture || texture.HasTransparency));
+            return new ResolvedTextureChannel(
+                resolved.DiffuseUrl,
+                resolved.DiffuseAnimation,
+                hasAlpha ? StaticMeshOpacityChannel.Alpha : StaticMeshOpacityChannel.Luminance);
         }
         catch (InvalidDataException)
         {
             // Optional channels must not make an otherwise usable diffuse graph fail.
-            return new ResolvedTextureChannel(null, null);
+            return new ResolvedTextureChannel(null, null, StaticMeshOpacityChannel.Alpha);
         }
     }
 
     private sealed record ResolvedTextureChannel(
         string? Url,
-        StaticMeshTextureAnimation? Animation);
+        StaticMeshTextureAnimation? Animation,
+        StaticMeshOpacityChannel Channel);
+
+    private static bool UsesDiffuseLuminanceOpacity(TextureMaterialManifestEntry material) =>
+        material.ClassName == "FinalBlend"
+            ? material.FrameBufferBlending == 4
+            : material.OutputBlending == 3;
 
     private static StaticMeshMaterialTint Tint(TextureMaterialColor color) => new(
         color.Red / 255f,
@@ -403,6 +450,18 @@ internal sealed class StaticMeshMaterialResolver
         {
             PackageName = string.IsNullOrEmpty(reference.PackageName) ? currentPackage : reference.PackageName
         };
+
+    private static bool SameReference(
+        TextureMaterialReference? left,
+        TextureMaterialReference? right,
+        string currentPackage)
+    {
+        var normalizedLeft = Normalize(left, currentPackage);
+        var normalizedRight = Normalize(right, currentPackage);
+        return normalizedLeft is not null && normalizedRight is not null &&
+            string.Equals(normalizedLeft.PackageName, normalizedRight.PackageName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(normalizedLeft.ObjectName, normalizedRight.ObjectName, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string Key(string packageName, string objectName) => $"{packageName}\n{objectName}";
 }

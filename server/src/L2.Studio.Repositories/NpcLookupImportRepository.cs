@@ -77,6 +77,7 @@ public sealed class NpcLookupImportRepository(
 
     private static object Command(string gameVersion, string kind, Guid runId) => (gameVersion, kind) switch
     {
+        ("c1", NpcLookupImportJobValues.Npcs) => new ImportC1Npcs(runId),
         ("c1", NpcLookupImportJobValues.NpcTypes) => new ImportC1NpcTypes(runId),
         ("c4", NpcLookupImportJobValues.NpcTypes) => new ImportC4NpcTypes(runId),
         ("interlude", NpcLookupImportJobValues.NpcTypes) => new ImportInterludeNpcTypes(runId),

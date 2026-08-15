@@ -10,6 +10,7 @@ using L2.Studio.Repositories.Interfaces;
 using L2.Studio.Repositories.Interfaces.Models;
 using L2.Studio.Services.Interfaces;
 using L2.Tools.AudioConverter;
+using L2.Tools.ClientData;
 using L2.Tools.PackageReader;
 using L2.Tools.StaticMeshConverter;
 using L2.Tools.TextureConverter;
@@ -34,7 +35,7 @@ public sealed partial class AssetImportJobProcessor(
     ILogger<AssetImportJobProcessor> logger) : IAssetImportWorkItemProcessor
 {
     private readonly List<AssetCatalogDependencyPublication> dependencyHints = [];
-    internal const int MapSchemaVersion = 15;
+    internal const int MapSchemaVersion = 16;
     internal const int SceneSchemaVersion = 13;
 
     private static readonly JsonSerializerOptions ManifestJsonOptions = new(JsonSerializerDefaults.Web)
@@ -113,6 +114,8 @@ public sealed partial class AssetImportJobProcessor(
                 await ImportStaticMeshesAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.Animations)
                 await ImportAnimationsAsync(context, item, cancellationToken);
+            else if (item.ImportKind == AssetImportJobValues.NpcAppearances)
+                await ImportNpcAppearancesAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.Maps)
                 await ImportMapsAsync(context, item, cancellationToken);
             else if (item.ImportKind == AssetImportJobValues.MapPreviews)
@@ -145,7 +148,7 @@ public sealed partial class AssetImportJobProcessor(
             .SingleOrDefaultAsync(source => source.Catalog.GameVersion == item.GameVersion &&
                 source.Catalog.Kind == item.ImportKind && source.Catalog.IsActive &&
                 source.NormalizedSourceKey == item.NormalizedSourceKey, cancellationToken);
-        if (previous is null) return AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash, []);
+        if (previous is null) return ComputeArtifactFingerprint(item, []);
         var active = await context.AssetCatalogSources.AsNoTracking()
             .Where(source => source.Catalog.GameVersion == item.GameVersion && source.Catalog.IsActive)
             .Select(source => new { source.Catalog.Kind, source.NormalizedSourceKey, source.ArtifactFingerprint, source.SourceHash })
@@ -157,8 +160,16 @@ public sealed partial class AssetImportJobProcessor(
             return (dependency.Kind, dependency.DependencyKey,
                 current?.ArtifactFingerprint ?? current?.SourceHash ?? "missing");
         });
-        return AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash, dependencies);
+        return ComputeArtifactFingerprint(item, dependencies);
     }
+
+    private static string ComputeArtifactFingerprint(
+        AssetImportWorkItem item,
+        IEnumerable<(string Kind, string Key, string Fingerprint)> dependencies) =>
+        item.ImportKind == AssetImportJobValues.MapPreviews
+            ? MapPreviewGeneration.ArtifactFingerprint(
+                item.SourceHash!, dependencies, item.Run.Force, item.RunId)
+            : AssetArtifactFingerprint.Compute(item.ImportKind, item.SourceHash!, dependencies);
 
     private async Task PersistWarningsAsync(
         GameContentDbContext context,
@@ -247,11 +258,13 @@ public sealed partial class AssetImportJobProcessor(
         }
     }
 
-    private static string DiagnosticCode(string kind) => kind switch
+    internal static string DiagnosticCode(string kind) => kind switch
     {
         AssetImportJobValues.Maps or AssetImportJobValues.Scenes => "map.resource_warning",
         AssetImportJobValues.MapPreviews => "preview.render_warning",
         AssetImportJobValues.StaticMeshes => "static_mesh.resource_warning",
+        AssetImportJobValues.Animations => "animation.resource_warning",
+        AssetImportJobValues.NpcAppearances => "npc_appearance.resource_warning",
         AssetImportJobValues.Music or AssetImportJobValues.Sounds => "audio.resource_warning",
         _ => "texture.resource_warning"
     };

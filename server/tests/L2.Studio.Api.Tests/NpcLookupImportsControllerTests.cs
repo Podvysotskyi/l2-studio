@@ -41,6 +41,22 @@ public sealed class NpcLookupImportsControllerTests
     }
 
     [Fact]
+    public async Task QueuesC1NpcImportInAddMissingMode()
+    {
+        var run = Summary();
+        var repository = new StubRepository { Queued = run };
+        var controller = new NpcLookupImportsController(repository);
+
+        var result = await controller.Queue("c1", "npcs", null, CancellationToken.None);
+
+        var accepted = Assert.IsType<AcceptedResult>(result.Result);
+        Assert.Equal($"/api/game-versions/c1/content/npcs/imports/{run.Id}", accepted.Location);
+        Assert.Equal("c1", repository.GameVersion);
+        Assert.Equal("npcs", repository.Kind);
+        Assert.Equal("add_missing", repository.Mode);
+    }
+
+    [Fact]
     public async Task ReturnsConflictWhenMatchingImportIsActive()
     {
         var controller = new NpcLookupImportsController(new StubRepository());
@@ -54,6 +70,7 @@ public sealed class NpcLookupImportsControllerTests
         var controller = new NpcLookupImportsController(new StubRepository());
         Assert.IsType<NotFoundResult>((await controller.Queue("high-five", "npc-races", null, CancellationToken.None)).Result);
         Assert.IsType<NotFoundResult>((await controller.Queue("c1", "npc-classes", null, CancellationToken.None)).Result);
+        Assert.IsType<NotFoundResult>((await controller.Queue("c4", "npcs", null, CancellationToken.None)).Result);
     }
 
     [Fact]
@@ -65,6 +82,19 @@ public sealed class NpcLookupImportsControllerTests
             "c1", "npc-types", new NpcLookupImportRequest("replace_all"), CancellationToken.None);
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task QueuesC1NpcImportInRestoreDefaultsMode()
+    {
+        var repository = new StubRepository { Queued = Summary() };
+        var controller = new NpcLookupImportsController(repository);
+
+        var result = await controller.Queue(
+            "c1", "npcs", new NpcLookupImportRequest("restore_defaults"), CancellationToken.None);
+
+        Assert.IsType<AcceptedResult>(result.Result);
+        Assert.Equal("restore_defaults", repository.Mode);
     }
 
     private static NpcLookupImportRunSummary Summary() => new(

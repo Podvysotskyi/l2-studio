@@ -22,6 +22,7 @@ public static partial class AssetImportSourcePaths
         AssetImportJobValues.Textures => ".utx",
         AssetImportJobValues.StaticMeshes => ".usx",
         AssetImportJobValues.Animations => ".ukx",
+        AssetImportJobValues.NpcAppearances => ".txt",
         AssetImportJobValues.Sounds => ".uax",
         AssetImportJobValues.Music => ".ogg",
         AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews or AssetImportJobValues.Scenes => ".unr",
@@ -30,8 +31,8 @@ public static partial class AssetImportSourcePaths
 
     public static void RequireSupportedVersion(string kind, string gameVersion)
     {
-        if (kind == AssetImportJobValues.Animations && gameVersion != "c1")
-            throw new ArgumentException("Animation imports currently support Chronicle 1 only.", nameof(gameVersion));
+        if (kind is (AssetImportJobValues.Animations or AssetImportJobValues.NpcAppearances) && gameVersion != "c1")
+            throw new ArgumentException($"{kind} imports currently support Chronicle 1 only.", nameof(gameVersion));
     }
 
     public static bool MatchesKind(string kind, string path)
@@ -41,6 +42,9 @@ public static partial class AssetImportSourcePaths
         var isWorldMap = WorldMapNamePattern().IsMatch(Path.GetFileNameWithoutExtension(path));
         return kind switch
         {
+            AssetImportJobValues.NpcAppearances =>
+                string.Equals(Path.GetFileName(path), "npcgrp.txt", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), "system", StringComparison.OrdinalIgnoreCase),
             AssetImportJobValues.Maps or AssetImportJobValues.MapPreviews => isWorldMap,
             AssetImportJobValues.Scenes => !isWorldMap,
             _ => true

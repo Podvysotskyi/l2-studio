@@ -172,140 +172,7 @@ public static class GlbStaticMeshEncoder
         if (color0Accessor is not null) attributes["COLOR_0"] = color0Accessor.Value;
         if (color1Accessor is not null) attributes["COLOR_1"] = color1Accessor.Value;
 
-        var images = new List<object>();
-        var textures = new List<object>();
-        var samplers = new List<object>
-        {
-            new { magFilter = 9729, minFilter = 9987, wrapS = 10497, wrapT = 10497 },
-            new { magFilter = 9729, minFilter = 9987, wrapS = 33071, wrapT = 10497 },
-            new { magFilter = 9729, minFilter = 9987, wrapS = 10497, wrapT = 33071 },
-            new { magFilter = 9729, minFilter = 9987, wrapS = 33071, wrapT = 33071 }
-        };
-        var textureIndices = new Dictionary<string, int>(StringComparer.Ordinal);
-        int TextureIndex(string url, bool clampU = false, bool clampV = false)
-        {
-            var sampler = (clampU ? 1 : 0) + (clampV ? 2 : 0);
-            var key = $"{sampler}\n{url}";
-            if (textureIndices.TryGetValue(key, out var existing))
-            {
-                return existing;
-            }
-            var index = textures.Count;
-            images.Add(new { uri = ImageUri(url) });
-            textures.Add(new { sampler, source = index });
-            textureIndices[key] = index;
-            return index;
-        }
-
-        var materials = new List<object>();
-        int MaterialIndex(StaticMeshMaterialBinding binding)
-        {
-            var pbr = new Dictionary<string, object?>
-            {
-                ["baseColorFactor"] = binding.BlendMode == StaticMeshBlendMode.Invisible
-                    ? new[] { binding.Tint?.R ?? 1f, binding.Tint?.G ?? 1f, binding.Tint?.B ?? 1f, 0f }
-                    : new[] { binding.Tint?.R ?? 1f, binding.Tint?.G ?? 1f, binding.Tint?.B ?? 1f, binding.Tint?.A ?? 1f },
-                ["metallicFactor"] = 0f,
-                ["roughnessFactor"] = 1f
-            };
-            if (binding.DiffuseUrl is not null)
-            {
-                pbr["baseColorTexture"] = new
-                {
-                    index = TextureIndex(binding.DiffuseUrl, binding.ClampU, binding.ClampV)
-                };
-            }
-            var material = new Dictionary<string, object?>
-            {
-                ["name"] = binding.Name,
-                ["pbrMetallicRoughness"] = pbr,
-                ["doubleSided"] = binding.DoubleSided,
-                ["extras"] = new
-                {
-                    l2 = new
-                    {
-                        // GLTFLoader intentionally receives a transparent image while Studio
-                        // prepares materials. Keep the primary image locations in the L2
-                        // contract so the browser can load every channel independently.
-                        diffuseUrl = binding.DiffuseUrl,
-                        emissiveUrl = binding.EmissiveUrl,
-                        blendMode = binding.BlendMode.ToString().ToLowerInvariant(),
-                        opacityUrl = binding.OpacityUrl,
-                        opacitySource = binding.OpacitySource.ToString().ToLowerInvariant(),
-                        opacityChannel = binding.OpacityChannel.ToString().ToLowerInvariant(),
-                        unlit = binding.Unlit,
-                        depthWrite = binding.DepthWrite,
-                        depthTest = binding.DepthTest,
-                        panRate = binding.PanRate,
-                        panRateV = binding.PanRateV,
-                        rotationRate = binding.RotationRate,
-                        detailUrl = binding.DetailUrl,
-                        detailScale = binding.DetailScale,
-                        diffuseAnimation = Animation(binding.DiffuseAnimation),
-                        opacityAnimation = Animation(binding.OpacityAnimation),
-                        emissiveAnimation = Animation(binding.EmissiveAnimation),
-                        uvOscillation = binding.UvOscillation,
-                        fade = Fade(binding.Fade),
-                        composite = Composite(binding.Composite),
-                        selfIlluminationMaskUrl = binding.SelfIlluminationMaskUrl,
-                        specularUrl = binding.SpecularUrl,
-                        specularityMaskUrl = binding.SpecularityMaskUrl,
-                        performLightingOnSpecularPass = binding.PerformLightingOnSpecularPass,
-                        clampU = binding.ClampU,
-                        clampV = binding.ClampV,
-                        windMode = binding.WindMode == StaticMeshWindMode.None
-                            ? null
-                            : binding.WindMode.ToString().ToLowerInvariant()
-                    }
-                }
-            };
-            if (binding.EmissiveUrl is not null)
-            {
-                material["emissiveTexture"] = new { index = TextureIndex(binding.EmissiveUrl) };
-                material["emissiveFactor"] = new[] { 1f, 1f, 1f };
-            }
-            if (binding.BlendMode == StaticMeshBlendMode.Masked)
-            {
-                material["alphaMode"] = "MASK";
-                material["alphaCutoff"] = binding.AlphaCutoff;
-            }
-            else if (binding.BlendMode != StaticMeshBlendMode.Opaque)
-            {
-                material["alphaMode"] = "BLEND";
-            }
-            materials.Add(material);
-            return materials.Count - 1;
-        }
-
-        static object? Animation(StaticMeshTextureAnimation? animation) => animation is null
-            ? null
-            : new { frameUrls = animation.FrameUrls, frameRate = animation.FrameRate };
-        static object? Tint(StaticMeshMaterialTint? tint) => tint is null
-            ? null
-            : new { r = tint.R, g = tint.G, b = tint.B, a = tint.A };
-        static object? Fade(StaticMeshMaterialFade? fade) => fade is null
-            ? null
-            : new
-            {
-                color1 = Tint(fade.Color1),
-                color2 = Tint(fade.Color2),
-                type = fade.Type,
-                period = fade.Period,
-                phase = fade.Phase
-            };
-        static object? Composite(StaticMeshMaterialComposite? composite) => composite is null
-            ? null
-            : new
-            {
-                secondaryUrl = composite.SecondaryUrl,
-                secondaryTint = Tint(composite.SecondaryTint),
-                secondaryFade = Fade(composite.SecondaryFade),
-                maskUrl = composite.MaskUrl,
-                colorOperation = composite.ColorOperation,
-                alphaOperation = composite.AlphaOperation,
-                invertMask = composite.InvertMask,
-                modulateScale = composite.ModulateScale
-            };
+        var materialEncoder = new GltfMaterialEncoder();
 
         var primitives = new List<object>();
         for (var index = 0; index < sectionIndexAccessors.Count; index++)
@@ -326,7 +193,7 @@ public static class GlbStaticMeshEncoder
             };
             if (binding is not null)
             {
-                primitive["material"] = MaterialIndex(binding);
+                primitive["material"] = materialEncoder.Add(binding);
             }
             primitives.Add(primitive);
         }
@@ -349,12 +216,12 @@ public static class GlbStaticMeshEncoder
             ["bufferViews"] = bufferViews,
             ["accessors"] = accessors
         };
-        if (materials.Count > 0)
+        if (materialEncoder.Materials.Count > 0)
         {
-            document["materials"] = materials;
-            document["samplers"] = samplers;
-            document["images"] = images;
-            document["textures"] = textures;
+            document["materials"] = materialEncoder.Materials;
+            document["samplers"] = materialEncoder.Samplers;
+            document["images"] = materialEncoder.Images;
+            document["textures"] = materialEncoder.Textures;
         }
         var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(document));
 
@@ -374,10 +241,6 @@ public static class GlbStaticMeshEncoder
         binary.CopyTo(output);
         return output.ToArray();
     }
-
-    // Retain the published namespace marker so browser loaders can distinguish
-    // texture assets from paths relative to the GLB's package directory.
-    private static string ImageUri(string url) => url;
 
     // Unreal is left-handed with Z up; glTF is right-handed with Y up. Swapping
     // Y and Z has a negative determinant, which also converts Unreal's clockwise

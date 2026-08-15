@@ -100,6 +100,23 @@ public sealed class MapPreviewGenerationTests
     }
 
     [Fact]
+    public void UsesAUniqueImmutableArtifactForEachForcedPreviewRun()
+    {
+        var dependencies = new[] { ("maps", "maps/17_25.unr", "map-fingerprint") };
+        var unforced = MapPreviewGeneration.ArtifactFingerprint(
+            "preview-source", dependencies, force: false, Guid.Empty);
+        var firstForced = MapPreviewGeneration.ArtifactFingerprint(
+            "preview-source", dependencies, force: true, Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var secondForced = MapPreviewGeneration.ArtifactFingerprint(
+            "preview-source", dependencies, force: true, Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
+        Assert.NotEqual(unforced, firstForced);
+        Assert.NotEqual(firstForced, secondForced);
+        Assert.Equal(unforced, MapPreviewGeneration.ArtifactFingerprint(
+            "preview-source", dependencies, force: false, Guid.NewGuid()));
+    }
+
+    [Fact]
     public void CapturesTheExactPublishedMapManifest()
     {
         var map = new MapPreviewRenderMap(

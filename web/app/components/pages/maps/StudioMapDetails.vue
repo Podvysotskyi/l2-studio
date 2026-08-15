@@ -5,6 +5,7 @@ import type {
   MapCatalogEntry,
   MapLightManifestEntry,
   MapManifest,
+  MapPlayerStartManifestEntry,
   MapPreviewCatalogEntry,
   MapWaterVolumeManifestEntry
 } from '~/types/studio'
@@ -33,10 +34,12 @@ import {
   type TerrainLayerStates
 } from '../../../utils/map-inspector'
 import { filterMapActors } from '../../../utils/map-actors'
+import { filterMapPlayerStarts } from '../../../utils/map-spawns'
 import { paginate } from '../../../utils/directory'
 
 interface MapPreviewApi {
   focusActor(name: string): void
+  focusPlayerStart(name: string): void
   focusBsp(name: string): void
   focusLight(name: string): void
   focusWater(name: string): void
@@ -46,6 +49,7 @@ interface MapPreviewApi {
 
 type InspectorTab =
   | 'actors'
+  | 'spawns'
   | 'bsp'
   | 'terrain'
   | 'lights'
@@ -61,23 +65,28 @@ const mapPreview = ref<MapPreviewCatalogEntry>()
 const mapPreviewJob = ref<AssetImportJob>()
 const preview = ref<MapPreviewApi>()
 const selectedActorName = ref<string>()
+const selectedPlayerStartName = ref<string>()
 const selectedBspName = ref<string>()
 const selectedLightName = ref<string>()
 const selectedWaterName = ref<string>()
 const selectedWaterSurfaceName = ref<string>()
 const inspectorTab = ref<InspectorTab>('actors')
 const actorsVisible = ref(true)
+const playerStartsVisible = ref(true)
 const bspVisible = ref(true)
 const worldBaseVisible = ref(false)
 const lightHelpersVisible = ref(false)
-const waterVolumesVisible = ref(true)
+const waterVolumesVisible = ref(false)
 const waterSurfacesVisible = ref(true)
 const terrainLayerStates = ref<TerrainLayerStates>({})
 const query = ref('')
+const spawnQuery = ref('')
 const lightQuery = ref('')
 const waterQuery = ref('')
 const page = ref(1)
 const pageSize = ref(50)
+const spawnPage = ref(1)
+const spawnPageSize = ref(50)
 const loading = ref(true)
 const sceneReady = ref(false)
 const error = ref<string>()
@@ -162,6 +171,13 @@ const filteredActors = computed(() =>
 const visibleActors = computed(() =>
   paginate(filteredActors.value, page.value, pageSize.value)
 )
+const playerStarts = computed(() => manifest.value?.playerStarts ?? [])
+const filteredPlayerStarts = computed(() =>
+  filterMapPlayerStarts(playerStarts.value, spawnQuery.value)
+)
+const visiblePlayerStarts = computed(() =>
+  paginate(filteredPlayerStarts.value, spawnPage.value, spawnPageSize.value)
+)
 const filteredLights = computed(() =>
   filterMapLights(manifest.value?.lights ?? [], lightQuery.value)
 )
@@ -199,12 +215,17 @@ const mapPreviewJobActive = computed(() =>
 )
 
 watch([query, pageSize], () => (page.value = 1))
+watch([spawnQuery, spawnPageSize], () => (spawnPage.value = 1))
 watch([routeName, routeSourceKey], () => void loadMap(), { immediate: true })
 watch(selectedSkyZoneName, () => (skyZonePreviewError.value = undefined))
 onBeforeUnmount(() => clearTimeout(mapPreviewPollTimer))
 
 function selectActor(actor: MapActorManifestEntry) {
   selectedActorName.value = actor.name
+}
+
+function selectPlayerStart(playerStart: MapPlayerStartManifestEntry) {
+  selectedPlayerStartName.value = playerStart.name
 }
 
 function selectBsp(bsp: MapBspMeshManifestEntry) {
@@ -229,6 +250,13 @@ async function focusActor(actor: MapActorManifestEntry) {
   selectActor(actor)
   await nextTick()
   preview.value?.focusActor(actor.name)
+}
+
+async function focusPlayerStart(playerStart: MapPlayerStartManifestEntry) {
+  if (!playerStartsVisible.value) return
+  selectPlayerStart(playerStart)
+  await nextTick()
+  preview.value?.focusPlayerStart(playerStart.name)
 }
 
 function layerEnabled(terrainName: string, index: number) {
@@ -380,19 +408,22 @@ async function loadMap() {
   mapPreviewJob.value = undefined
   mapPreviewJobError.value = undefined
   selectedActorName.value = undefined
+  selectedPlayerStartName.value = undefined
   selectedBspName.value = undefined
   selectedLightName.value = undefined
   selectedWaterName.value = undefined
   selectedWaterSurfaceName.value = undefined
   inspectorTab.value = 'actors'
   actorsVisible.value = true
+  playerStartsVisible.value = true
   bspVisible.value = true
   worldBaseVisible.value = false
   lightHelpersVisible.value = false
-  waterVolumesVisible.value = true
+  waterVolumesVisible.value = false
   waterSurfacesVisible.value = true
   terrainLayerStates.value = {}
   query.value = ''
+  spawnQuery.value = ''
   lightQuery.value = ''
   waterQuery.value = ''
 
@@ -541,6 +572,8 @@ async function loadMap() {
             :selected-actor-name="selectedActorName"
             :selected-bsp-name="selectedBspName"
             :actors-visible="actorsVisible"
+            :player-starts-visible="playerStartsVisible"
+            :selected-player-start-name="selectedPlayerStartName"
             :bsp-visible="bspVisible"
             :world-base-visible="worldBaseVisible"
             :terrain-layer-visibility="terrainLayerVisibility"
@@ -591,6 +624,16 @@ async function loadMap() {
                 :aria-selected="inspectorTab === 'actors'"
                 class="justify-center"
                 @click="inspectorTab = 'actors'"
+              />
+              <UButton
+                label="Spawns"
+                icon="i-lucide-map-pin"
+                color="neutral"
+                :variant="inspectorTab === 'spawns' ? 'soft' : 'ghost'"
+                role="tab"
+                :aria-selected="inspectorTab === 'spawns'"
+                class="justify-center"
+                @click="inspectorTab = 'spawns'"
               />
               <UButton
                 label="Terrain"
@@ -844,6 +887,88 @@ async function loadMap() {
               v-model:page="page"
               v-model:page-size="pageSize"
               :total="filteredActors.length"
+              :page-size-options="[50, 100, 200]"
+            />
+          </template>
+
+          <template v-else-if="inspectorTab === 'spawns'">
+            <div class="space-y-3 border-b border-default p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-sm font-semibold text-highlighted">
+                    Spawn locations
+                  </h2>
+                  <p class="text-xs text-muted">
+                    {{ filteredPlayerStarts.length.toLocaleString() }} of
+                    {{ playerStarts.length.toLocaleString() }} PlayerStart markers
+                  </p>
+                </div>
+                <USwitch
+                  v-model="playerStartsVisible"
+                  label="Show"
+                  aria-label="Show PlayerStart markers"
+                />
+              </div>
+              <p class="text-xs text-muted">
+                UE map player-start markers. Authoritative L2 character spawns are managed by the Game Server.
+              </p>
+              <UInput
+                v-model="spawnQuery"
+                icon="i-lucide-search"
+                placeholder="Search PlayerStart markers"
+                aria-label="Search PlayerStart markers"
+                class="w-full"
+              />
+            </div>
+            <div class="max-h-[54vh] divide-y divide-default overflow-y-auto">
+              <div
+                v-for="playerStart in visiblePlayerStarts"
+                :key="playerStart.name"
+                class="flex items-center gap-2 p-2"
+                :class="selectedPlayerStartName === playerStart.name ? 'bg-primary/10' : ''"
+              >
+                <button
+                  type="button"
+                  class="min-w-0 flex-1 rounded-md p-2 text-left hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
+                  :aria-pressed="selectedPlayerStartName === playerStart.name"
+                  @click="selectPlayerStart(playerStart)"
+                  @dblclick="focusPlayerStart(playerStart)"
+                >
+                  <span class="flex items-center gap-2">
+                    <span class="truncate text-sm font-medium text-highlighted">{{
+                      playerStart.name
+                    }}</span>
+                    <UBadge color="success" variant="subtle" size="sm">
+                      PlayerStart
+                    </UBadge>
+                  </span>
+                  <span class="mt-1 block truncate text-xs text-dimmed">
+                    X {{ playerStart.location.x.toFixed(0) }} · Y
+                    {{ playerStart.location.y.toFixed(0) }} · Z
+                    {{ playerStart.location.z.toFixed(0) }}
+                  </span>
+                </button>
+                <UButton
+                  icon="i-lucide-focus"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :disabled="!playerStartsVisible"
+                  :aria-label="'Focus ' + playerStart.name"
+                  @click="focusPlayerStart(playerStart)"
+                />
+              </div>
+              <div
+                v-if="visiblePlayerStarts.length === 0"
+                class="grid min-h-48 place-items-center p-8 text-center text-sm text-muted"
+              >
+                No PlayerStart markers match this search.
+              </div>
+            </div>
+            <StudioTableFooter
+              v-model:page="spawnPage"
+              v-model:page-size="spawnPageSize"
+              :total="filteredPlayerStarts.length"
               :page-size-options="[50, 100, 200]"
             />
           </template>

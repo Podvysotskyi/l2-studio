@@ -21,9 +21,9 @@ public sealed class AssetImportTests
     public void DefinesTypedDiscoveryAndFileCommandsForEverySupportedKind()
     {
         var assembly = typeof(DiscoverTextures).Assembly;
-        Assert.Equal(8, assembly.GetTypes().Count(type =>
+        Assert.Equal(9, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportDiscoveryCommand).IsAssignableFrom(type)));
-        Assert.Equal(8, assembly.GetTypes().Count(type =>
+        Assert.Equal(9, assembly.GetTypes().Count(type =>
             !type.IsInterface && typeof(IAssetImportFileCommand).IsAssignableFrom(type)));
     }
 
@@ -32,8 +32,16 @@ public sealed class AssetImportTests
     {
         Assert.Contains("maps", AssetImportJobValues.SupportedKinds);
         Assert.Contains("mappreviews", AssetImportJobValues.SupportedKinds);
+        Assert.Contains("npcappearances", AssetImportJobValues.SupportedKinds);
         Assert.DoesNotContain("levels", AssetImportJobValues.SupportedKinds);
         Assert.DoesNotContain("levelpreviews", AssetImportJobValues.SupportedKinds);
+    }
+
+    [Fact]
+    public void ClassifiesAnimationWarningsSeparatelyFromTextureWarnings()
+    {
+        Assert.Equal("animation.resource_warning", AssetImportJobProcessor.DiagnosticCode(AssetImportJobValues.Animations));
+        Assert.Equal("texture.resource_warning", AssetImportJobProcessor.DiagnosticCode(AssetImportJobValues.Textures));
     }
 
 }

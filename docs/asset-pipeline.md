@@ -18,7 +18,7 @@ milestone. Diagnostics and discovered, completed, succeeded, warning, and failed
 counts are stored as queryable rows.
 
 Supported asset families currently include textures, static meshes, Chronicle
-1 skeletal animations, sounds, music, maps, scenes, and generated map previews. Conversion failures are
+1 skeletal animations and NPC appearances, sounds, music, maps, scenes, and generated map previews. Conversion failures are
 isolated to their source and remain visible in the catalog and diagnostics.
 
 ## Artifacts and releases
@@ -52,17 +52,56 @@ provides an explicit file.
 - Static meshes are published as GLB with standard geometry plus material
   metadata consumed by Web and Studio. Studio resolves published WebP texture
   channels independently so an unavailable material falls back per section
-  without preventing geometry inspection.
+  without preventing geometry inspection. UE2 brightness-based translucent
+  shaders publish their diffuse texture as a luminance opacity channel,
+  including the same flipbook timeline; explicit opacity maps use decoded
+  alpha when present and luminance otherwise. A normal Shader that reuses its
+  diffuse texture as a specularity mask remains opaque: decoded alpha is kept
+  for the mask and is not promoted to surface opacity.
   Maps and scenes publish complete render manifests whose terrain texture and
   control-map contracts are consumed independently by both renderers. Map
   manifests also retain UE2 `LevelSummary` browser metadata (including the raw
-  screenshot material reference) without converting it into a preview image.
+  screenshot material reference) without converting it into a preview image,
+  plus `PlayerStart` transforms for Studio inspection. Authored BSP water
+  surfaces use their published material graph and live texture or UV animation;
+  gameplay water-volume meshes remain optional diagnostics, default to hidden
+  in the map inspector, and are omitted from generated map previews.
+  PlayerStart data is not authoritative Game Server spawn configuration.
 - Chronicle 1 `.ukx` packages publish skeletal meshes, skin weights, skeletons,
-  and reusable compatible animation sets as browser-playable GLB. Animation manifests
-  retain sequence groups and typed notify timelines for inspection. Studio
+  resolved per-section default materials, and reusable compatible animation
+  sets as browser-playable GLB. Animation
+  sets bind by exact runtime bone name and are linked when at least 95 percent
+  of animation bones exist on the mesh; lower-coverage rigs remain unlinked and
+  report their matched-bone counts as warnings. Schema 2 animation manifests
+  retain ordered default-material references, resolution diagnostics, sequence
+  groups, and typed notify timelines for inspection. Studio
   visualizes notify timing and metadata but does not execute notify sounds,
-  effects, or functions. Unsupported `VertMesh` exports and malformed skeletal
+  effects, or functions. The GLB conversion changes UE2's left-handed Z-up
+  coordinates to glTF's right-handed Y-up coordinates, converts centimeters to
+  meters, and applies the UE2 root-bone quaternion convention consistently to
+  bind poses and clips. Unsupported `VertMesh` exports and malformed skeletal
   objects are isolated as warnings without invalidating the rest of a package.
+- Chronicle 1 `system/npcgrp.txt` publishes one immutable, normalized NPC
+  appearance manifest per Mobius NPC at `npcs/{npcId}/manifest.json`. Studio
+  resolves each Mobius `displayId` through `CT0_to_C4_ids.txt` before matching
+  it to the client appearance ID, so NPC aliases receive separate manifests
+  while retaining their shared `appearanceId`. Mesh and sound values retain
+  their source references and include URLs when exactly one active asset
+  resolves them. Schema 6 mesh
+  references additionally retain the compatible animation-set URL used by the
+  Studio NPC preview. Raw texture slots retain the ordered `npcgrp` overrides,
+  while material slots record each skeletal section's default, override,
+  effective material, provenance, and fallback warning. Resolved overrides
+  replace their matching section; absent or unresolved overrides preserve the
+  skeletal default. Texture lookup
+  prefers an exact Unreal object path,
+  then accepts a unique package-local final object segment so grouped C1 exports
+  such as `LineageNpcsTex.Box.coffer_a_t00` resolve the shorter `npcgrp`
+  reference. Missing, ambiguous, or incomplete material graphs remain visible
+  with diagnostics and do not block publication. Effect references remain
+  unresolved until an effect asset importer exists. The catalog stores only
+  manifest summary metadata, match counts, and a compact Mobius NPC ID index,
+  not one row per NPC.
 - Embedded UAX PCM payloads are published as RIFF/WAVE without lossy
   transcoding.
 - Music accepts either the proprietary `L2SD` first-page signature or standard

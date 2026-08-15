@@ -127,6 +127,21 @@ public sealed class AssetImportsControllerTests
     }
 
     [Fact]
+    public async Task RejectsNpcAppearanceImportsOutsideChronicleOne()
+    {
+        var repository = new StubAssetImportRepository();
+        var controller = new AssetImportsController(repository);
+
+        var result = await controller.Queue(
+            "interlude", AssetImportJobValues.NpcAppearances, new AssetImportRequest(false), CancellationToken.None);
+        var problem = Assert.IsType<ValidationProblemDetails>(
+            Assert.IsType<BadRequestObjectResult>(result.Result).Value);
+
+        Assert.Equal("NPC appearance imports currently support Chronicle 1 only.",
+            Assert.Single(problem.Errors["gameVersion"]));
+    }
+
+    [Fact]
     public async Task ValidatesWorkItemAndDiagnosticFilters()
     {
         var repository = new StubAssetImportRepository();

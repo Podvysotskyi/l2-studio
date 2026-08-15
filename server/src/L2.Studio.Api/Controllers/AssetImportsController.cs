@@ -16,8 +16,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         string gameVersion, string kind, [FromBody] AssetImportRequest? request, CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        if (UnsupportedAnimationVersion(kind, gameVersion))
-            return ValidationError("gameVersion", "Animation imports currently support Chronicle 1 only.");
+        if (UnsupportedC1OnlyVersion(kind, gameVersion))
+            return ValidationError("gameVersion", C1OnlyVersionError(kind));
         AssetImportRunSummary? run;
         try
         {
@@ -55,8 +55,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        if (UnsupportedAnimationVersion(kind, gameVersion))
-            return ValidationError("gameVersion", "Animation imports currently support Chronicle 1 only.");
+        if (UnsupportedC1OnlyVersion(kind, gameVersion))
+            return ValidationError("gameVersion", C1OnlyVersionError(kind));
         try
         {
             var run = await repository.QueueSingleFileAsync(gameVersion, kind, fileName, force, token);
@@ -85,8 +85,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         CancellationToken token)
     {
         if (kind is not (AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes or AssetImportJobValues.Animations or AssetImportJobValues.Maps)) return NotFound();
-        if (UnsupportedAnimationVersion(kind, gameVersion))
-            return ValidationError("gameVersion", "Animation imports currently support Chronicle 1 only.");
+        if (UnsupportedC1OnlyVersion(kind, gameVersion))
+            return ValidationError("gameVersion", C1OnlyVersionError(kind));
         if (string.IsNullOrWhiteSpace(request.ResourceName)) return ValidationError("resourceName", "A resource name is required.");
         if (kind is (AssetImportJobValues.Textures or AssetImportJobValues.StaticMeshes or AssetImportJobValues.Animations) && string.IsNullOrWhiteSpace(request.PackageName))
             return ValidationError("packageName", "A package name is required.");
@@ -121,8 +121,8 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
         string kind, string gameVersion, CancellationToken token)
     {
         if (!AssetImportJobValues.SupportedKinds.Contains(kind)) return NotFound();
-        if (UnsupportedAnimationVersion(kind, gameVersion))
-            return ValidationError("gameVersion", "Animation imports currently support Chronicle 1 only.");
+        if (UnsupportedC1OnlyVersion(kind, gameVersion))
+            return ValidationError("gameVersion", C1OnlyVersionError(kind));
         var run = await repository.QueueStaleAsync(gameVersion, kind, token);
         return run is null
             ? Conflict(new { message = $"A stale rebuild for '{kind}' conflicts with an active run." })
@@ -205,6 +205,11 @@ public sealed class AssetImportsController(IAssetImportRepository repository) : 
     private BadRequestObjectResult ValidationError(string key, string message) =>
         BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]> { [key] = [message] }));
 
-    private static bool UnsupportedAnimationVersion(string kind, string gameVersion) =>
-        kind == AssetImportJobValues.Animations && !gameVersion.Equals("c1", StringComparison.OrdinalIgnoreCase);
+    private static bool UnsupportedC1OnlyVersion(string kind, string gameVersion) =>
+        kind is (AssetImportJobValues.Animations or AssetImportJobValues.NpcAppearances) &&
+        !gameVersion.Equals("c1", StringComparison.OrdinalIgnoreCase);
+
+    private static string C1OnlyVersionError(string kind) => kind == AssetImportJobValues.Animations
+        ? "Animation imports currently support Chronicle 1 only."
+        : "NPC appearance imports currently support Chronicle 1 only.";
 }

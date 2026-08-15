@@ -1113,6 +1113,484 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("game_versions", "content");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.Item", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ArmorType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("armor_type");
+
+                    b.Property<int?>("CrystalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("crystal_count");
+
+                    b.Property<string>("DamageRange")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("damage_range");
+
+                    b.Property<int?>("DisplayId")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_id");
+
+                    b.Property<bool?>("ElementEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("element_enabled");
+
+                    b.Property<bool?>("EnchantEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enchant_enabled");
+
+                    b.Property<string>("EtcItemType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("etcitem_type");
+
+                    b.Property<bool?>("ForNpc")
+                        .HasColumnType("boolean")
+                        .HasColumnName("for_npc");
+
+                    b.Property<string>("Handler")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("handler");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("icon");
+
+                    b.Property<bool?>("ImmediateEffect")
+                        .HasColumnType("boolean")
+                        .HasColumnName("immediate_effect");
+
+                    b.Property<bool?>("IsAttackWeapon")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_attack_weapon");
+
+                    b.Property<bool?>("IsDepositable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_depositable");
+
+                    b.Property<bool?>("IsDestroyable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_destroyable");
+
+                    b.Property<bool?>("IsDropable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_dropable");
+
+                    b.Property<bool?>("IsForceEquip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_force_equip");
+
+                    b.Property<bool?>("IsMagicWeapon")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_magic_weapon");
+
+                    b.Property<bool?>("IsOlyRestricted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_oly_restricted");
+
+                    b.Property<bool?>("IsQuestItem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_questitem");
+
+                    b.Property<bool?>("IsSellable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_sellable");
+
+                    b.Property<bool?>("IsStackable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_stackable");
+
+                    b.Property<bool?>("IsTradable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_tradable");
+
+                    b.Property<string>("ItemActionName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_action_name");
+
+                    b.Property<string>("ItemBodyPartName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_body_part_name");
+
+                    b.Property<string>("ItemCrystalTypeName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_crystal_type_name");
+
+                    b.Property<string>("ItemMaterialName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_material_name");
+
+                    b.Property<string>("ItemSkill")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_skill");
+
+                    b.Property<string>("ItemTypeName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("item_type_name");
+
+                    b.Property<int?>("MpConsume")
+                        .HasColumnType("integer")
+                        .HasColumnName("mp_consume");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<long?>("Price")
+                        .HasColumnType("bigint")
+                        .HasColumnName("price");
+
+                    b.Property<int?>("RecipeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
+
+                    b.Property<string>("ReducedMpConsume")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reduced_mp_consume");
+
+                    b.Property<int?>("ReuseDelay")
+                        .HasColumnType("integer")
+                        .HasColumnName("reuse_delay");
+
+                    b.Property<int?>("Soulshots")
+                        .HasColumnType("integer")
+                        .HasColumnName("soulshots");
+
+                    b.Property<int?>("Spiritshots")
+                        .HasColumnType("integer")
+                        .HasColumnName("spiritshots");
+
+                    b.Property<string>("UseCondition")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("use_condition");
+
+                    b.Property<bool?>("UseWeaponSkillsOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("use_weapon_skills_only");
+
+                    b.Property<string>("WeaponType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("weapon_type");
+
+                    b.Property<int?>("Weight")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight");
+
+                    b.HasKey("GameVersion", "Id");
+
+                    b.HasIndex("GameVersion", "ItemActionName");
+
+                    b.HasIndex("GameVersion", "ItemBodyPartName");
+
+                    b.HasIndex("GameVersion", "ItemCrystalTypeName");
+
+                    b.HasIndex("GameVersion", "ItemMaterialName");
+
+                    b.HasIndex("GameVersion", "ItemTypeName")
+                        .HasDatabaseName("ix_items_item_type_name");
+
+                    b.HasIndex("GameVersion", "Name")
+                        .HasDatabaseName("ix_items_name");
+
+                    b.ToTable("items", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemAction", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
+
+                    b.HasKey("GameVersion", "Name");
+
+                    b.ToTable("item_actions", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemBodyPart", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
+
+                    b.HasKey("GameVersion", "Name");
+
+                    b.ToTable("item_body_parts", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
+
+                    b.HasKey("GameVersion", "Name");
+
+                    b.ToTable("item_crystal_types", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemImportRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("ExistingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("existing_count");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("InsertedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("inserted_count");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("add_missing")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<int>("RestoredCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("restored_count");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_item_import_runs_active")
+                        .HasFilter("status IN ('queued', 'running')");
+
+                    b.HasIndex("GameVersion", "RequestedAt")
+                        .HasDatabaseName("ix_item_import_runs_recent");
+
+                    b.ToTable("item_import_runs", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemMaterial", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
+
+                    b.HasKey("GameVersion", "Name");
+
+                    b.ToTable("item_materials", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemStats", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal?>("AccuracyCombat")
+                        .HasColumnType("numeric")
+                        .HasColumnName("accuracy_combat");
+
+                    b.Property<decimal?>("CriticalRate")
+                        .HasColumnType("numeric")
+                        .HasColumnName("critical_rate");
+
+                    b.Property<decimal?>("Evasion")
+                        .HasColumnType("numeric")
+                        .HasColumnName("evasion");
+
+                    b.Property<decimal?>("MagicalAttack")
+                        .HasColumnType("numeric")
+                        .HasColumnName("magical_attack");
+
+                    b.Property<decimal?>("MagicalDefence")
+                        .HasColumnType("numeric")
+                        .HasColumnName("magical_defence");
+
+                    b.Property<decimal?>("MaximumMp")
+                        .HasColumnType("numeric")
+                        .HasColumnName("maximum_mp");
+
+                    b.Property<decimal?>("PhysicalAttack")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical_attack");
+
+                    b.Property<decimal?>("PhysicalAttackRange")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical_attack_range");
+
+                    b.Property<decimal?>("PhysicalAttackSpeed")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical_attack_speed");
+
+                    b.Property<decimal?>("PhysicalDefence")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical_defence");
+
+                    b.Property<decimal?>("RandomDamage")
+                        .HasColumnType("numeric")
+                        .HasColumnName("random_damage");
+
+                    b.Property<decimal?>("ShieldDefence")
+                        .HasColumnType("numeric")
+                        .HasColumnName("shield_defence");
+
+                    b.Property<decimal?>("ShieldRate")
+                        .HasColumnType("numeric")
+                        .HasColumnName("shield_rate");
+
+                    b.HasKey("GameVersion", "ItemId");
+
+                    b.ToTable("item_stats", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemType", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
+
+                    b.HasKey("GameVersion", "Name");
+
+                    b.ToTable("item_types", "content");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -1125,6 +1603,10 @@ namespace L2.Studio.Migrations.Migrations
                     b.Property<int>("Id")
                         .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    b.Property<int?>("AppearanceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("appearance_id");
 
                     b.Property<short>("Level")
                         .HasColumnType("smallint")
@@ -1297,6 +1779,267 @@ namespace L2.Studio.Migrations.Migrations
                     b.HasKey("GameVersion", "Name");
 
                     b.ToTable("npc_sexes", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStats", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<int?>("Con")
+                        .HasColumnType("integer")
+                        .HasColumnName("con");
+
+                    b.Property<int?>("Dex")
+                        .HasColumnType("integer")
+                        .HasColumnName("dex");
+
+                    b.Property<int?>("HitTime")
+                        .HasColumnType("integer")
+                        .HasColumnName("hit_time");
+
+                    b.Property<int?>("Int")
+                        .HasColumnType("integer")
+                        .HasColumnName("int");
+
+                    b.Property<int?>("Men")
+                        .HasColumnType("integer")
+                        .HasColumnName("men");
+
+                    b.Property<int?>("Str")
+                        .HasColumnType("integer")
+                        .HasColumnName("str");
+
+                    b.Property<int?>("Wit")
+                        .HasColumnType("integer")
+                        .HasColumnName("wit");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_stats", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsAttack", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<decimal?>("Accuracy")
+                        .HasColumnType("numeric")
+                        .HasColumnName("accuracy");
+
+                    b.Property<int?>("AttackSpeed")
+                        .HasColumnType("integer")
+                        .HasColumnName("attack_speed");
+
+                    b.Property<int?>("Critical")
+                        .HasColumnType("integer")
+                        .HasColumnName("critical");
+
+                    b.Property<int?>("Distance")
+                        .HasColumnType("integer")
+                        .HasColumnName("distance");
+
+                    b.Property<decimal?>("Magical")
+                        .HasColumnType("numeric")
+                        .HasColumnName("magical");
+
+                    b.Property<decimal?>("Physical")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical");
+
+                    b.Property<int?>("Random")
+                        .HasColumnType("integer")
+                        .HasColumnName("random");
+
+                    b.Property<int?>("Range")
+                        .HasColumnType("integer")
+                        .HasColumnName("range");
+
+                    b.Property<int?>("ReuseDelay")
+                        .HasColumnType("integer")
+                        .HasColumnName("reuse_delay");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_stats_attack", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsDefence", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<int?>("Evasion")
+                        .HasColumnType("integer")
+                        .HasColumnName("evasion");
+
+                    b.Property<decimal?>("Magical")
+                        .HasColumnType("numeric")
+                        .HasColumnName("magical");
+
+                    b.Property<decimal?>("Physical")
+                        .HasColumnType("numeric")
+                        .HasColumnName("physical");
+
+                    b.Property<int?>("Shield")
+                        .HasColumnType("integer")
+                        .HasColumnName("shield");
+
+                    b.Property<int?>("ShieldRate")
+                        .HasColumnType("integer")
+                        .HasColumnName("shield_rate");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_stats_defence", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsSpeed", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<decimal?>("RunGround")
+                        .HasColumnType("numeric")
+                        .HasColumnName("run_ground");
+
+                    b.Property<decimal?>("WalkGround")
+                        .HasColumnType("numeric")
+                        .HasColumnName("walk_ground");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_stats_speed", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsVitals", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<decimal?>("Hp")
+                        .HasColumnType("numeric")
+                        .HasColumnName("hp");
+
+                    b.Property<decimal?>("HpRegen")
+                        .HasColumnType("numeric")
+                        .HasColumnName("hp_regen");
+
+                    b.Property<decimal?>("Mp")
+                        .HasColumnType("numeric")
+                        .HasColumnName("mp");
+
+                    b.Property<decimal?>("MpRegen")
+                        .HasColumnType("numeric")
+                        .HasColumnName("mp_regen");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_stats_vitals", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatus", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("NpcId")
+                        .HasColumnType("integer")
+                        .HasColumnName("npc_id");
+
+                    b.Property<bool>("Attackable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("attackable");
+
+                    b.Property<bool>("CanBeSown")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_be_sown");
+
+                    b.Property<bool>("CanMove")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_move");
+
+                    b.Property<bool>("NoSleepMode")
+                        .HasColumnType("boolean")
+                        .HasColumnName("no_sleep_mode");
+
+                    b.Property<bool>("RandomWalk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("random_walk");
+
+                    b.Property<bool>("ShowName")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_name");
+
+                    b.Property<bool>("Talkable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("talkable");
+
+                    b.Property<bool>("Targetable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("targetable");
+
+                    b.Property<bool>("Undying")
+                        .HasColumnType("boolean")
+                        .HasColumnName("undying");
+
+                    b.HasKey("GameVersion", "NpcId");
+
+                    b.ToTable("npc_statuses", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcType", b =>
@@ -1491,6 +2234,80 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("player_hair_styles", "content");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.PlayerImportRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("ExistingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("existing_count");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("InsertedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("inserted_count");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("add_missing")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<int>("RestoredCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("restored_count");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_player_import_runs_active")
+                        .HasFilter("status IN ('queued', 'running')");
+
+                    b.HasIndex("GameVersion", "RequestedAt")
+                        .HasDatabaseName("ix_player_import_runs_recent");
+
+                    b.ToTable("player_import_runs", "content");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.PlayerRace", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -1625,6 +2442,80 @@ namespace L2.Studio.Migrations.Migrations
                         {
                             t.HasCheckConstraint("ck_skill_icons_level", "level BETWEEN 1 AND 255");
                         });
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.SkillImportRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("ExistingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("existing_count");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("InsertedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("inserted_count");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("add_missing")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<int>("RestoredCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("restored_count");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_skill_import_runs_active")
+                        .HasFilter("status IN ('queued', 'running')");
+
+                    b.HasIndex("GameVersion", "RequestedAt")
+                        .HasDatabaseName("ix_skill_import_runs_recent");
+
+                    b.ToTable("skill_import_runs", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.SkillOperateType", b =>
@@ -1942,6 +2833,122 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("PublishedRelease");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.Item", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemAction", "ItemAction")
+                        .WithMany("Items")
+                        .HasForeignKey("GameVersion", "ItemActionName")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemBodyPart", "ItemBodyPart")
+                        .WithMany("Items")
+                        .HasForeignKey("GameVersion", "ItemBodyPartName")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemCrystalType", "ItemCrystalType")
+                        .WithMany("Items")
+                        .HasForeignKey("GameVersion", "ItemCrystalTypeName")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemMaterial", "ItemMaterial")
+                        .WithMany("Items")
+                        .HasForeignKey("GameVersion", "ItemMaterialName")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemType", "ItemType")
+                        .WithMany("Items")
+                        .HasForeignKey("GameVersion", "ItemTypeName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ItemAction");
+
+                    b.Navigation("ItemBodyPart");
+
+                    b.Navigation("ItemCrystalType");
+
+                    b.Navigation("ItemMaterial");
+
+                    b.Navigation("ItemType");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemAction", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemBodyPart", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemImportRun", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemMaterial", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemStats", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Item", "Item")
+                        .WithOne("Stats")
+                        .HasForeignKey("L2.Studio.Context.Entities.ItemStats", "GameVersion", "ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemType", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -1999,6 +3006,108 @@ namespace L2.Studio.Migrations.Migrations
                         .HasForeignKey("GameVersion")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStats", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("Stats")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStats", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsAttack", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("StatsAttack")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStatsAttack", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsDefence", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("StatsDefence")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStatsDefence", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsSpeed", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("StatsSpeed")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStatsSpeed", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatsVitals", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("StatsVitals")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStatsVitals", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.NpcStatus", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Npc", "Npc")
+                        .WithOne("Status")
+                        .HasForeignKey("L2.Studio.Context.Entities.NpcStatus", "GameVersion", "NpcId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Npc");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcType", b =>
@@ -2117,6 +3226,15 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("PlayerSex");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.PlayerImportRun", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.PlayerRace", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -2173,6 +3291,15 @@ namespace L2.Studio.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("Skill");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.SkillImportRun", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.SkillOperateType", b =>
@@ -2239,6 +3366,51 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("Artifacts");
 
                     b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.Item", b =>
+                {
+                    b.Navigation("Stats");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemAction", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemBodyPart", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemMaterial", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemType", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.Npc", b =>
+                {
+                    b.Navigation("Stats");
+
+                    b.Navigation("StatsAttack");
+
+                    b.Navigation("StatsDefence");
+
+                    b.Navigation("StatsSpeed");
+
+                    b.Navigation("StatsVitals");
+
+                    b.Navigation("Status");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcRace", b =>

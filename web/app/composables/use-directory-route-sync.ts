@@ -2,10 +2,17 @@ import { nextTick, onBeforeUnmount, onMounted, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { directoryRouteQuery, directoryRouteState } from '../utils/directory'
 
+interface DirectoryRouteSyncOptions {
+  filterRefs?: Ref<unknown>[]
+  readFilters?: (query: Record<string, unknown>) => void
+  filterQuery?: () => Record<string, string>
+}
+
 export function useDirectoryRouteSync(
   path: string,
   state: { query: Ref<string>; page: Ref<number>; pageSize: Ref<number> },
-  load: () => Promise<void>
+  load: () => Promise<void>,
+  options?: DirectoryRouteSyncOptions
 ) {
   const route = useRoute()
   const router = useRouter()
@@ -17,17 +24,21 @@ export function useDirectoryRouteSync(
   state.query.value = initialState.query
   state.page.value = initialState.page
   state.pageSize.value = initialState.pageSize
+  options?.readFilters?.(route.query)
 
   async function replaceRouteAndLoad() {
     replacingRoute = true
     try {
       await router.replace({
         path,
-        query: directoryRouteQuery(
-          state.query.value,
-          state.page.value,
-          state.pageSize.value
-        )
+        query: {
+          ...directoryRouteQuery(
+            state.query.value,
+            state.page.value,
+            state.pageSize.value
+          ),
+          ...options?.filterQuery?.()
+        }
       })
     } finally {
       replacingRoute = false
@@ -45,6 +56,7 @@ export function useDirectoryRouteSync(
       state.query.value = routeState.query
       state.page.value = routeState.page
       state.pageSize.value = routeState.pageSize
+      options?.readFilters?.(query)
       await nextTick()
       mutatingViewState = false
       await load()
@@ -81,6 +93,19 @@ export function useDirectoryRouteSync(
       await replaceRouteAndLoad()
     })()
   })
+
+  if (options?.filterRefs?.length) {
+    watch(options.filterRefs, () => {
+      if (mutatingViewState) return
+      void (async () => {
+        mutatingViewState = true
+        state.page.value = 1
+        await nextTick()
+        mutatingViewState = false
+        await replaceRouteAndLoad()
+      })()
+    })
+  }
 
   onMounted(() => void load())
   onBeforeUnmount(() => clearTimeout(searchTimer))

@@ -1,12 +1,18 @@
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using L2.Tools.PackageReader;
 
 namespace L2.Tools.StaticMeshConverter;
 
 public static class GlbAnimationEncoder
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     public static byte[] Encode(UnrealMeshAnimation animation)
     {
         ArgumentNullException.ThrowIfNull(animation);
@@ -60,8 +66,10 @@ public static class GlbAnimationEncoder
             for (var boneIndex = 0; boneIndex < animation.Bones.Count && boneIndex < clip.Tracks.Count; boneIndex++)
             {
                 var track = clip.Tracks[boneIndex];
-                AddChannel(track.Rotations, ConvertQuaternion, WriteVector4, 16, "VEC4", "rotation");
-                AddChannel(track.Translations, ConvertVector, WriteVector3, 12, "VEC3", "translation");
+                AddChannel(track.Rotations, value => ConvertQuaternion(value, boneIndex == 0),
+                    WriteVector4, 16, "VEC4", "rotation");
+                AddChannel(track.Translations, UnrealGltfTransform.Position,
+                    WriteVector3, 12, "VEC3", "translation");
 
                 void AddChannel<TInput, TOutput>(
                     IReadOnlyList<TInput> keys,
@@ -72,7 +80,7 @@ public static class GlbAnimationEncoder
                     string path)
                 {
                     if (keys.Count == 0) return;
-                    var times = Timeline(keys.Count, track.Times, clip.FrameCount, clip.FrameRate);
+                    var times = Timeline(keys.Count, track.Times, clip.FrameRate);
                     var input = AddAccessor(times, WriteSingle, 4, "SCALAR", [times[0]], [times[^1]]);
                     var output = AddAccessor(keys.Select(convert), write, elementSize, type);
                     var sampler = samplers.Count;
@@ -93,21 +101,18 @@ public static class GlbAnimationEncoder
             bufferViews = views,
             buffers = new[] { new { byteLength = (int)binary.Length } }
         };
-        return BuildGlb(JsonSerializer.SerializeToUtf8Bytes(document), binary.ToArray());
+        return BuildGlb(JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions), binary.ToArray());
     }
 
-    private static float[] Timeline(int count, IReadOnlyList<float> times, int frames, float rate)
+    private static float[] Timeline(int count, IReadOnlyList<float> times, float rate)
     {
         if (times.Count == count) return times.Select(value => rate > 0 ? value / rate : value).ToArray();
-        if (count == 1) return [0];
-        var duration = rate > 0 ? frames / rate : frames;
-        return Enumerable.Range(0, count).Select(index => duration * index / (count - 1)).ToArray();
+        return Enumerable.Range(0, count).Select(index => rate > 0 ? index / rate : index).ToArray();
     }
 
-    private static Vector3 ConvertVector(Vector3 value) => new(value.X, value.Z, -value.Y);
-    private static Vector4 ConvertQuaternion(Quaternion value)
+    private static Vector4 ConvertQuaternion(Quaternion value, bool conjugateRoot)
     {
-        var converted = Quaternion.Normalize(new Quaternion(value.X, value.Z, -value.Y, value.W));
+        var converted = UnrealGltfTransform.Rotation(value, conjugateRoot);
         return new Vector4(converted.X, converted.Y, converted.Z, converted.W);
     }
 

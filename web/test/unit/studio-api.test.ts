@@ -9,6 +9,8 @@ import {
   getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
+  getNpcDefinition,
+  getNpcAppearanceManifest,
   getNpcLookupDirectory,
   getNpcLookupImportJob,
   getNpcLookupImportJobs,
@@ -18,6 +20,7 @@ import {
   startAssetImport,
   startNpcLookupImport,
   updateNpcLookupDisplayName,
+  updateNpcDefinition,
   rebuildStaleAssetSources,
   verifyAssetArtifact
 } from '../../app/services/studio-api'
@@ -39,10 +42,52 @@ describe('Studio API service', () => {
 
   it('normalizes directory requests through the service boundary', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 50 })
-    await getNpcDirectory({ query: ' Goblin ', page: 2, pageSize: 50 })
-    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/npcs', {
-      query: { query: 'Goblin', page: 2, pageSize: 50 }
+    await getNpcDirectory({
+      query: ' Goblin ',
+      page: 2,
+      pageSize: 50,
+      npcTypeName: ' Monster ',
+      npcRaceName: ' HUMANOID ',
+      withoutRace: true,
+      npcSexName: ' MALE ',
+      hasVisuals: false
     })
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/npcs', {
+      query: {
+        query: 'Goblin',
+        page: 2,
+        pageSize: 50,
+        npcTypeName: 'Monster',
+        npcRaceName: 'HUMANOID',
+        withoutRace: true,
+        npcSexName: 'MALE',
+        hasVisuals: false
+      }
+    })
+  })
+
+  it('loads and updates an NPC definition through the content API', async () => {
+    fetchMock.mockResolvedValue({})
+    await getNpcDefinition(100)
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/npcs/100')
+
+    const request = {
+      name: 'Goblin', level: 10, npcTypeName: 'Monster', npcRaceName: null, npcSexName: 'MALE'
+    }
+    await updateNpcDefinition(100, request)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npcs/100', {
+      method: 'PATCH', body: request
+    })
+  })
+
+  it('loads one NPC appearance manifest reference through the asset API', async () => {
+    fetchMock.mockResolvedValue({ manifestUrl: '/versions/c1/npc/manifest.json' })
+
+    await getNpcAppearanceManifest(100)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/game-versions/c1/assets/npcappearances/npcs/100/manifest'
+    )
   })
 
   it('loads and starts import jobs through same-origin URLs', async () => {
@@ -54,6 +99,12 @@ describe('Studio API service', () => {
 
     await startAssetImport('textures')
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/textures/imports', {
+      method: 'POST',
+      body: {}
+    })
+
+    await startAssetImport('npcappearances')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/npcappearances/imports', {
       method: 'POST',
       body: {}
     })
@@ -245,6 +296,16 @@ describe('Studio API service', () => {
     await startNpcLookupImport('npc-sexes')
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/content/npc-sexes/imports',
+      { method: 'POST' }
+    )
+    await getNpcLookupImportJobs('npcs')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npcs/imports',
+      { query: { limit: 1 } }
+    )
+    await startNpcLookupImport('npcs')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/npcs/imports',
       { method: 'POST' }
     )
     await startNpcLookupImport('npc-types', 'add_missing')

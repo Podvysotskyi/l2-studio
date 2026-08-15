@@ -41,6 +41,24 @@ public sealed class RequestValidationTests
     }
 
     [Fact]
+    public void ValidatesNpcDirectoryFilters()
+    {
+        var request = new NpcDirectoryRequest(
+            NpcTypeName: new string('t', 65),
+            NpcRaceName: "HUMANOID",
+            WithoutRace: true,
+            NpcSexName: new string('s', 65));
+        var context = CreateContext(request);
+
+        new ValidateDirectoryRequestAttribute().OnActionExecuting(context);
+
+        var problem = Problem(context);
+        Assert.Equal("NPC type filters must contain 64 characters or fewer.", Assert.Single(problem.Errors["npcTypeName"]));
+        Assert.Equal("Choose either a specific NPC race or no race.", Assert.Single(problem.Errors["withoutRace"]));
+        Assert.Equal("NPC sex filters must contain 64 characters or fewer.", Assert.Single(problem.Errors["npcSexName"]));
+    }
+
+    [Fact]
     public void ValidatesAssetCatalogPageBounds()
     {
         var context = CreateContext(new AssetCatalogRequest(Page: 0, PageSize: 501));

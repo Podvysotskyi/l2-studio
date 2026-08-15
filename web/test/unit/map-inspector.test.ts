@@ -152,6 +152,7 @@ describe('map inspector', () => {
       ],
       terrains: [{}],
       actors: [{}],
+      playerStarts: [{}],
       lights: [{}],
       waterVolumes: [{}]
     } as MapManifest
@@ -166,6 +167,7 @@ describe('map inspector', () => {
       bspMeshes: [{ name: 'Higher0' }],
       terrains: [],
       actors: [],
+      playerStarts: [],
       lights: [],
       waterVolumes: []
     })

@@ -660,6 +660,10 @@ public sealed partial class AssetImportJobProcessor
                                 PublishEnvironment(map),
                                 terrains,
                                 actors,
+                                map.PlayerStarts.Select(playerStart => new MapPlayerStartManifestEntry(
+                                    playerStart.Name,
+                                    Vec(playerStart.Location),
+                                    Rot(playerStart.Rotation))).ToArray(),
                                 lights,
                                 waterVolumes,
                                 SceneSkyZones(map.SkyZones, textures, source, warnings),

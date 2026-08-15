@@ -77,7 +77,7 @@ public sealed partial class AssetImportJobProcessor
                 .Concat(publicationItems.Select(item => item.MetadataJson)).Append(metadataJson),
             JsonSerializer.Deserialize<string[]>(job.WarningsJson) ?? [],
             cancellationToken);
-        var fingerprint = AssetArtifactFingerprint.Compute(job.Kind, job.SourceHash!, dependencies.Select(dependency => (
+        var fingerprint = ComputeArtifactFingerprint(job, dependencies.Select(dependency => (
             dependency.Kind, dependency.DependencyKey, dependency.ArtifactFingerprint ?? "missing")));
         (finalPath, provisionalUrlRoot, publicationGroups, publicationItems, metadataJson) = RelocateArtifact(
             job, finalPath, provisionalUrlRoot, fingerprint, publicationGroups, publicationItems, metadataJson);
@@ -410,8 +410,9 @@ public sealed partial class AssetImportJobProcessor
     private string VersionRoot(AssetImportJob job) =>
         AssetImportSourcePaths.VersionRoot(options.Value.SourceRootPath, job.GameVersion);
 
-    private static void Promote(string stagingPath, string finalPath)
+    internal static void Promote(string stagingPath, string finalPath)
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         if (Directory.Exists(finalPath))
         {
             if (File.Exists(Path.Combine(finalPath, ".l2-asset-version")))

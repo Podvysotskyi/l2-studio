@@ -1,5 +1,7 @@
 using L2.Studio.Context.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using System.Linq.Expressions;
 
 namespace L2.Studio.Context;
 
@@ -9,17 +11,33 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
 
     public DbSet<GameVersion> GameVersions => Set<GameVersion>();
     public DbSet<Npc> Npcs => Set<Npc>();
+    public DbSet<NpcStatus> NpcStatuses => Set<NpcStatus>();
+    public DbSet<NpcStats> NpcStats => Set<NpcStats>();
+    public DbSet<NpcStatsVitals> NpcStatsVitals => Set<NpcStatsVitals>();
+    public DbSet<NpcStatsAttack> NpcStatsAttacks => Set<NpcStatsAttack>();
+    public DbSet<NpcStatsDefence> NpcStatsDefences => Set<NpcStatsDefence>();
+    public DbSet<NpcStatsSpeed> NpcStatsSpeeds => Set<NpcStatsSpeed>();
     public DbSet<NpcType> NpcTypes => Set<NpcType>();
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
     public DbSet<NpcSex> NpcSexes => Set<NpcSex>();
     public DbSet<NpcLookupImportRun> NpcLookupImportRuns => Set<NpcLookupImportRun>();
+    public DbSet<Item> Items => Set<Item>();
+    public DbSet<ItemStats> ItemStats => Set<ItemStats>();
+    public DbSet<ItemType> ItemTypes => Set<ItemType>();
+    public DbSet<ItemAction> ItemActions => Set<ItemAction>();
+    public DbSet<ItemBodyPart> ItemBodyParts => Set<ItemBodyPart>();
+    public DbSet<ItemMaterial> ItemMaterials => Set<ItemMaterial>();
+    public DbSet<ItemCrystalType> ItemCrystalTypes => Set<ItemCrystalType>();
+    public DbSet<ItemImportRun> ItemImportRuns => Set<ItemImportRun>();
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<SkillIcon> SkillIcons => Set<SkillIcon>();
+    public DbSet<SkillImportRun> SkillImportRuns => Set<SkillImportRun>();
     public DbSet<SkillOperateType> SkillOperateTypes => Set<SkillOperateType>();
     public DbSet<SkillTargetType> SkillTargetTypes => Set<SkillTargetType>();
     public DbSet<PlayerRace> PlayerRaces => Set<PlayerRace>();
     public DbSet<PlayerSex> PlayerSexes => Set<PlayerSex>();
     public DbSet<PlayerClass> PlayerClasses => Set<PlayerClass>();
+    public DbSet<PlayerImportRun> PlayerImportRuns => Set<PlayerImportRun>();
     public DbSet<PlayerFace> PlayerFaces => Set<PlayerFace>();
     public DbSet<PlayerHairStyle> PlayerHairStyles => Set<PlayerHairStyle>();
     public DbSet<PlayerHairColor> PlayerHairColors => Set<PlayerHairColor>();
@@ -135,6 +153,24 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerRaceId }).OnDelete(DeleteBehavior.Restrict);
         playerHairColor.HasOne(entity => entity.PlayerSex).WithMany(entity => entity.PlayerHairColors)
             .HasForeignKey(entity => new { entity.GameVersion, entity.PlayerSexId }).OnDelete(DeleteBehavior.Restrict);
+
+        var playerImportRun = modelBuilder.Entity<PlayerImportRun>();
+        playerImportRun.ToTable("player_import_runs");
+        playerImportRun.HasKey(entity => entity.Id);
+        playerImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        playerImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        playerImportRun.Property(entity => entity.Mode).HasColumnName("mode").HasMaxLength(32).HasDefaultValue("add_missing");
+        playerImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        playerImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        playerImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        playerImportRun.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        playerImportRun.Property(entity => entity.TotalCount).HasColumnName("total_count");
+        playerImportRun.Property(entity => entity.InsertedCount).HasColumnName("inserted_count");
+        playerImportRun.Property(entity => entity.ExistingCount).HasColumnName("existing_count");
+        playerImportRun.Property(entity => entity.RestoredCount).HasColumnName("restored_count");
+        playerImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        playerImportRun.HasIndex(entity => new { entity.GameVersion, entity.RequestedAt }).HasDatabaseName("ix_player_import_runs_recent");
+        playerImportRun.HasIndex(entity => entity.GameVersion).IsUnique().HasFilter("status IN ('queued', 'running')").HasDatabaseName("ix_player_import_runs_active");
 
         var assetImportRun = modelBuilder.Entity<AssetImportRun>();
         assetImportRun.ToTable("asset_import_runs");
@@ -528,6 +564,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npc.HasKey(entity => new { entity.GameVersion, entity.Id });
         npc.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
         npc.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        npc.Property(entity => entity.AppearanceId).HasColumnName("appearance_id");
         npc.Property(entity => entity.Level).HasColumnName("level");
         npc.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(100).IsRequired(false);
         npc.Property(entity => entity.NpcTypeName).HasColumnName("npc_type_name").HasMaxLength(64);
@@ -548,6 +585,203 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .WithMany(entity => entity.Npcs)
             .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSexName })
             .OnDelete(DeleteBehavior.Restrict);
+
+        var npcStatus = modelBuilder.Entity<NpcStatus>();
+        npcStatus.ToTable("npc_statuses");
+        npcStatus.HasKey(entity => new { entity.GameVersion, entity.NpcId });
+        npcStatus.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        npcStatus.Property(entity => entity.NpcId).HasColumnName("npc_id").ValueGeneratedNever();
+        npcStatus.Property(entity => entity.Attackable).HasColumnName("attackable");
+        npcStatus.Property(entity => entity.Targetable).HasColumnName("targetable");
+        npcStatus.Property(entity => entity.Talkable).HasColumnName("talkable");
+        npcStatus.Property(entity => entity.Undying).HasColumnName("undying");
+        npcStatus.Property(entity => entity.ShowName).HasColumnName("show_name");
+        npcStatus.Property(entity => entity.RandomWalk).HasColumnName("random_walk");
+        npcStatus.Property(entity => entity.CanMove).HasColumnName("can_move");
+        npcStatus.Property(entity => entity.NoSleepMode).HasColumnName("no_sleep_mode");
+        npcStatus.Property(entity => entity.CanBeSown).HasColumnName("can_be_sown");
+        npcStatus.HasOne(entity => entity.Npc)
+            .WithOne(entity => entity.Status)
+            .HasForeignKey<NpcStatus>(entity => new { entity.GameVersion, entity.NpcId })
+            .OnDelete(DeleteBehavior.Cascade);
+
+        ConfigureNpcStats(modelBuilder.Entity<NpcStats>(), "npc_stats", entity => entity.Stats);
+        ConfigureNpcStats(modelBuilder.Entity<NpcStatsVitals>(), "npc_stats_vitals", entity => entity.StatsVitals);
+        ConfigureNpcStats(modelBuilder.Entity<NpcStatsAttack>(), "npc_stats_attack", entity => entity.StatsAttack);
+        ConfigureNpcStats(modelBuilder.Entity<NpcStatsDefence>(), "npc_stats_defence", entity => entity.StatsDefence);
+        ConfigureNpcStats(modelBuilder.Entity<NpcStatsSpeed>(), "npc_stats_speed", entity => entity.StatsSpeed);
+        var npcStats = modelBuilder.Entity<NpcStats>();
+        npcStats.Property(entity => entity.Str).HasColumnName("str");
+        npcStats.Property(entity => entity.Int).HasColumnName("int");
+        npcStats.Property(entity => entity.Dex).HasColumnName("dex");
+        npcStats.Property(entity => entity.Wit).HasColumnName("wit");
+        npcStats.Property(entity => entity.Con).HasColumnName("con");
+        npcStats.Property(entity => entity.Men).HasColumnName("men");
+        npcStats.Property(entity => entity.HitTime).HasColumnName("hit_time");
+        var npcVitals = modelBuilder.Entity<NpcStatsVitals>();
+        npcVitals.Property(entity => entity.Hp).HasColumnName("hp");
+        npcVitals.Property(entity => entity.HpRegen).HasColumnName("hp_regen");
+        npcVitals.Property(entity => entity.Mp).HasColumnName("mp");
+        npcVitals.Property(entity => entity.MpRegen).HasColumnName("mp_regen");
+        var npcAttack = modelBuilder.Entity<NpcStatsAttack>();
+        npcAttack.Property(entity => entity.Physical).HasColumnName("physical");
+        npcAttack.Property(entity => entity.Magical).HasColumnName("magical");
+        npcAttack.Property(entity => entity.Random).HasColumnName("random");
+        npcAttack.Property(entity => entity.Critical).HasColumnName("critical");
+        npcAttack.Property(entity => entity.Accuracy).HasColumnName("accuracy");
+        npcAttack.Property(entity => entity.AttackSpeed).HasColumnName("attack_speed");
+        npcAttack.Property(entity => entity.ReuseDelay).HasColumnName("reuse_delay");
+        npcAttack.Property(entity => entity.Type).HasColumnName("type").HasMaxLength(16);
+        npcAttack.Property(entity => entity.Range).HasColumnName("range");
+        npcAttack.Property(entity => entity.Distance).HasColumnName("distance");
+        npcAttack.Property(entity => entity.Width).HasColumnName("width");
+        var npcDefence = modelBuilder.Entity<NpcStatsDefence>();
+        npcDefence.Property(entity => entity.Physical).HasColumnName("physical");
+        npcDefence.Property(entity => entity.Magical).HasColumnName("magical");
+        npcDefence.Property(entity => entity.Evasion).HasColumnName("evasion");
+        npcDefence.Property(entity => entity.Shield).HasColumnName("shield");
+        npcDefence.Property(entity => entity.ShieldRate).HasColumnName("shield_rate");
+        var npcSpeed = modelBuilder.Entity<NpcStatsSpeed>();
+        npcSpeed.Property(entity => entity.WalkGround).HasColumnName("walk_ground");
+        npcSpeed.Property(entity => entity.RunGround).HasColumnName("run_ground");
+
+        var itemType = modelBuilder.Entity<ItemType>();
+        itemType.ToTable("item_types");
+        itemType.HasKey(entity => new { entity.GameVersion, entity.Name });
+        itemType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
+        itemType.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+        var itemAction = modelBuilder.Entity<ItemAction>();
+        itemAction.ToTable("item_actions");
+        itemAction.HasKey(entity => new { entity.GameVersion, entity.Name });
+        itemAction.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemAction.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
+        itemAction.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+        var itemBodyPart = modelBuilder.Entity<ItemBodyPart>();
+        itemBodyPart.ToTable("item_body_parts");
+        itemBodyPart.HasKey(entity => new { entity.GameVersion, entity.Name });
+        itemBodyPart.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemBodyPart.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
+        itemBodyPart.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+        var itemMaterial = modelBuilder.Entity<ItemMaterial>();
+        itemMaterial.ToTable("item_materials");
+        itemMaterial.HasKey(entity => new { entity.GameVersion, entity.Name });
+        itemMaterial.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemMaterial.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
+        itemMaterial.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+        var itemCrystalType = modelBuilder.Entity<ItemCrystalType>();
+        itemCrystalType.ToTable("item_crystal_types");
+        itemCrystalType.HasKey(entity => new { entity.GameVersion, entity.Name });
+        itemCrystalType.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemCrystalType.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(64);
+        itemCrystalType.Property(entity => entity.DisplayName).HasColumnName("display_name").HasMaxLength(64);
+
+        var item = modelBuilder.Entity<Item>();
+        item.ToTable("items");
+        item.HasKey(entity => new { entity.GameVersion, entity.Id });
+        item.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        item.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        item.Property(entity => entity.Name).HasColumnName("name").HasMaxLength(100);
+        item.Property(entity => entity.ItemTypeName).HasColumnName("item_type_name").HasMaxLength(64);
+        item.Property(entity => entity.ItemActionName).HasColumnName("item_action_name").HasMaxLength(64);
+        item.Property(entity => entity.ItemBodyPartName).HasColumnName("item_body_part_name").HasMaxLength(64);
+        item.Property(entity => entity.ItemMaterialName).HasColumnName("item_material_name").HasMaxLength(64);
+        item.Property(entity => entity.ItemCrystalTypeName).HasColumnName("item_crystal_type_name").HasMaxLength(64);
+        item.Property(entity => entity.Icon).HasColumnName("icon").HasMaxLength(256);
+        item.Property(entity => entity.WeaponType).HasColumnName("weapon_type").HasMaxLength(64);
+        item.Property(entity => entity.ArmorType).HasColumnName("armor_type").HasMaxLength(64);
+        item.Property(entity => entity.EtcItemType).HasColumnName("etcitem_type").HasMaxLength(64);
+        item.Property(entity => entity.DamageRange).HasColumnName("damage_range").HasMaxLength(64);
+        item.Property(entity => entity.DisplayId).HasColumnName("display_id");
+        item.Property(entity => entity.CrystalCount).HasColumnName("crystal_count");
+        item.Property(entity => entity.Weight).HasColumnName("weight");
+        item.Property(entity => entity.Price).HasColumnName("price");
+        item.Property(entity => entity.Soulshots).HasColumnName("soulshots");
+        item.Property(entity => entity.Spiritshots).HasColumnName("spiritshots");
+        item.Property(entity => entity.MpConsume).HasColumnName("mp_consume");
+        item.Property(entity => entity.ReducedMpConsume).HasColumnName("reduced_mp_consume").HasMaxLength(64);
+        item.Property(entity => entity.ReuseDelay).HasColumnName("reuse_delay");
+        item.Property(entity => entity.RecipeId).HasColumnName("recipe_id");
+        item.Property(entity => entity.Handler).HasColumnName("handler").HasMaxLength(64);
+        item.Property(entity => entity.ItemSkill).HasColumnName("item_skill").HasMaxLength(64);
+        item.Property(entity => entity.UseCondition).HasColumnName("use_condition").HasMaxLength(512);
+        item.Property(entity => entity.ElementEnabled).HasColumnName("element_enabled");
+        item.Property(entity => entity.EnchantEnabled).HasColumnName("enchant_enabled");
+        item.Property(entity => entity.ForNpc).HasColumnName("for_npc");
+        item.Property(entity => entity.ImmediateEffect).HasColumnName("immediate_effect");
+        item.Property(entity => entity.IsAttackWeapon).HasColumnName("is_attack_weapon");
+        item.Property(entity => entity.IsForceEquip).HasColumnName("is_force_equip");
+        item.Property(entity => entity.IsDepositable).HasColumnName("is_depositable");
+        item.Property(entity => entity.IsDestroyable).HasColumnName("is_destroyable");
+        item.Property(entity => entity.IsDropable).HasColumnName("is_dropable");
+        item.Property(entity => entity.IsMagicWeapon).HasColumnName("is_magic_weapon");
+        item.Property(entity => entity.IsOlyRestricted).HasColumnName("is_oly_restricted");
+        item.Property(entity => entity.IsQuestItem).HasColumnName("is_questitem");
+        item.Property(entity => entity.IsSellable).HasColumnName("is_sellable");
+        item.Property(entity => entity.IsStackable).HasColumnName("is_stackable");
+        item.Property(entity => entity.IsTradable).HasColumnName("is_tradable");
+        item.Property(entity => entity.UseWeaponSkillsOnly).HasColumnName("use_weapon_skills_only");
+        item.HasIndex(entity => new { entity.GameVersion, entity.Name }).HasDatabaseName("ix_items_name");
+        item.HasIndex(entity => new { entity.GameVersion, entity.ItemTypeName }).HasDatabaseName("ix_items_item_type_name");
+        item.HasOne(entity => entity.ItemType).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemTypeName }).OnDelete(DeleteBehavior.Restrict);
+        item.HasOne(entity => entity.ItemAction).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemActionName }).OnDelete(DeleteBehavior.Restrict);
+        item.HasOne(entity => entity.ItemBodyPart).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemBodyPartName }).OnDelete(DeleteBehavior.Restrict);
+        item.HasOne(entity => entity.ItemMaterial).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemMaterialName }).OnDelete(DeleteBehavior.Restrict);
+        item.HasOne(entity => entity.ItemCrystalType).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemCrystalTypeName }).OnDelete(DeleteBehavior.Restrict);
+        var itemStats = modelBuilder.Entity<ItemStats>();
+        itemStats.ToTable("item_stats");
+        itemStats.HasKey(entity => new { entity.GameVersion, entity.ItemId });
+        itemStats.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemStats.Property(entity => entity.ItemId).HasColumnName("item_id").ValueGeneratedNever();
+        itemStats.Property(entity => entity.AccuracyCombat).HasColumnName("accuracy_combat");
+        itemStats.Property(entity => entity.CriticalRate).HasColumnName("critical_rate");
+        itemStats.Property(entity => entity.MagicalAttack).HasColumnName("magical_attack");
+        itemStats.Property(entity => entity.MagicalDefence).HasColumnName("magical_defence");
+        itemStats.Property(entity => entity.MaximumMp).HasColumnName("maximum_mp");
+        itemStats.Property(entity => entity.PhysicalAttack).HasColumnName("physical_attack");
+        itemStats.Property(entity => entity.PhysicalAttackRange).HasColumnName("physical_attack_range");
+        itemStats.Property(entity => entity.PhysicalAttackSpeed).HasColumnName("physical_attack_speed");
+        itemStats.Property(entity => entity.PhysicalDefence).HasColumnName("physical_defence");
+        itemStats.Property(entity => entity.Evasion).HasColumnName("evasion");
+        itemStats.Property(entity => entity.ShieldRate).HasColumnName("shield_rate");
+        itemStats.Property(entity => entity.RandomDamage).HasColumnName("random_damage");
+        itemStats.Property(entity => entity.ShieldDefence).HasColumnName("shield_defence");
+        itemStats.HasOne(entity => entity.Item).WithOne(entity => entity.Stats).HasForeignKey<ItemStats>(entity => new { entity.GameVersion, entity.ItemId }).OnDelete(DeleteBehavior.Cascade);
+        var itemImportRun = modelBuilder.Entity<ItemImportRun>();
+        itemImportRun.ToTable("item_import_runs");
+        itemImportRun.HasKey(entity => entity.Id);
+        itemImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        itemImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        itemImportRun.Property(entity => entity.Mode).HasColumnName("mode").HasMaxLength(32).HasDefaultValue("add_missing");
+        itemImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        itemImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        itemImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        itemImportRun.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        itemImportRun.Property(entity => entity.TotalCount).HasColumnName("total_count");
+        itemImportRun.Property(entity => entity.InsertedCount).HasColumnName("inserted_count");
+        itemImportRun.Property(entity => entity.ExistingCount).HasColumnName("existing_count");
+        itemImportRun.Property(entity => entity.RestoredCount).HasColumnName("restored_count");
+        itemImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        itemImportRun.HasIndex(entity => new { entity.GameVersion, entity.RequestedAt }).HasDatabaseName("ix_item_import_runs_recent");
+        itemImportRun.HasIndex(entity => entity.GameVersion).IsUnique().HasFilter("status IN ('queued', 'running')").HasDatabaseName("ix_item_import_runs_active");
+
+        var skillImportRun = modelBuilder.Entity<SkillImportRun>();
+        skillImportRun.ToTable("skill_import_runs");
+        skillImportRun.HasKey(entity => entity.Id);
+        skillImportRun.Property(entity => entity.Id).HasColumnName("id").ValueGeneratedNever();
+        skillImportRun.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        skillImportRun.Property(entity => entity.Mode).HasColumnName("mode").HasMaxLength(32).HasDefaultValue("add_missing");
+        skillImportRun.Property(entity => entity.Status).HasColumnName("status").HasMaxLength(32);
+        skillImportRun.Property(entity => entity.RequestedAt).HasColumnName("requested_at");
+        skillImportRun.Property(entity => entity.StartedAt).HasColumnName("started_at");
+        skillImportRun.Property(entity => entity.FinishedAt).HasColumnName("finished_at");
+        skillImportRun.Property(entity => entity.TotalCount).HasColumnName("total_count");
+        skillImportRun.Property(entity => entity.InsertedCount).HasColumnName("inserted_count");
+        skillImportRun.Property(entity => entity.ExistingCount).HasColumnName("existing_count");
+        skillImportRun.Property(entity => entity.RestoredCount).HasColumnName("restored_count");
+        skillImportRun.Property(entity => entity.Error).HasColumnName("error").HasMaxLength(4000);
+        skillImportRun.HasIndex(entity => new { entity.GameVersion, entity.RequestedAt }).HasDatabaseName("ix_skill_import_runs_recent");
+        skillImportRun.HasIndex(entity => entity.GameVersion).IsUnique().HasFilter("status IN ('queued', 'running')").HasDatabaseName("ix_skill_import_runs_active");
 
         var skillIcon = modelBuilder.Entity<SkillIcon>();
         skillIcon.ToTable(
@@ -605,11 +839,27 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         playerFace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         playerHairStyle.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         playerHairColor.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        playerImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcRace.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcSex.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcLookupImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        skillImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npc.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcStatus.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcVitals.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcAttack.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcDefence.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpeed.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemAction.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemBodyPart.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemMaterial.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemCrystalType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        item.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemImportRun.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillTargetType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -620,9 +870,13 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
 
         foreach (var entityType in new[]
         {
-            typeof(PlayerRace), typeof(PlayerSex), typeof(PlayerClass), typeof(PlayerFace),
+            typeof(PlayerRace), typeof(PlayerSex), typeof(PlayerClass), typeof(PlayerImportRun), typeof(PlayerFace),
             typeof(PlayerHairStyle), typeof(PlayerHairColor), typeof(NpcType), typeof(NpcRace),
-            typeof(NpcSex), typeof(Npc), typeof(NpcLookupImportRun), typeof(SkillOperateType), typeof(SkillTargetType),
+            typeof(NpcSex), typeof(Npc), typeof(NpcStatus), typeof(NpcStats), typeof(NpcStatsVitals),
+            typeof(NpcStatsAttack), typeof(NpcStatsDefence), typeof(NpcStatsSpeed), typeof(NpcLookupImportRun),
+            typeof(ItemType), typeof(ItemAction), typeof(ItemBodyPart), typeof(ItemMaterial), typeof(ItemCrystalType),
+            typeof(Item), typeof(ItemStats), typeof(ItemImportRun), typeof(SkillImportRun),
+            typeof(SkillOperateType), typeof(SkillTargetType),
             typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),
             typeof(AssetCatalog)
         })
@@ -630,5 +884,21 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             modelBuilder.Entity(entityType).Property<string>(nameof(PlayerRace.GameVersion))
                 .HasDefaultValue("interlude");
         }
+    }
+
+    private static void ConfigureNpcStats<TEntity>(
+        EntityTypeBuilder<TEntity> stats,
+        string tableName,
+        Expression<Func<Npc, TEntity?>> navigation)
+        where TEntity : class, INpcStatsRecord
+    {
+        stats.ToTable(tableName);
+        stats.HasKey(entity => new { entity.GameVersion, entity.NpcId });
+        stats.Property(entity => entity.GameVersion).HasColumnName("game_version").HasMaxLength(32);
+        stats.Property(entity => entity.NpcId).HasColumnName("npc_id").ValueGeneratedNever();
+        stats.HasOne(entity => entity.Npc)
+            .WithOne(navigation)
+            .HasForeignKey<TEntity>(entity => new { entity.GameVersion, entity.NpcId })
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

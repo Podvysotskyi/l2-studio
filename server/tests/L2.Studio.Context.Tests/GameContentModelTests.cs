@@ -18,6 +18,12 @@ public sealed class GameContentModelTests
         Assert.Equal("asset_import_runs", Entity<AssetImportRun>(context).GetTableName());
         Assert.Equal("asset_catalogs", Entity<AssetCatalog>(context).GetTableName());
         Assert.Equal("skills", Entity<Skill>(context).GetTableName());
+        Assert.Equal("npc_statuses", Entity<NpcStatus>(context).GetTableName());
+        Assert.Equal("npc_stats", Entity<NpcStats>(context).GetTableName());
+        Assert.Equal("npc_stats_vitals", Entity<NpcStatsVitals>(context).GetTableName());
+        Assert.Equal("npc_stats_attack", Entity<NpcStatsAttack>(context).GetTableName());
+        Assert.Equal("npc_stats_defence", Entity<NpcStatsDefence>(context).GetTableName());
+        Assert.Equal("npc_stats_speed", Entity<NpcStatsSpeed>(context).GetTableName());
     }
 
     [Fact]
@@ -65,6 +71,39 @@ public sealed class GameContentModelTests
             key.PrincipalEntityType.ClrType == typeof(NpcSex) &&
             key.Properties.Select(property => property.Name).SequenceEqual(
                 [nameof(Npc.GameVersion), nameof(Npc.NpcSexName)]));
+
+        var status = Entity<NpcStatus>(context);
+        Assert.Equal(
+            [nameof(NpcStatus.GameVersion), nameof(NpcStatus.NpcId)],
+            status.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        var statusNpc = Assert.Single(status.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Npc));
+        Assert.Equal(DeleteBehavior.Cascade, statusNpc.DeleteBehavior);
+        Assert.Equal(
+            [nameof(NpcStatus.GameVersion), nameof(NpcStatus.NpcId)],
+            statusNpc.Properties.Select(property => property.Name));
+        Assert.All(
+            new[]
+            {
+                nameof(NpcStatus.Attackable), nameof(NpcStatus.Targetable), nameof(NpcStatus.Talkable),
+                nameof(NpcStatus.Undying), nameof(NpcStatus.ShowName), nameof(NpcStatus.RandomWalk),
+                nameof(NpcStatus.CanMove), nameof(NpcStatus.NoSleepMode), nameof(NpcStatus.CanBeSown)
+            },
+            property => Assert.False(status.FindProperty(property)!.IsNullable));
+
+        Assert.All(
+            new IEntityType[]
+            {
+                Entity<NpcStats>(context), Entity<NpcStatsVitals>(context), Entity<NpcStatsAttack>(context),
+                Entity<NpcStatsDefence>(context), Entity<NpcStatsSpeed>(context)
+            },
+            stats =>
+            {
+                Assert.Equal(["GameVersion", "NpcId"], stats.FindPrimaryKey()!.Properties.Select(property => property.Name));
+                Assert.Contains(stats.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Npc) && key.DeleteBehavior == DeleteBehavior.Cascade);
+            });
+        var npcStats = Entity<NpcStats>(context);
+        Assert.True(npcStats.FindProperty(nameof(NpcStats.HitTime))!.IsNullable);
+        Assert.Equal("hit_time", npcStats.FindProperty(nameof(NpcStats.HitTime))!.GetColumnName());
 
         var importRun = Entity<NpcLookupImportRun>(context);
         Assert.Equal("add_missing", importRun.FindProperty(nameof(NpcLookupImportRun.Mode))!.GetDefaultValue());

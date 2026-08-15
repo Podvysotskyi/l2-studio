@@ -77,4 +77,49 @@ public sealed class GlbStaticMeshEncoderTests
         Assert.True(l2.GetProperty("clampU").GetBoolean());
         Assert.False(l2.GetProperty("clampV").GetBoolean());
     }
+
+    [Fact]
+    public void PublishesLuminanceOpacityAnimationForLegacyTranslucency()
+    {
+        var mesh = new UnrealStaticMesh(
+            "flame",
+            [Vector3.Zero, Vector3.UnitX, Vector3.UnitY],
+            [Vector3.UnitZ, Vector3.UnitZ, Vector3.UnitZ],
+            [Vector2.Zero, Vector2.UnitX, Vector2.UnitY],
+            [0, 1, 2],
+            [new UnrealStaticMeshSection(0, 3)]);
+        var animation = new StaticMeshTextureAnimation(
+            ["/flame-1.webp", "/flame-2.webp"],
+            20);
+        var material = new StaticMeshMaterialBinding(
+            "flame",
+            "/flame.webp",
+            "/flame.webp",
+            null,
+            StaticMeshBlendMode.AlphaBlend,
+            true,
+            0.5f,
+            false,
+            true,
+            StaticMeshOpacitySource.Texture,
+            StaticMeshOpacityChannel.Luminance,
+            DiffuseAnimation: animation,
+            OpacityAnimation: animation);
+
+        var glb = GlbStaticMeshEncoder.Encode(mesh, [material]);
+
+        var jsonLength = BinaryPrimitives.ReadUInt32LittleEndian(glb.AsSpan(12, 4));
+        using var document = JsonDocument.Parse(glb.AsSpan(20, (int)jsonLength).ToArray());
+        var published = document.RootElement.GetProperty("materials")[0];
+        var l2 = published.GetProperty("extras").GetProperty("l2");
+        Assert.Equal("BLEND", published.GetProperty("alphaMode").GetString());
+        Assert.Equal("/flame.webp", l2.GetProperty("opacityUrl").GetString());
+        Assert.Equal("texture", l2.GetProperty("opacitySource").GetString());
+        Assert.Equal("luminance", l2.GetProperty("opacityChannel").GetString());
+        Assert.Equal(20, l2.GetProperty("opacityAnimation").GetProperty("frameRate").GetSingle());
+        Assert.Equal(
+            ["/flame-1.webp", "/flame-2.webp"],
+            l2.GetProperty("opacityAnimation").GetProperty("frameUrls")
+                .EnumerateArray().Select(value => value.GetString()!).ToArray());
+    }
 }

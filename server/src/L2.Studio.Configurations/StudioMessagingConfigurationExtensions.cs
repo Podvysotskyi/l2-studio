@@ -68,6 +68,7 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<DiscoverTextures>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverStaticMeshes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverAnimations>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<DiscoverNpcAppearances>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverSounds>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverMusic>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverMaps>().ToPostgresqlQueue(ControlQueue);
@@ -78,6 +79,10 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<DeleteAssetVersion>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ValidateAssetRelease>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ActivateAssetRelease>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1Npcs>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1Items>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1Skills>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1Players>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1NpcTypes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC4NpcTypes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportInterludeNpcTypes>().ToPostgresqlQueue(ControlQueue);
@@ -94,6 +99,7 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<ImportTextureFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportStaticMeshFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportAnimationFile>().ToPostgresqlQueue(FileQueue);
+        options.PublishMessage<ImportNpcAppearanceFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportSoundFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportMusicFile>().ToPostgresqlQueue(FileQueue);
         options.PublishMessage<ImportMapFile>().ToPostgresqlQueue(FileQueue);

@@ -4,12 +4,45 @@ using L2.Studio.Migrations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
 
 namespace L2.Studio.Migrations.Tests;
 
 public sealed class GameVersionSeederTests
 {
+    [Fact]
+    public void BuildsTheMigrationSnapshot()
+    {
+        var snapshotType = typeof(GameVersionSeeder).Assembly.GetType(
+            "L2.Studio.Migrations.Migrations.GameContentDbContextModelSnapshot",
+            throwOnError: true)!;
+        var snapshot = Assert.IsAssignableFrom<ModelSnapshot>(Activator.CreateInstance(snapshotType, nonPublic: true));
+
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatus)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStats)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsVitals)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsAttack)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsDefence)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsSpeed)));
+    }
+
+    [Fact]
+    public void MigrationSnapshotMatchesTheCurrentModel()
+    {
+        using var context = CreateNpgsqlContext();
+        var snapshotType = typeof(GameVersionSeeder).Assembly.GetType(
+            "L2.Studio.Migrations.Migrations.GameContentDbContextModelSnapshot",
+            throwOnError: true)!;
+        var snapshot = Assert.IsAssignableFrom<ModelSnapshot>(Activator.CreateInstance(snapshotType, nonPublic: true));
+        var differ = context.GetService<IMigrationsModelDiffer>();
+        var initializer = context.GetService<IModelRuntimeInitializer>();
+        var source = initializer.Initialize(snapshot.Model, designTime: true);
+        var target = context.GetService<IDesignTimeModel>().Model;
+
+        Assert.Empty(differ.GetDifferences(source.GetRelationalModel(), target.GetRelationalModel()));
+    }
+
     [Fact]
     public async Task SeedsAndReconcilesCanonicalVersionsWithoutRemovingCustomVersions()
     {
@@ -57,6 +90,14 @@ public sealed class GameVersionSeederTests
     {
         var options = new DbContextOptionsBuilder<GameContentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new GameContentDbContext(options);
+    }
+
+    private static GameContentDbContext CreateNpgsqlContext()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseNpgsql("Host=localhost;Database=model;Username=model;Password=model")
             .Options;
         return new GameContentDbContext(options);
     }

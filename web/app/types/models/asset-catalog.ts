@@ -5,6 +5,7 @@ export type AssetImportKind =
   | 'sounds'
   | 'staticmeshes'
   | 'animations'
+  | 'npcappearances'
   | 'maps'
   | 'mappreviews'
   | 'scenes'
@@ -274,9 +275,115 @@ export interface AnimationMeshManifestEntry {
   animationUrl: string | null
   clips: AnimationClipManifestEntry[]
   materialCount: number
-  materialStatus: 'referenced' | 'runtime' | 'unavailable'
+  resolvedMaterialCount: number
+  materialStatus: 'resolved' | 'partial' | 'unresolved' | 'none' | 'unavailable'
+  materialError: string | null
+  defaultMaterials: AnimationMeshMaterialSlot[]
   sha256: string | null
   status: 'resolved' | 'skipped'
   error: string | null
   sourceKey: string
+}
+
+export interface AnimationMeshMaterialSlot {
+  sectionIndex: number
+  reference: TextureMaterialReference | null
+  status: 'resolved' | 'unresolved' | 'none'
+}
+
+export interface TextureMaterialReference {
+  packageName: string
+  objectName: string
+  className: string
+}
+
+export interface NpcAppearanceManifestReference {
+  manifestUrl: string
+}
+
+export interface NpcAppearanceManifest {
+  schemaVersion: number
+  kind: 'npcappearances'
+  sourceKey: string
+  sourceHash: string
+  protocol: number
+  npc: NpcAppearanceManifestEntry
+}
+
+export interface NpcAssetReference {
+  reference: string
+  url: string | null
+}
+
+export interface NpcAnimationAssetReference extends NpcAssetReference {
+  animationUrl: string | null
+}
+
+export interface NpcAppearanceMaterialBinding {
+  name: string
+  diffuseUrl: string | null
+  opacityUrl: string | null
+  emissiveUrl: string | null
+  blendMode: 'opaque' | 'masked' | 'alphablend' | 'additive' | 'modulate' | 'invisible'
+  doubleSided: boolean
+  alphaCutoff: number
+  depthWrite: boolean
+  depthTest: boolean
+  opacitySource: 'none' | 'texture'
+  opacityChannel: 'alpha' | 'luminance'
+  panRate: number
+  panRateV: number
+  rotationRate: number
+  detailUrl: string | null
+  detailScale: number
+  diffuseAnimation: { frameUrls: string[], frameRate: number } | null
+  opacityAnimation: { frameUrls: string[], frameRate: number } | null
+  emissiveAnimation: { frameUrls: string[], frameRate: number } | null
+  windMode: 'none' | 'grass' | 'foliage'
+  tint: { r: number, g: number, b: number, a: number } | null
+  uvOscillation: { uType: number, vType: number, uRate: number, vRate: number, uAmplitude: number, vAmplitude: number, uPhase: number, vPhase: number } | null
+  unlit: boolean
+  fade: unknown | null
+  composite: unknown | null
+  selfIlluminationMaskUrl: string | null
+  specularUrl: string | null
+  specularityMaskUrl: string | null
+  performLightingOnSpecularPass: boolean
+  clampU: boolean
+  clampV: boolean
+}
+
+export interface NpcMaterialReference {
+  reference: string
+  url: string | null
+  material: NpcAppearanceMaterialBinding | null
+}
+
+export interface NpcAppearanceMaterialSlot {
+  sectionIndex: number
+  defaultMaterial: NpcMaterialReference | null
+  overrideMaterial: NpcMaterialReference | null
+  effectiveMaterial: NpcMaterialReference | null
+  effectiveSource: 'override' | 'default' | 'fallback'
+  warning: string | null
+}
+
+export interface NpcAppearanceManifestEntry {
+  id: number
+  appearanceId: number
+  appearanceName: string
+  speed: number
+  className: string
+  mesh: NpcAnimationAssetReference
+  textures: NpcMaterialReference[]
+  materialSlots: NpcAppearanceMaterialSlot[]
+  collisionRadius: number
+  collisionHeight: number
+  attackSounds: NpcAssetReference[]
+  defenceSounds: NpcAssetReference[]
+  damageSounds: NpcAssetReference[]
+  soundVolume: number
+  soundRadius: number
+  soundRandomness: number
+  attackEffect: NpcAssetReference
 }

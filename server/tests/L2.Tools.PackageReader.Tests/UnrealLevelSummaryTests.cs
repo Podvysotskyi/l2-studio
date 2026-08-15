@@ -55,6 +55,36 @@ public sealed class UnrealLevelSummaryTests
         Assert.Contains("could not be decoded", level.SummaryWarning, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ReadsPlayerStartLocationsAndExcludesThemFromDiagnostics()
+    {
+        var level = new UnrealPackageReader(PackageWithPlayerStart(PlayerStart())).ReadLevel();
+
+        var playerStart = Assert.Single(level.PlayerStarts);
+        Assert.Equal("PlayerStart0", playerStart.Name);
+        Assert.Equal(new System.Numerics.Vector3(100, 200, 300), playerStart.Location);
+        Assert.Equal(new UnrealRotator(400, 500, 600), playerStart.Rotation);
+        Assert.DoesNotContain("PlayerStart", level.UnrepresentedObjectClasses.Keys);
+    }
+
+    [Fact]
+    public void SkipsDeletedPlayerStarts()
+    {
+        var level = new UnrealPackageReader(PackageWithPlayerStart(DeletedPlayerStart())).ReadLevel();
+
+        Assert.Empty(level.PlayerStarts);
+        Assert.DoesNotContain("PlayerStart", level.UnrepresentedObjectClasses.Keys);
+    }
+
+    [Fact]
+    public void RetainsUnreadablePlayerStartsAsDiagnostics()
+    {
+        var level = new UnrealPackageReader(PackageWithPlayerStart(MalformedPlayerStart())).ReadLevel();
+
+        Assert.Empty(level.PlayerStarts);
+        Assert.Equal(1, level.UnrepresentedObjectClasses["PlayerStart"]);
+    }
+
     private static byte[] LevelSummary()
     {
         var properties = new List<byte>();
@@ -81,13 +111,43 @@ public sealed class UnrealLevelSummaryTests
         return [.. properties];
     }
 
-    private static byte[] Package(params byte[][] summaries)
+    private static byte[] PlayerStart()
+    {
+        var properties = new List<byte>();
+        VectorProperty(properties, "Location", [100f, 200f, 300f]);
+        RotatorProperty(properties, "Rotation", [400, 500, 600]);
+        Name(properties, "None");
+        return [.. properties];
+    }
+
+    private static byte[] DeletedPlayerStart()
+    {
+        var properties = new List<byte>();
+        BoolProperty(properties, "bDeleteMe", true);
+        Name(properties, "None");
+        return [.. properties];
+    }
+
+    private static byte[] MalformedPlayerStart()
+    {
+        var properties = new List<byte>();
+        Name(properties, "Location");
+        properties.Add(0x5d);
+        return [.. properties];
+    }
+
+    private static byte[] Package(params byte[][] summaries) => BuildPackage(summaries, null);
+
+    private static byte[] PackageWithPlayerStart(byte[] playerStart) => BuildPackage([], playerStart);
+
+    private static byte[] BuildPackage(IReadOnlyList<byte[]> summaries, byte[]? playerStart)
     {
         var names = new[]
         {
             "None", "Core", "Class", "LevelSummary", "Texture", "Summary", "ScreenshotMaterial",
             "Title", "Author", "Description", "LevelEnterText", "ExtraInfo", "DecoTextName",
-            "HideFromMenus", "IdealPlayerCountMin", "IdealPlayerCountMax", "SinglePlayerTeamSize", "Screenshot"
+            "HideFromMenus", "IdealPlayerCountMin", "IdealPlayerCountMax", "SinglePlayerTeamSize", "Screenshot",
+            "PlayerStart", "PlayerStart0", "Location", "Rotation", "Vector", "Rotator", "bDeleteMe"
         };
         var nameIndices = names.Select((name, index) => (name, index)).ToDictionary(item => item.name, item => item.index);
         var nameTable = new List<byte>();
@@ -100,10 +160,12 @@ public sealed class UnrealLevelSummaryTests
         var importTable = new List<byte>();
         Import(importTable, nameIndices, "LevelSummary");
         Import(importTable, nameIndices, "Texture");
+        Import(importTable, nameIndices, "PlayerStart");
 
         var exports = new List<(int ClassIndex, string Name, byte[] Data)>();
         exports.AddRange(summaries.Select(summary => (-1, "Summary", summary)));
-        if (summaries.Length > 0) exports.Add((-2, "ScreenshotMaterial", Array.Empty<byte>()));
+        if (summaries.Count > 0) exports.Add((-2, "ScreenshotMaterial", Array.Empty<byte>()));
+        if (playerStart is not null) exports.Add((-3, "PlayerStart0", playerStart));
         var exportSize = exports.Sum(export =>
             CompactIndexSize(export.ClassIndex) + 1 + sizeof(int) + 1 + sizeof(uint) +
             CompactIndexSize(export.Data.Length) + (export.Data.Length == 0 ? 0 : 2));
@@ -137,7 +199,7 @@ public sealed class UnrealLevelSummaryTests
         Int32(package, nameOffset);
         Int32(package, exports.Count);
         Int32(package, exportOffset);
-        Int32(package, 2);
+        Int32(package, 3);
         Int32(package, importOffset);
         package.AddRange(nameTable);
         package.AddRange(importTable);
@@ -184,12 +246,33 @@ public sealed class UnrealLevelSummaryTests
         CompactIndex(target, value);
     }
 
+    private static void VectorProperty(
+        List<byte> target,
+        string name,
+        IReadOnlyList<float> values)
+    {
+        Name(target, name);
+        target.Add(0x3b);
+        foreach (var value in values) Single(target, value);
+    }
+
+    private static void RotatorProperty(
+        List<byte> target,
+        string name,
+        IReadOnlyList<int> values)
+    {
+        Name(target, name);
+        target.Add(0x3c);
+        foreach (var value in values) Int32(target, value);
+    }
+
     private static void Name(List<byte> target, string name) =>
         CompactIndex(target, Array.IndexOf(new[]
         {
             "None", "Core", "Class", "LevelSummary", "Texture", "Summary", "ScreenshotMaterial",
             "Title", "Author", "Description", "LevelEnterText", "ExtraInfo", "DecoTextName",
-            "HideFromMenus", "IdealPlayerCountMin", "IdealPlayerCountMax", "SinglePlayerTeamSize", "Screenshot"
+            "HideFromMenus", "IdealPlayerCountMin", "IdealPlayerCountMax", "SinglePlayerTeamSize", "Screenshot",
+            "PlayerStart", "PlayerStart0", "Location", "Rotation", "Vector", "Rotator", "bDeleteMe"
         }, name));
 
     private static void Name(List<byte> target, IReadOnlyDictionary<string, int> names, string name) =>
@@ -237,6 +320,13 @@ public sealed class UnrealLevelSummaryTests
     {
         Span<byte> bytes = stackalloc byte[sizeof(int)];
         BinaryPrimitives.WriteInt32LittleEndian(bytes, value);
+        target.AddRange(bytes);
+    }
+
+    private static void Single(List<byte> target, float value)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(float)];
+        BinaryPrimitives.WriteSingleLittleEndian(bytes, value);
         target.AddRange(bytes);
     }
 

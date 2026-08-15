@@ -6,9 +6,9 @@ import {
 
 describe('scene manifest schema', () => {
   it('accepts the current published scene manifest schema only', () => {
-    expect(sceneManifestSchemaVersion).toBe(12)
-    expect(isSupportedSceneManifestSchema(12)).toBe(true)
-    expect(isSupportedSceneManifestSchema(11)).toBe(false)
-    expect(isSupportedSceneManifestSchema(13)).toBe(false)
+    expect(sceneManifestSchemaVersion).toBe(13)
+    expect(isSupportedSceneManifestSchema(13)).toBe(true)
+    expect(isSupportedSceneManifestSchema(12)).toBe(false)
+    expect(isSupportedSceneManifestSchema(14)).toBe(false)
   })
 })
