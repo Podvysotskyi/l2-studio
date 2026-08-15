@@ -20,15 +20,12 @@ public static class StudioApplicationConfigurationExtensions
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();
         services.AddScoped<IAssetReleaseRepository, AssetReleaseRepository>();
         services.AddScoped<IAssetImportRepository, AssetImportRepository>();
-        services.AddScoped<INpcLookupImportRepository, NpcLookupImportRepository>();
-        services.AddScoped<IItemImportRepository, ItemImportRepository>();
-        services.AddScoped<ISkillImportRepository, SkillImportRepository>();
-        services.AddScoped<IPlayerImportRepository, PlayerImportRepository>();
+        services.AddScoped<IImportJobRepository, ImportJobRepository>();
         services.AddScoped<IAssetCatalogStore, AssetCatalogStore>();
         services.AddSingleton<GameVersionSeeder>();
         services.TryAddTimeProvider();
         services.AddHostedService<GameContentInitializer>();
-        services.AddHostedService<AssetImportAbandonmentService>();
+        services.AddHostedService<ImportJobAbandonmentService>();
         return services;
     }
 

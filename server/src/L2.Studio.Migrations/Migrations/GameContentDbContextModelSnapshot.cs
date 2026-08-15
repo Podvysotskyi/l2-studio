@@ -609,119 +609,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("asset_import_diagnostics", "content");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("CompletedFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("completed_file_count");
-
-                    b.Property<int>("DiscoveredFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("discovered_file_count");
-
-                    b.Property<DateTimeOffset?>("DiscoveryFinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("discovery_finished_at");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("error");
-
-                    b.Property<int>("FailedFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_file_count");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<bool>("Force")
-                        .HasColumnType("boolean")
-                        .HasColumnName("force");
-
-                    b.Property<string>("GameVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("interlude")
-                        .HasColumnName("game_version");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("kind");
-
-                    b.Property<DateTimeOffset?>("LastHeartbeatAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_heartbeat_at");
-
-                    b.Property<string>("NormalizedRequestedSourceKey")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("normalized_requested_source_key");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<string>("RequestedSourceKey")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("requested_source_key");
-
-                    b.Property<int>("ReusedFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("reused_file_count");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("SucceededFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("succeeded_file_count");
-
-                    b.Property<string>("TriggerType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("trigger_type");
-
-                    b.Property<int>("WarningFileCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("warning_file_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVersion", "Kind")
-                        .IsUnique()
-                        .HasDatabaseName("ix_asset_import_runs_active_full_scan_kind")
-                        .HasFilter("trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')");
-
-                    b.HasIndex("GameVersion", "Kind", "NormalizedRequestedSourceKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_asset_import_runs_active_single_source")
-                        .HasFilter("trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')");
-
-                    b.HasIndex("GameVersion", "Kind", "RequestedAt")
-                        .HasDatabaseName("ix_asset_import_runs_kind_requested");
-
-                    b.ToTable("asset_import_runs", "content");
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1113,6 +1000,74 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("game_versions", "content");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.ImportJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("GameVersion")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LastHeartbeatAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_heartbeat_at");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameVersion", "RequestedAt")
+                        .HasDatabaseName("ix_import_jobs_recent");
+
+                    b.HasIndex("GameVersion", "Category", "Kind", "RequestedAt")
+                        .HasDatabaseName("ix_import_jobs_target_recent");
+
+                    b.ToTable("import_jobs", "content");
+
+                    b.HasDiscriminator<string>("Category").HasValue("ImportJob");
+
+                    b.UseTphMappingStrategy();
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.Item", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -1397,80 +1352,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("item_crystal_types", "content");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.ItemImportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("error");
-
-                    b.Property<int>("ExistingCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("existing_count");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<string>("GameVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("interlude")
-                        .HasColumnName("game_version");
-
-                    b.Property<int>("InsertedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("inserted_count");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("add_missing")
-                        .HasColumnName("mode");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<int>("RestoredCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("restored_count");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("TotalCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVersion")
-                        .IsUnique()
-                        .HasDatabaseName("ix_item_import_runs_active")
-                        .HasFilter("status IN ('queued', 'running')");
-
-                    b.HasIndex("GameVersion", "RequestedAt")
-                        .HasDatabaseName("ix_item_import_runs_recent");
-
-                    b.ToTable("item_import_runs", "content");
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemMaterial", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -1649,86 +1530,6 @@ namespace L2.Studio.Migrations.Migrations
                         {
                             t.HasCheckConstraint("ck_npcs_level", "level BETWEEN 1 AND 255");
                         });
-                });
-
-            modelBuilder.Entity("L2.Studio.Context.Entities.NpcLookupImportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("error");
-
-                    b.Property<int>("ExistingCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("existing_count");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<string>("GameVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("interlude")
-                        .HasColumnName("game_version");
-
-                    b.Property<int>("InsertedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("inserted_count");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("add_missing")
-                        .HasColumnName("mode");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<int>("RestoredCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("restored_count");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("TotalCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVersion", "Kind")
-                        .IsUnique()
-                        .HasDatabaseName("ix_npc_lookup_import_runs_active")
-                        .HasFilter("status IN ('queued', 'running')");
-
-                    b.HasIndex("GameVersion", "Kind", "RequestedAt")
-                        .HasDatabaseName("ix_npc_lookup_import_runs_recent");
-
-                    b.ToTable("npc_lookup_import_runs", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcRace", b =>
@@ -2234,80 +2035,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("player_hair_styles", "content");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.PlayerImportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("error");
-
-                    b.Property<int>("ExistingCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("existing_count");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<string>("GameVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("interlude")
-                        .HasColumnName("game_version");
-
-                    b.Property<int>("InsertedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("inserted_count");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("add_missing")
-                        .HasColumnName("mode");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<int>("RestoredCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("restored_count");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("TotalCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVersion")
-                        .IsUnique()
-                        .HasDatabaseName("ix_player_import_runs_active")
-                        .HasFilter("status IN ('queued', 'running')");
-
-                    b.HasIndex("GameVersion", "RequestedAt")
-                        .HasDatabaseName("ix_player_import_runs_recent");
-
-                    b.ToTable("player_import_runs", "content");
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.PlayerRace", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -2387,25 +2114,23 @@ namespace L2.Studio.Migrations.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<int?>("SkillOperateTypeId")
-                        .HasColumnType("integer")
-                        .HasColumnName("skill_operate_type_id");
+                    b.Property<string>("SkillOperateTypeName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("skill_operate_type_name");
 
-                    b.Property<int?>("SkillTargetTypeId")
-                        .HasColumnType("integer")
-                        .HasColumnName("skill_target_type_id");
+                    b.Property<string>("SkillTargetTypeName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("skill_target_type_name");
 
                     b.HasKey("GameVersion", "Id");
 
-                    b.HasIndex("SkillOperateTypeId")
-                        .HasDatabaseName("ix_skills_skill_operate_type_id");
+                    b.HasIndex("GameVersion", "SkillOperateTypeName")
+                        .HasDatabaseName("ix_skills_skill_operate_type_name");
 
-                    b.HasIndex("SkillTargetTypeId")
-                        .HasDatabaseName("ix_skills_skill_target_type_id");
-
-                    b.HasIndex("GameVersion", "SkillOperateTypeId");
-
-                    b.HasIndex("GameVersion", "SkillTargetTypeId");
+                    b.HasIndex("GameVersion", "SkillTargetTypeName")
+                        .HasDatabaseName("ix_skills_skill_target_type_name");
 
                     b.ToTable("skills", "content", t =>
                         {
@@ -2444,80 +2169,6 @@ namespace L2.Studio.Migrations.Migrations
                         });
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.SkillImportRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("error");
-
-                    b.Property<int>("ExistingCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("existing_count");
-
-                    b.Property<DateTimeOffset?>("FinishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("finished_at");
-
-                    b.Property<string>("GameVersion")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("interlude")
-                        .HasColumnName("game_version");
-
-                    b.Property<int>("InsertedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("inserted_count");
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("add_missing")
-                        .HasColumnName("mode");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<int>("RestoredCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("restored_count");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<int>("TotalCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_count");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVersion")
-                        .IsUnique()
-                        .HasDatabaseName("ix_skill_import_runs_active")
-                        .HasFilter("status IN ('queued', 'running')");
-
-                    b.HasIndex("GameVersion", "RequestedAt")
-                        .HasDatabaseName("ix_skill_import_runs_recent");
-
-                    b.ToTable("skill_import_runs", "content");
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.SkillOperateType", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -2527,21 +2178,18 @@ namespace L2.Studio.Migrations.Migrations
                         .HasDefaultValue("interlude")
                         .HasColumnName("game_version");
 
-                    b.Property<int>("Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("name");
 
-                    b.HasKey("GameVersion", "Id");
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
 
-                    b.HasIndex("GameVersion", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_skill_operate_types_name");
+                    b.HasKey("GameVersion", "Name");
 
                     b.ToTable("skill_operate_types", "content");
                 });
@@ -2555,23 +2203,134 @@ namespace L2.Studio.Migrations.Migrations
                         .HasDefaultValue("interlude")
                         .HasColumnName("game_version");
 
-                    b.Property<int>("Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("name");
 
-                    b.HasKey("GameVersion", "Id");
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("display_name");
 
-                    b.HasIndex("GameVersion", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_skill_target_types_name");
+                    b.HasKey("GameVersion", "Name");
 
                     b.ToTable("skill_target_types", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
+                {
+                    b.HasBaseType("L2.Studio.Context.Entities.ImportJob");
+
+                    b.Property<int>("CompletedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_file_count");
+
+                    b.Property<int>("DiscoveredFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("discovered_file_count");
+
+                    b.Property<DateTimeOffset?>("DiscoveryFinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("discovery_finished_at");
+
+                    b.Property<int>("FailedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_file_count");
+
+                    b.Property<bool>("Force")
+                        .HasColumnType("boolean")
+                        .HasColumnName("force");
+
+                    b.Property<string>("NormalizedRequestedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("normalized_requested_source_key");
+
+                    b.Property<string>("RequestedSourceKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("requested_source_key");
+
+                    b.Property<int>("ReusedFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("reused_file_count");
+
+                    b.Property<int>("SucceededFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("succeeded_file_count");
+
+                    b.Property<string>("TriggerType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("trigger_type");
+
+                    b.Property<int>("WarningFileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("warning_file_count");
+
+                    b.HasIndex("GameVersion", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_import_runs_active_full_scan_kind")
+                        .HasFilter("trigger_type = 'full_scan' AND status IN ('queued', 'discovering', 'running')");
+
+                    b.HasIndex("GameVersion", "Kind", "NormalizedRequestedSourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_import_runs_active_single_source")
+                        .HasFilter("trigger_type = 'single_file' AND status IN ('queued', 'discovering', 'running')");
+
+                    b.HasIndex("GameVersion", "Kind", "RequestedAt")
+                        .HasDatabaseName("ix_asset_import_runs_kind_requested");
+
+                    b.ToTable("import_jobs", "content");
+
+                    b.HasDiscriminator().HasValue("asset");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ContentImportRun", b =>
+                {
+                    b.HasBaseType("L2.Studio.Context.Entities.ImportJob");
+
+                    b.Property<string>("ConcurrencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("concurrency_key");
+
+                    b.Property<int>("ExistingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("existing_count");
+
+                    b.Property<int>("InsertedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("inserted_count");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("add_missing")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("RestoredCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("restored_count");
+
+                    b.Property<int>("TotalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_count");
+
+                    b.HasIndex("GameVersion", "ConcurrencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_import_jobs_active_content_target")
+                        .HasFilter("category = 'content' AND status IN ('queued', 'running')");
+
+                    b.ToTable("import_jobs", "content");
+
+                    b.HasDiscriminator().HasValue("content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetArtifact", b =>
@@ -2715,15 +2474,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("WorkItem");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
-                {
-                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
-                        .WithMany()
-                        .HasForeignKey("GameVersion")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -2833,6 +2583,15 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("PublishedRelease");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.ImportJob", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.Item", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -2897,15 +2656,6 @@ namespace L2.Studio.Migrations.Migrations
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
-                {
-                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
-                        .WithMany()
-                        .HasForeignKey("GameVersion")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("L2.Studio.Context.Entities.ItemImportRun", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
                         .WithMany()
@@ -2979,15 +2729,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("NpcSex");
 
                     b.Navigation("NpcType");
-                });
-
-            modelBuilder.Entity("L2.Studio.Context.Entities.NpcLookupImportRun", b =>
-                {
-                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
-                        .WithMany()
-                        .HasForeignKey("GameVersion")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.NpcRace", b =>
@@ -3226,15 +2967,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("PlayerSex");
                 });
 
-            modelBuilder.Entity("L2.Studio.Context.Entities.PlayerImportRun", b =>
-                {
-                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
-                        .WithMany()
-                        .HasForeignKey("GameVersion")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("L2.Studio.Context.Entities.PlayerRace", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -3263,12 +2995,12 @@ namespace L2.Studio.Migrations.Migrations
 
                     b.HasOne("L2.Studio.Context.Entities.SkillOperateType", "SkillOperateType")
                         .WithMany("Skills")
-                        .HasForeignKey("GameVersion", "SkillOperateTypeId")
+                        .HasForeignKey("GameVersion", "SkillOperateTypeName")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("L2.Studio.Context.Entities.SkillTargetType", "SkillTargetType")
                         .WithMany("Skills")
-                        .HasForeignKey("GameVersion", "SkillTargetTypeId")
+                        .HasForeignKey("GameVersion", "SkillTargetTypeName")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("SkillOperateType");
@@ -3291,15 +3023,6 @@ namespace L2.Studio.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("Skill");
-                });
-
-            modelBuilder.Entity("L2.Studio.Context.Entities.SkillImportRun", b =>
-                {
-                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
-                        .WithMany()
-                        .HasForeignKey("GameVersion")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.SkillOperateType", b =>
@@ -3347,13 +3070,6 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("Groups");
 
                     b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
-                {
-                    b.Navigation("Diagnostics");
-
-                    b.Navigation("WorkItems");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportWorkItem", b =>
@@ -3468,6 +3184,13 @@ namespace L2.Studio.Migrations.Migrations
             modelBuilder.Entity("L2.Studio.Context.Entities.SkillTargetType", b =>
                 {
                     b.Navigation("Skills");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.AssetImportRun", b =>
+                {
+                    b.Navigation("Diagnostics");
+
+                    b.Navigation("WorkItems");
                 });
 #pragma warning restore 612, 618
         }

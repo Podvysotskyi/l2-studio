@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { AssetImportJob } from '../../app/types/models/asset-import-job'
-import type { NpcLookupImportRun } from '../../app/types/models/npc-lookup-import'
 import {
   assetImportProgressItem,
+  importJobProgressItem,
   importProgressPercent,
-  isActiveImportStatus,
-  npcLookupImportProgressItem
+  isActiveImportStatus
 } from '../../app/utils/import-progress'
 
 describe('import progress', () => {
@@ -58,29 +56,73 @@ describe('import progress', () => {
     expect(importProgressPercent(item)).toBeUndefined()
   })
 
-  it('normalizes restore-default NPC results', () => {
-    const run: NpcLookupImportRun = {
-      id: 'run-2',
-      kind: 'npc-races',
-      mode: 'restore_defaults',
-      status: 'succeeded',
+  it('normalizes an active content import for the shared drawer', () => {
+    const item = importJobProgressItem({
+      id: 'job-1',
+      category: 'content',
+      target: 'items',
+      operation: 'add_missing',
+      status: 'running',
+      requestedSourceKey: null,
+      force: false,
       requestedAt: '2026-08-12T00:00:00Z',
       startedAt: '2026-08-12T00:00:01Z',
-      finishedAt: '2026-08-12T00:00:02Z',
-      totalCount: 7,
-      insertedCount: 1,
-      existingCount: 6,
-      restoredCount: 2,
+      discoveryFinishedAt: '2026-08-12T00:00:02Z',
+      finishedAt: null,
+      totalCount: 10,
+      completedCount: 5,
+      metrics: [
+        { key: 'inserted', value: 3 },
+        { key: 'existing', value: 2 }
+      ],
       error: null
-    }
-    const item = npcLookupImportProgressItem(run, 'NPC races')
+    }, 'Items')
 
-    expect(item.detail).toBe('Restore defaults')
-    expect(item.stats.map(stat => [stat.label, stat.value])).toEqual([
-      ['inserted', 1],
-      ['restored', 2],
-      ['already default', 4]
+    expect(item).toMatchObject({
+      id: 'job-1',
+      label: 'Items',
+      detail: 'Import missing',
+      status: 'running',
+      completed: 5,
+      total: 10,
+      to: '/pipeline/imports?job=job-1'
+    })
+    expect(item.stats).toEqual([
+      { label: 'inserted', value: 3, color: 'success' },
+      { label: 'existing', value: 2, color: 'neutral' }
+    ])
+    expect(importProgressPercent(item)).toBe(50)
+  })
+
+  it('preserves completed content import results and errors', () => {
+    const item = importJobProgressItem({
+      id: 'job-2',
+      category: 'content',
+      target: 'player-classes',
+      operation: 'restore_defaults',
+      status: 'failed',
+      requestedSourceKey: 'c1',
+      force: true,
+      requestedAt: '2026-08-12T00:00:00Z',
+      startedAt: '2026-08-12T00:00:01Z',
+      discoveryFinishedAt: '2026-08-12T00:00:02Z',
+      finishedAt: '2026-08-12T00:00:03Z',
+      totalCount: 8,
+      completedCount: 4,
+      metrics: [
+        { key: 'restored', value: 3 },
+        { key: 'failed', value: 1 }
+      ],
+      error: 'Source record could not be converted.'
+    }, 'Player classes')
+
+    expect(item.detail).toBe('Restore defaults · c1')
+    expect(item.error).toBe('Source record could not be converted.')
+    expect(item.stats).toEqual([
+      { label: 'restored', value: 3, color: 'warning' },
+      { label: 'failed', value: 1, color: 'error' }
     ])
     expect(importProgressPercent(item)).toBe(100)
   })
+
 })

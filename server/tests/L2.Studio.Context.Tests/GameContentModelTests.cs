@@ -15,7 +15,9 @@ public sealed class GameContentModelTests
 
         Assert.Equal(GameContentDbContext.SchemaName, context.Model.GetDefaultSchema());
         Assert.Equal("player_classes", Entity<PlayerClass>(context).GetTableName());
-        Assert.Equal("asset_import_runs", Entity<AssetImportRun>(context).GetTableName());
+        Assert.Equal("import_jobs", Entity<ImportJob>(context).GetTableName());
+        Assert.Equal("import_jobs", Entity<AssetImportRun>(context).GetTableName());
+        Assert.Equal("import_jobs", Entity<ContentImportRun>(context).GetTableName());
         Assert.Equal("asset_catalogs", Entity<AssetCatalog>(context).GetTableName());
         Assert.Equal("skills", Entity<Skill>(context).GetTableName());
         Assert.Equal("npc_statuses", Entity<NpcStatus>(context).GetTableName());
@@ -24,6 +26,25 @@ public sealed class GameContentModelTests
         Assert.Equal("npc_stats_attack", Entity<NpcStatsAttack>(context).GetTableName());
         Assert.Equal("npc_stats_defence", Entity<NpcStatsDefence>(context).GetTableName());
         Assert.Equal("npc_stats_speed", Entity<NpcStatsSpeed>(context).GetTableName());
+    }
+
+    [Fact]
+    public void PreservesScalarSchemaMetadataFromEntityAnnotations()
+    {
+        using var context = CreateContext();
+        var item = Entity<Item>(context);
+
+        Assert.Equal("game_version", item.FindProperty(nameof(Item.GameVersion))!.GetColumnName());
+        Assert.Equal(32, item.FindProperty(nameof(Item.GameVersion))!.GetMaxLength());
+        Assert.Equal("name", item.FindProperty(nameof(Item.Name))!.GetColumnName());
+        Assert.Equal(100, item.FindProperty(nameof(Item.Name))!.GetMaxLength());
+        Assert.Equal(ValueGenerated.Never, item.FindProperty(nameof(Item.Id))!.ValueGenerated);
+
+        var importRun = Entity<ImportJob>(context);
+        Assert.Equal("import_jobs", importRun.GetTableName());
+        Assert.Equal("kind", importRun.FindProperty(nameof(ImportJob.Kind))!.GetColumnName());
+        Assert.Equal(64, importRun.FindProperty(nameof(ImportJob.Kind))!.GetMaxLength());
+        Assert.Equal(ValueGenerated.Never, importRun.FindProperty(nameof(ImportJob.Id))!.ValueGenerated);
     }
 
     [Fact]
@@ -41,6 +62,31 @@ public sealed class GameContentModelTests
         Assert.Equal(
             [nameof(PlayerClass.GameVersion), nameof(PlayerClass.ParentClassId), nameof(PlayerClass.PlayerSexId), nameof(PlayerClass.PlayerRaceId)],
             parent.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public void ModelsSkillLookupsByCanonicalName()
+    {
+        using var context = CreateContext();
+
+        Assert.Equal(
+            [nameof(SkillOperateType.GameVersion), nameof(SkillOperateType.Name)],
+            Entity<SkillOperateType>(context).FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal(
+            [nameof(SkillTargetType.GameVersion), nameof(SkillTargetType.Name)],
+            Entity<SkillTargetType>(context).FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.False(Entity<SkillOperateType>(context).FindProperty(nameof(SkillOperateType.DisplayName))!.IsNullable);
+        Assert.False(Entity<SkillTargetType>(context).FindProperty(nameof(SkillTargetType.DisplayName))!.IsNullable);
+
+        var skill = Entity<Skill>(context);
+        Assert.Contains(skill.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(SkillOperateType) &&
+            key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Skill.GameVersion), nameof(Skill.SkillOperateTypeName)]));
+        Assert.Contains(skill.GetForeignKeys(), key =>
+            key.PrincipalEntityType.ClrType == typeof(SkillTargetType) &&
+            key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Skill.GameVersion), nameof(Skill.SkillTargetTypeName)]));
     }
 
     [Fact]
@@ -105,11 +151,11 @@ public sealed class GameContentModelTests
         Assert.True(npcStats.FindProperty(nameof(NpcStats.HitTime))!.IsNullable);
         Assert.Equal("hit_time", npcStats.FindProperty(nameof(NpcStats.HitTime))!.GetColumnName());
 
-        var importRun = Entity<NpcLookupImportRun>(context);
-        Assert.Equal("add_missing", importRun.FindProperty(nameof(NpcLookupImportRun.Mode))!.GetDefaultValue());
-        Assert.Equal("restored_count", importRun.FindProperty(nameof(NpcLookupImportRun.RestoredCount))!.GetColumnName());
-        Assert.Contains(importRun.GetIndexes(), index =>
-            index.IsUnique && index.GetFilter() == "status IN ('queued', 'running')");
+        var importRun = Entity<ContentImportRun>(context);
+        Assert.Equal("add_missing", importRun.FindProperty(nameof(ContentImportRun.Mode))!.GetDefaultValue());
+        Assert.Equal("restored_count", importRun.FindProperty(nameof(ContentImportRun.RestoredCount))!.GetColumnName());
+        Assert.Contains(importRun.GetIndexes(), index => index.IsUnique &&
+            index.GetFilter() == "category = 'content' AND status IN ('queued', 'running')");
     }
 
     [Fact]

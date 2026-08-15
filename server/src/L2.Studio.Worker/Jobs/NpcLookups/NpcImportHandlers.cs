@@ -22,7 +22,7 @@ public sealed class NpcImportHandlers(
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            var run = await context.NpcLookupImportRuns.SingleOrDefaultAsync(
+            var run = await context.ContentImportRuns.SingleOrDefaultAsync(
                 value => value.Id == runId && value.Kind == NpcLookupImportJobValues.Npcs,
                 cancellationToken);
             if (run is null || NpcLookupImportJobValues.TerminalStatuses.Contains(run.Status)) return;
@@ -35,6 +35,7 @@ public sealed class NpcImportHandlers(
             var now = timeProvider.GetUtcNow();
             run.Status = NpcLookupImportJobValues.Running;
             run.StartedAt ??= now;
+            run.LastHeartbeatAt = now;
             await EnsureC1LookupsAsync(context, cancellationToken);
 
             var existing = await context.Npcs
@@ -113,6 +114,7 @@ public sealed class NpcImportHandlers(
             run.RestoredCount = reconciliation.Restored.Length;
             run.Status = NpcLookupImportJobValues.Succeeded;
             run.FinishedAt = timeProvider.GetUtcNow();
+            run.LastHeartbeatAt = run.FinishedAt;
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -132,12 +134,13 @@ public sealed class NpcImportHandlers(
             .Select(item => item.Name).ToHashSetAsync(StringComparer.Ordinal, cancellationToken);
         var sexes = await context.NpcSexes.Where(item => item.GameVersion == "c1")
             .Select(item => item.Name).ToHashSetAsync(StringComparer.Ordinal, cancellationToken);
-        var missing = MissingC1Lookups(types, races, sexes);
-        if (missing.Length > 0)
-        {
-            throw new InvalidOperationException(
-                $"Import NPC types, races, and sexes before NPC definitions. Missing: {string.Join("; ", missing)}.");
-        }
+        context.NpcTypes.AddRange(C1Catalog.Types.Where(value => !types.Contains(value.Name)).Select(value =>
+            new NpcType { GameVersion = "c1", Name = value.Name, DisplayName = value.DisplayName }));
+        context.NpcRaces.AddRange(C1Catalog.Races.Where(value => !races.Contains(value.Name)).Select(value =>
+            new NpcRace { GameVersion = "c1", Name = value.Name, DisplayName = value.DisplayName }));
+        context.NpcSexes.AddRange(C1Catalog.Sexes.Where(value => !sexes.Contains(value.Name)).Select(value =>
+            new NpcSex { GameVersion = "c1", Name = value.Name, DisplayName = value.DisplayName }));
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     internal static (NpcDefinition[] Missing, NpcDefinition[] Restored, NpcDefinition[] AppearanceMappings) Reconcile(
@@ -355,10 +358,11 @@ public sealed class NpcImportHandlers(
     private async Task MarkFailedAsync(Guid runId, Exception exception, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var run = await context.NpcLookupImportRuns.SingleOrDefaultAsync(value => value.Id == runId, cancellationToken);
+        var run = await context.ContentImportRuns.SingleOrDefaultAsync(value => value.Id == runId, cancellationToken);
         if (run is null || NpcLookupImportJobValues.TerminalStatuses.Contains(run.Status)) return;
         run.Status = NpcLookupImportJobValues.Failed;
         run.FinishedAt = timeProvider.GetUtcNow();
+        run.LastHeartbeatAt = run.FinishedAt;
         run.Error = exception.Message.Length <= 4000 ? exception.Message : exception.Message[..4000];
         await context.SaveChangesAsync(cancellationToken);
     }

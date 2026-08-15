@@ -25,6 +25,19 @@ public sealed class ValidateDirectoryRequestAttribute : ActionFilterAttribute
             if (npcRequest.WithoutRace is true && !string.IsNullOrWhiteSpace(npcRequest.NpcRaceName))
                 errors["withoutRace"] = ["Choose either a specific NPC race or no race."];
         }
+        if (request is ItemDirectoryRequest itemRequest)
+        {
+            ValidateLookupFilter(itemRequest.ItemTypeName, "itemTypeName", "Item type", errors);
+            ValidateLookupFilter(itemRequest.ItemActionName, "itemActionName", "Item action", errors);
+            ValidateLookupFilter(itemRequest.ItemBodyPartName, "itemBodyPartName", "Item body part", errors);
+            ValidateLookupFilter(itemRequest.ItemMaterialName, "itemMaterialName", "Item material", errors);
+            ValidateLookupFilter(itemRequest.ItemCrystalTypeName, "itemCrystalTypeName", "Item crystal type", errors);
+        }
+        if (request is PlayerAppearanceDirectoryRequest appearanceRequest)
+        {
+            if (appearanceRequest.PlayerRaceId < 0) errors["playerRaceId"] = ["Player race must not be negative."];
+            if (appearanceRequest.PlayerSexId < 0) errors["playerSexId"] = ["Player sex must not be negative."];
+        }
         if (errors.Count > 0) context.Result = new BadRequestObjectResult(new ValidationProblemDetails(errors));
     }
 

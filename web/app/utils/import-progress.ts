@@ -1,7 +1,7 @@
 import type { AssetImportJob } from '../types/models/asset-import-job'
-import type { NpcLookupImportRun } from '../types/models/npc-lookup-import'
+import type { ImportJob, ImportJobStatus } from '../types/models/import-job'
 
-export type ImportProgressStatus = AssetImportJob['status'] | NpcLookupImportRun['status']
+export type ImportProgressStatus = ImportJobStatus
 export type ImportProgressColor = 'neutral' | 'primary' | 'success' | 'warning' | 'error'
 
 export interface ImportProgressStat {
@@ -19,6 +19,7 @@ export interface ImportProgressItem {
   total: number
   stats: ImportProgressStat[]
   error: string | null
+  to?: string
 }
 
 export function assetImportProgressItem(
@@ -42,37 +43,25 @@ export function assetImportProgressItem(
   }
 }
 
-export function npcLookupImportProgressItem(
-  run: NpcLookupImportRun,
+export function importJobProgressItem(
+  job: ImportJob,
   label: string
 ): ImportProgressItem {
-  const processed = run.status === 'succeeded' || run.status === 'failed'
-    ? run.totalCount
-    : Math.min(run.totalCount, run.insertedCount + run.existingCount)
-  const stats: ImportProgressStat[] = run.mode === 'restore_defaults'
-    ? [
-        { label: 'inserted', value: run.insertedCount, color: 'success' },
-        { label: 'restored', value: run.restoredCount, color: 'warning' },
-        {
-          label: 'already default',
-          value: Math.max(0, run.existingCount - run.restoredCount),
-          color: 'neutral'
-        }
-      ]
-    : [
-        { label: 'inserted', value: run.insertedCount, color: 'success' },
-        { label: 'already existed', value: run.existingCount, color: 'neutral' }
-      ]
-
+  const operation = operationLabel(job.operation)
   return {
-    id: run.id,
+    id: job.id,
     label,
-    detail: run.mode === 'restore_defaults' ? 'Restore defaults' : 'Import missing',
-    status: run.status,
-    completed: processed,
-    total: run.totalCount,
-    stats,
-    error: run.error
+    detail: job.requestedSourceKey ? `${operation} · ${job.requestedSourceKey}` : operation,
+    status: job.status,
+    completed: job.completedCount,
+    total: job.totalCount,
+    stats: job.metrics.map(metric => ({
+      label: metric.key.replaceAll('_', ' '),
+      value: metric.value,
+      color: metricColor(metric.key)
+    })),
+    error: job.error,
+    to: `/pipeline/imports?job=${job.id}`
   }
 }
 
@@ -84,4 +73,17 @@ export function importProgressPercent(item: ImportProgressItem): number | undefi
   if (isActiveImportStatus(item.status) && !item.total) return undefined
   if (!isActiveImportStatus(item.status)) return 100
   return Math.round((Math.min(item.completed, item.total) / item.total) * 100)
+}
+
+function operationLabel(operation: string) {
+  if (operation === 'add_missing') return 'Import missing'
+  if (operation === 'restore_defaults') return 'Restore defaults'
+  return operation.replaceAll('_', ' ')
+}
+
+function metricColor(metric: string): ImportProgressColor {
+  if (metric === 'inserted' || metric === 'succeeded') return 'success'
+  if (metric === 'restored' || metric === 'warnings') return 'warning'
+  if (metric === 'failed') return 'error'
+  return 'neutral'
 }

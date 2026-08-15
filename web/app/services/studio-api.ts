@@ -17,29 +17,39 @@ import type {
 import type {
   LookupKind,
   LookupRecord,
-  NpcImportKind,
   NpcLookupKind,
   NpcLookupRecord,
   NpcRecord,
   PlayerAppearanceKind,
   PlayerAppearanceRecord,
-  PlayerClassRecord
+  PlayerClassRecord,
+  SkillRecord,
+  SkillLookupKind,
+  SkillLookupRecord
 } from '../types/models/content-directory'
-import type { DirectoryRequest, NpcDirectoryRequest } from '../types/requests/directory-request'
+import type {
+  DirectoryRequest,
+  ItemDirectoryRequest,
+  NpcDirectoryRequest,
+  PlayerAppearanceDirectoryRequest
+} from '../types/requests/directory-request'
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
-import type { ItemImportMode, ItemImportRun, ItemLookupKind, ItemLookupRecord, ItemPage, ItemRecord } from '../types/models/item'
-import type { SkillImportMode, SkillImportRun } from '../types/models/skill-import'
-import type { PlayerImportMode, PlayerImportRun } from '../types/models/player-import'
+import type { ItemLookupKind, ItemLookupRecord, ItemPage, ItemRecord } from '../types/models/item'
 import type {
   NpcPage,
-  SkillPage
+  SkillPage,
+  DirectoryPage
 } from '../types/responses/content-directory-response'
 import type { StudioServiceInfo } from '../types/responses/studio-service-info'
 import type { GameVersionSummary } from '../types/models/game-version'
 import type {
-  NpcLookupImportMode,
-  NpcLookupImportRun
-} from '../types/models/npc-lookup-import'
+  ContentImportMode,
+  ContentImportTarget,
+  ImportJob,
+  ImportJobCategory,
+  ImportJobPage,
+  ImportJobStatus
+} from '../types/models/import-job'
 import type {
   AssetReleaseDetail,
   AssetReleasePage,
@@ -61,6 +71,37 @@ export function getStudioServiceInfo(): Promise<StudioServiceInfo> {
   return $fetch<StudioServiceInfo>('/api/system/info')
 }
 
+export function getImportJobs(request: {
+  category?: ImportJobCategory
+  target?: string
+  status?: ImportJobStatus
+  query?: string
+  page?: number
+  pageSize?: number
+} = {}): Promise<ImportJobPage> {
+  return $fetch<ImportJobPage>(versionPath('/imports'), {
+    query: {
+      ...request,
+      page: request.page ?? 1,
+      pageSize: request.pageSize ?? 25
+    }
+  })
+}
+
+export function getImportJob(id: string): Promise<ImportJob> {
+  return $fetch<ImportJob>(versionPath(`/imports/${encodeURIComponent(id)}`))
+}
+
+export function startContentImport(
+  target: ContentImportTarget,
+  mode: ContentImportMode
+): Promise<ImportJob> {
+  return $fetch<ImportJob>(versionPath(`/imports/content/${target}`), {
+    method: 'POST',
+    body: { mode }
+  })
+}
+
 export function getNpcDirectory(
   request: NpcDirectoryRequest = {}
 ): Promise<NpcPage> {
@@ -69,8 +110,8 @@ export function getNpcDirectory(
   })
 }
 
-export function getItemDirectory(request: { query?: string; page?: number; pageSize?: number } = {}): Promise<ItemPage> {
-  return $fetch<ItemPage>(versionPath('/content/items'), { query: request })
+export function getItemDirectory(request: ItemDirectoryRequest = {}): Promise<ItemPage> {
+  return $fetch<ItemPage>(versionPath('/content/items'), { query: itemDirectoryQuery(request) })
 }
 
 export function getItemDefinition(id: number): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`)) }
@@ -80,15 +121,23 @@ export function updateItemDefinition(id: number, request: {
   weight?: number | null; price?: number | null; weaponType?: string | null; armorType?: string | null
   etcItemType?: string | null; damageRange?: string | null
 }): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`), { method: 'PATCH', body: request }) }
-export function getItemLookups(kind: ItemLookupKind): Promise<ItemLookupRecord[]> { return $fetch<ItemLookupRecord[]>(versionPath(`/content/${kind}`)) }
+export function deleteItemDefinition(id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/items/${id}`), { method: 'DELETE' })
+}
+export function getItemLookups(
+  kind: ItemLookupKind,
+  request: DirectoryRequest = {}
+): Promise<DirectoryPage<ItemLookupRecord>> {
+  return $fetch<DirectoryPage<ItemLookupRecord>>(versionPath(`/content/${kind}`), {
+    query: directoryQuery(request)
+  })
+}
 export function updateItemLookupDisplayName(kind: ItemLookupKind, name: string, displayName: string): Promise<ItemLookupRecord> {
   return $fetch<ItemLookupRecord>(versionPath(`/content/${kind}/${encodeURIComponent(name)}`), { method: 'PATCH', body: { displayName } })
 }
-export function getItemImportRuns(limit = 1): Promise<ItemImportRun[]> { return $fetch<ItemImportRun[]>(versionPath('/content/items/imports'), { query: { limit } }) }
-export function startItemImport(mode?: ItemImportMode): Promise<ItemImportRun> {
-  return $fetch<ItemImportRun>(versionPath('/content/items/imports'), { method: 'POST', ...(mode ? { body: { mode } } : {}) })
+export function deleteItemLookup(kind: ItemLookupKind, name: string): Promise<void> {
+  return $fetch<void>(versionPath(`/content/${kind}/${encodeURIComponent(name)}`), { method: 'DELETE' })
 }
-
 export function getNpcDefinition(id: number): Promise<NpcRecord> {
   return $fetch<NpcRecord>(versionPath(`/content/npcs/${id}`))
 }
@@ -102,6 +151,9 @@ export function updateNpcDefinition(
     body: request
   })
 }
+export function deleteNpcDefinition(id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/npcs/${id}`), { method: 'DELETE' })
+}
 
 export function getSkillDirectory(
   request: DirectoryRequest = {}
@@ -110,24 +162,63 @@ export function getSkillDirectory(
     query: directoryQuery(request)
   })
 }
-
-export function getSkillImportRuns(limit = 1): Promise<SkillImportRun[]> {
-  return $fetch<SkillImportRun[]>(versionPath('/content/skills/imports'), { query: { limit } })
+export function updateSkillDefinition(id: number, request: {
+  name: string
+  levels: number
+  skillOperateTypeName?: string | null
+  skillTargetTypeName?: string | null
+}): Promise<SkillRecord> {
+  return $fetch<SkillRecord>(versionPath(`/content/skills/${id}`), { method: 'PATCH', body: request })
+}
+export function deleteSkillDefinition(id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/skills/${id}`), { method: 'DELETE' })
 }
 
-export function startSkillImport(mode?: SkillImportMode): Promise<SkillImportRun> {
-  return $fetch<SkillImportRun>(versionPath('/content/skills/imports'), {
-    method: 'POST',
-    ...(mode ? { body: { mode } } : {})
+export function getLookupDirectory(
+  kind: LookupKind,
+  request: DirectoryRequest = {}
+): Promise<DirectoryPage<LookupRecord>> {
+  return $fetch<DirectoryPage<LookupRecord>>(versionPath(`/content/${kind}`), {
+    query: directoryQuery(request)
+  })
+}
+export function updatePlayerLookupName(kind: Extract<LookupKind, 'player-races' | 'player-sexes'>, id: number, name: string): Promise<LookupRecord> {
+  return $fetch<LookupRecord>(versionPath(`/content/${kind}/${id}`), { method: 'PATCH', body: { name } })
+}
+export function deletePlayerLookup(kind: Extract<LookupKind, 'player-races' | 'player-sexes'>, id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/${kind}/${id}`), { method: 'DELETE' })
+}
+
+export function getSkillLookupDirectory(
+  kind: SkillLookupKind,
+  request: DirectoryRequest = {}
+): Promise<DirectoryPage<SkillLookupRecord>> {
+  return $fetch<DirectoryPage<SkillLookupRecord>>(versionPath(`/content/${kind}`), {
+    query: directoryQuery(request)
   })
 }
 
-export function getLookupDirectory(kind: LookupKind): Promise<LookupRecord[]> {
-  return $fetch<LookupRecord[]>(versionPath(`/content/${kind}`))
+export function updateSkillLookupDisplayName(
+  kind: SkillLookupKind,
+  name: string,
+  displayName: string
+): Promise<SkillLookupRecord> {
+  return $fetch<SkillLookupRecord>(
+    versionPath(`/content/${kind}/${encodeURIComponent(name)}`),
+    { method: 'PATCH', body: { displayName } }
+  )
+}
+export function deleteSkillLookup(kind: SkillLookupKind, name: string): Promise<void> {
+  return $fetch<void>(versionPath(`/content/${kind}/${encodeURIComponent(name)}`), { method: 'DELETE' })
 }
 
-export function getNpcLookupDirectory(kind: NpcLookupKind): Promise<NpcLookupRecord[]> {
-  return $fetch<NpcLookupRecord[]>(versionPath(`/content/${kind}`))
+export function getNpcLookupDirectory(
+  kind: NpcLookupKind,
+  request: DirectoryRequest = {}
+): Promise<DirectoryPage<NpcLookupRecord>> {
+  return $fetch<DirectoryPage<NpcLookupRecord>>(versionPath(`/content/${kind}`), {
+    query: directoryQuery(request)
+  })
 }
 
 export function updateNpcLookupDisplayName(
@@ -140,56 +231,33 @@ export function updateNpcLookupDisplayName(
     { method: 'PATCH', body: { displayName } }
   )
 }
-
-export function getNpcLookupImportJobs(
-  kind: NpcImportKind,
-  limit = 1
-): Promise<NpcLookupImportRun[]> {
-  return $fetch<NpcLookupImportRun[]>(versionPath(`/content/${kind}/imports`), {
-    query: { limit }
-  })
-}
-
-export function getNpcLookupImportJob(
-  kind: NpcImportKind,
-  id: string
-): Promise<NpcLookupImportRun> {
-  return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports/${id}`))
-}
-
-export function startNpcLookupImport(
-  kind: NpcImportKind,
-  mode?: NpcLookupImportMode
-): Promise<NpcLookupImportRun> {
-  return $fetch<NpcLookupImportRun>(versionPath(`/content/${kind}/imports`), {
-    method: 'POST',
-    ...(mode ? { body: { mode } } : {})
-  })
+export function deleteNpcLookup(kind: NpcLookupKind, name: string): Promise<void> {
+  return $fetch<void>(versionPath(`/content/${kind}/${encodeURIComponent(name)}`), { method: 'DELETE' })
 }
 
 export function getPlayerClasses(): Promise<PlayerClassRecord[]> {
   return $fetch<PlayerClassRecord[]>(versionPath('/content/player-classes'))
 }
+export function updatePlayerClass(id: number, request: { name: string; isMage: boolean; parentClassId: number | null }): Promise<PlayerClassRecord> {
+  return $fetch<PlayerClassRecord>(versionPath(`/content/player-classes/${id}`), { method: 'PATCH', body: request })
+}
+export function deletePlayerClass(id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/player-classes/${id}`), { method: 'DELETE' })
+}
 
 export function getPlayerAppearanceDirectory(
-  kind: PlayerAppearanceKind
-): Promise<PlayerAppearanceRecord[]> {
-  return $fetch<PlayerAppearanceRecord[]>(versionPath(`/content/${kind}`))
-}
-
-export function getPlayerImportRuns(limit = 1): Promise<PlayerImportRun[]> {
-  return $fetch<PlayerImportRun[]>(versionPath('/content/players/imports'), { query: { limit } })
-}
-
-export function getPlayerImportRun(id: string): Promise<PlayerImportRun> {
-  return $fetch<PlayerImportRun>(versionPath(`/content/players/imports/${id}`))
-}
-
-export function startPlayerImport(mode?: PlayerImportMode): Promise<PlayerImportRun> {
-  return $fetch<PlayerImportRun>(versionPath('/content/players/imports'), {
-    method: 'POST',
-    ...(mode ? { body: { mode } } : {})
+  kind: PlayerAppearanceKind,
+  request: PlayerAppearanceDirectoryRequest = {}
+): Promise<DirectoryPage<PlayerAppearanceRecord>> {
+  return $fetch<DirectoryPage<PlayerAppearanceRecord>>(versionPath(`/content/${kind}`), {
+    query: playerAppearanceDirectoryQuery(request)
   })
+}
+export function updatePlayerAppearanceName(kind: PlayerAppearanceKind, item: Pick<PlayerAppearanceRecord, 'id' | 'playerRaceId' | 'playerSexId'>, name: string): Promise<PlayerAppearanceRecord> {
+  return $fetch<PlayerAppearanceRecord>(versionPath(`/content/${kind}/${item.id}/races/${item.playerRaceId}/sexes/${item.playerSexId}`), { method: 'PATCH', body: { name } })
+}
+export function deletePlayerAppearance(kind: PlayerAppearanceKind, item: Pick<PlayerAppearanceRecord, 'id' | 'playerRaceId' | 'playerSexId'>): Promise<void> {
+  return $fetch<void>(versionPath(`/content/${kind}/${item.id}/races/${item.playerRaceId}/sexes/${item.playerSexId}`), { method: 'DELETE' })
 }
 
 export function getAssetCatalogs(): Promise<AssetCatalogSummary[]> {
@@ -534,5 +602,29 @@ function npcDirectoryQuery(request: NpcDirectoryRequest) {
     ...(request.withoutRace ? { withoutRace: true } : {}),
     ...(npcSexName ? { npcSexName } : {}),
     ...(request.hasVisuals !== undefined ? { hasVisuals: request.hasVisuals } : {})
+  }
+}
+
+function itemDirectoryQuery(request: ItemDirectoryRequest) {
+  const itemTypeName = request.itemTypeName?.trim()
+  const itemActionName = request.itemActionName?.trim()
+  const itemBodyPartName = request.itemBodyPartName?.trim()
+  const itemMaterialName = request.itemMaterialName?.trim()
+  const itemCrystalTypeName = request.itemCrystalTypeName?.trim()
+  return {
+    ...directoryQuery(request),
+    ...(itemTypeName ? { itemTypeName } : {}),
+    ...(itemActionName ? { itemActionName } : {}),
+    ...(itemBodyPartName ? { itemBodyPartName } : {}),
+    ...(itemMaterialName ? { itemMaterialName } : {}),
+    ...(itemCrystalTypeName ? { itemCrystalTypeName } : {})
+  }
+}
+
+function playerAppearanceDirectoryQuery(request: PlayerAppearanceDirectoryRequest) {
+  return {
+    ...directoryQuery(request),
+    ...(request.playerRaceId === undefined ? {} : { playerRaceId: request.playerRaceId }),
+    ...(request.playerSexId === undefined ? {} : { playerSexId: request.playerSexId })
   }
 }

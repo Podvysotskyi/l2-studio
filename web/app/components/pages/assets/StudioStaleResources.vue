@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AssetImportKind } from '~/types/studio'
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import {
   getStaleAssetSources,
   rebuildStaleAssetSources,
@@ -14,6 +14,7 @@ import {
   assetImportKindOptions,
   assetImportKinds
 } from '../../../utils/asset-import-kinds'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 const importStore = useAssetImportsStore()
 const { jobs: jobsByKind, loading: jobsLoading, error: jobsError } = storeToRefs(importStore)
@@ -23,12 +24,19 @@ const staleLoading = ref(false)
 const staleError = ref<string>()
 const rebuildingStale = ref(false)
 const reimporting = ref<string>()
+const progressJobIds = ref<string[]>([])
+const importDrawerOpen = ref(false)
 const notifications = useStudioToasts()
+let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const jobs = computed(() =>
   assetImportKinds.flatMap((kind) => jobsByKind.value[kind] ?? [])
 )
 const hasActiveJob = computed(() => jobs.value.some((job) => isActive(job.status)))
+const progressItems = computed(() => progressJobIds.value.flatMap((id) => {
+  const job = jobs.value.find(candidate => candidate.id === id)
+  return job ? [assetImportProgressItem(job, assetImportKindLabel(job.kind))] : []
+}))
 const visibleStaleSources = computed(() => assetImportKinds
   .filter((kind) => kindFilter.value === 'all' || kind === kindFilter.value)
   .flatMap((kind) => (staleByKind.value[kind] ?? []).map((source) => ({ kind, source }))))
@@ -54,11 +62,32 @@ async function loadStaleSources() {
   }
 }
 
+async function loadJobs(schedule = true, refreshStaleWhenSettled = true) {
+  clearTimeout(pollTimer)
+  await importStore.load(assetImportKinds).catch(() => undefined)
+  const activeJobs = jobs.value.filter(job => isActive(job.status))
+  const newActiveJobs = activeJobs.filter(job => !progressJobIds.value.includes(job.id))
+  if (newActiveJobs.length) {
+    progressJobIds.value = [...progressJobIds.value, ...newActiveJobs.map(job => job.id)]
+    importDrawerOpen.value = true
+  }
+  if (schedule && activeJobs.length) {
+    pollTimer = setTimeout(() => void loadJobs(), 1000)
+  } else if (!activeJobs.length && refreshStaleWhenSettled) {
+    await loadStaleSources()
+  }
+}
+
 async function refreshWorkspace() {
-  await Promise.all([
-    importStore.load(assetImportKinds).catch(() => undefined),
-    loadStaleSources()
-  ])
+  await Promise.all([loadJobs(true, false), loadStaleSources()])
+}
+
+function trackJobs(queuedJobs: AssetImportJob[]) {
+  progressJobIds.value = [
+    ...progressJobIds.value,
+    ...queuedJobs.map(job => job.id).filter(id => !progressJobIds.value.includes(id))
+  ]
+  importDrawerOpen.value = true
 }
 
 async function rebuildAllStale() {
@@ -68,9 +97,14 @@ async function rebuildAllStale() {
       (kindFilter.value === 'all' || kind === kindFilter.value)
       && staleByKind.value[kind]?.length
     )
-    await Promise.all(kinds.map((kind) => rebuildStaleAssetSources(kind)))
-    await refreshWorkspace()
-    notifications.success({ title: 'Stale rebuilds queued' })
+    const results = await Promise.allSettled(kinds.map(kind => rebuildStaleAssetSources(kind)))
+    const queuedJobs = results.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+    const failureCount = results.length - queuedJobs.length
+    if (queuedJobs.length) {
+      trackJobs(queuedJobs)
+      await loadJobs()
+    }
+    if (failureCount) throw new Error(`${failureCount} stale rebuilds could not be queued.`)
   } catch {
     notifications.error({
       title: 'One or more stale rebuilds could not be queued',
@@ -84,9 +118,9 @@ async function rebuildAllStale() {
 async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSource) {
   reimporting.value = `${kind}:${source.sourceKey}`
   try {
-    await startAssetFileImport(kind, source.sourceKey)
-    await refreshWorkspace()
-    notifications.success({ title: 'Stale rebuild queued' })
+    const job = await startAssetFileImport(kind, source.sourceKey)
+    trackJobs([job])
+    await loadJobs()
   } catch {
     notifications.error({
       title: `Stale rebuild for ${source.sourceKey} could not be queued`,
@@ -98,6 +132,7 @@ async function rebuildStaleSource(kind: AssetImportKind, source: StaleAssetSourc
 }
 
 onMounted(() => void refreshWorkspace())
+onBeforeUnmount(() => clearTimeout(pollTimer))
 </script>
 
 <template>
@@ -217,5 +252,6 @@ onMounted(() => void refreshWorkspace())
         </div>
       </div>
     </UCard>
+    <StudioImportProgressDrawer v-model:open="importDrawerOpen" :items="progressItems" />
   </div>
 </template>

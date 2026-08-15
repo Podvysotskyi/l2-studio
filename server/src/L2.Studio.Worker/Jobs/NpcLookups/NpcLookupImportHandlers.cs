@@ -53,13 +53,14 @@ public sealed class NpcLookupImportHandlers(
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            var run = await context.NpcLookupImportRuns.SingleOrDefaultAsync(
+            var run = await context.ContentImportRuns.SingleOrDefaultAsync(
                 value => value.Id == runId && value.Kind == kind, cancellationToken);
             if (run is null || NpcLookupImportJobValues.TerminalStatuses.Contains(run.Status)) return;
 
             var now = timeProvider.GetUtcNow();
             run.Status = NpcLookupImportJobValues.Running;
             run.StartedAt ??= now;
+            run.LastHeartbeatAt = now;
             NpcLookupDefinition[] missing;
             int existingCount;
             int restoredCount;
@@ -127,6 +128,7 @@ public sealed class NpcLookupImportHandlers(
             run.RestoredCount = restoredCount;
             run.Status = NpcLookupImportJobValues.Succeeded;
             run.FinishedAt = timeProvider.GetUtcNow();
+            run.LastHeartbeatAt = run.FinishedAt;
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -153,10 +155,11 @@ public sealed class NpcLookupImportHandlers(
     private async Task MarkFailedAsync(Guid runId, Exception exception, CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var run = await context.NpcLookupImportRuns.SingleOrDefaultAsync(value => value.Id == runId, cancellationToken);
+        var run = await context.ContentImportRuns.SingleOrDefaultAsync(value => value.Id == runId, cancellationToken);
         if (run is null || NpcLookupImportJobValues.TerminalStatuses.Contains(run.Status)) return;
         run.Status = NpcLookupImportJobValues.Failed;
         run.FinishedAt = timeProvider.GetUtcNow();
+        run.LastHeartbeatAt = run.FinishedAt;
         run.Error = exception.Message.Length <= 4000 ? exception.Message : exception.Message[..4000];
         await context.SaveChangesAsync(cancellationToken);
     }

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using L2.Studio.Context;
 using L2.Studio.Context.Entities;
 using L2.Studio.Messages;
@@ -9,7 +8,7 @@ using Wolverine.Attributes;
 namespace L2.Studio.Worker;
 
 [WolverineHandler]
-public sealed partial class ItemImportHandlers(IDbContextFactory<GameContentDbContext> contextFactory, TimeProvider timeProvider)
+public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> contextFactory, TimeProvider timeProvider)
 {
     private static readonly C1ItemCatalog Catalog = new();
 
@@ -21,12 +20,14 @@ public sealed partial class ItemImportHandlers(IDbContextFactory<GameContentDbCo
         {
             await using var context = await contextFactory.CreateDbContextAsync(token);
             await using var transaction = await context.Database.BeginTransactionAsync(token);
-            var run = await context.ItemImportRuns.SingleOrDefaultAsync(value => value.Id == runId, token);
+            var run = await context.ContentImportRuns.SingleOrDefaultAsync(value =>
+                value.Id == runId && value.Kind == ContentImportTargetValues.Items, token);
             if (run is null || ItemImportJobValues.TerminalStatuses.Contains(run.Status)) return;
             if (run.GameVersion != "c1" || !ItemImportJobValues.SupportedModes.Contains(run.Mode)) throw new InvalidOperationException("Only C1 add-missing and restore-defaults item imports are supported.");
             run.Status = ItemImportJobValues.Running;
             run.StartedAt ??= timeProvider.GetUtcNow();
-            await EnsureLookups(context, run.GameVersion, token);
+            run.LastHeartbeatAt = timeProvider.GetUtcNow();
+            await EnsureC1LookupsAsync(context, run.GameVersion, token);
             var existing = await context.Items.Include(item => item.Stats).Where(item => item.GameVersion == run.GameVersion).ToDictionaryAsync(item => item.Id, token);
             var missing = Catalog.Items.Where(definition => !existing.ContainsKey(definition.Id)).ToArray();
             context.Items.AddRange(missing.Select(definition => ToEntity(run.GameVersion, definition)));
@@ -42,6 +43,7 @@ public sealed partial class ItemImportHandlers(IDbContextFactory<GameContentDbCo
             run.RestoredCount = restored.Length;
             run.Status = ItemImportJobValues.Succeeded;
             run.FinishedAt = timeProvider.GetUtcNow();
+            run.LastHeartbeatAt = run.FinishedAt;
             await context.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
         }
@@ -51,18 +53,71 @@ public sealed partial class ItemImportHandlers(IDbContextFactory<GameContentDbCo
         }
     }
 
-    private static async Task EnsureLookups(GameContentDbContext context, string gameVersion, CancellationToken token)
+    private static async Task EnsureC1LookupsAsync(
+        GameContentDbContext context,
+        string gameVersion,
+        CancellationToken token)
+    {
+        var types = await context.ItemTypes.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemTypes.AddRange(Catalog.Types.Where(value => !types.Contains(value.Name)).Select(value =>
+            new ItemType { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var actions = await context.ItemActions.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemActions.AddRange(Catalog.Actions.Where(value => !actions.Contains(value.Name)).Select(value =>
+            new ItemAction { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var bodyParts = await context.ItemBodyParts.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemBodyParts.AddRange(Catalog.BodyParts.Where(value => !bodyParts.Contains(value.Name)).Select(value =>
+            new ItemBodyPart { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var materials = await context.ItemMaterials.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemMaterials.AddRange(Catalog.Materials.Where(value => !materials.Contains(value.Name)).Select(value =>
+            new ItemMaterial { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var crystals = await context.ItemCrystalTypes.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemCrystalTypes.AddRange(Catalog.CrystalTypes.Where(value => !crystals.Contains(value.Name)).Select(value =>
+            new ItemCrystalType { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        await context.SaveChangesAsync(token);
+    }
+
+    private static async Task<IReadOnlyList<string>> MissingC1LookupsAsync(
+        GameContentDbContext context,
+        string gameVersion,
+        CancellationToken token)
     {
         var types = await context.ItemTypes.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var actions = await context.ItemActions.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var bodyParts = await context.ItemBodyParts.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var materials = await context.ItemMaterials.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var crystals = await context.ItemCrystalTypes.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
-        context.ItemTypes.AddRange(Catalog.Types.Where(name => !types.Contains(name)).Select(name => new ItemType { GameVersion = gameVersion, Name = name, DisplayName = FriendlyName(name) }));
-        context.ItemActions.AddRange(Catalog.Actions.Where(name => !actions.Contains(name)).Select(name => new ItemAction { GameVersion = gameVersion, Name = name, DisplayName = FriendlyName(name) }));
-        context.ItemBodyParts.AddRange(Catalog.BodyParts.Where(name => !bodyParts.Contains(name)).Select(name => new ItemBodyPart { GameVersion = gameVersion, Name = name, DisplayName = FriendlyName(name) }));
-        context.ItemMaterials.AddRange(Catalog.Materials.Where(name => !materials.Contains(name)).Select(name => new ItemMaterial { GameVersion = gameVersion, Name = name, DisplayName = FriendlyName(name) }));
-        context.ItemCrystalTypes.AddRange(Catalog.CrystalTypes.Where(name => !crystals.Contains(name)).Select(name => new ItemCrystalType { GameVersion = gameVersion, Name = name, DisplayName = FriendlyName(name) }));
+        return MissingC1Lookups(types, actions, bodyParts, materials, crystals);
+    }
+
+    internal static IReadOnlyList<string> MissingC1Lookups(
+        IReadOnlySet<string> types,
+        IReadOnlySet<string> actions,
+        IReadOnlySet<string> bodyParts,
+        IReadOnlySet<string> materials,
+        IReadOnlySet<string> crystals)
+    {
+        return
+        [
+            .. MissingLookupNames("item types", Catalog.Types.Select(definition => definition.Name), types),
+            .. MissingLookupNames("item actions", Catalog.Actions.Select(definition => definition.Name), actions),
+            .. MissingLookupNames("item body parts", Catalog.BodyParts.Select(definition => definition.Name), bodyParts),
+            .. MissingLookupNames("item materials", Catalog.Materials.Select(definition => definition.Name), materials),
+            .. MissingLookupNames("item crystal types", Catalog.CrystalTypes.Select(definition => definition.Name), crystals)
+        ];
+    }
+
+    private static IEnumerable<string> MissingLookupNames(
+        string label,
+        IEnumerable<string> definitions,
+        IReadOnlySet<string> existing)
+    {
+        var missing = definitions.Where(name => !existing.Contains(name)).ToArray();
+        return missing.Length == 0 ? [] : [$"{label} ({string.Join(", ", missing)})"];
     }
 
     private static Item ToEntity(string gameVersion, ItemDefinition definition)
@@ -106,16 +161,12 @@ public sealed partial class ItemImportHandlers(IDbContextFactory<GameContentDbCo
     private async Task MarkFailed(Guid runId, Exception exception, CancellationToken token)
     {
         await using var context = await contextFactory.CreateDbContextAsync(token);
-        var run = await context.ItemImportRuns.SingleOrDefaultAsync(value => value.Id == runId, token);
+        var run = await context.ContentImportRuns.SingleOrDefaultAsync(value => value.Id == runId, token);
         if (run is null || ItemImportJobValues.TerminalStatuses.Contains(run.Status)) return;
         run.Status = ItemImportJobValues.Failed;
         run.Error = exception.ToString()[..Math.Min(exception.ToString().Length, 4000)];
         run.FinishedAt = timeProvider.GetUtcNow();
+        run.LastHeartbeatAt = run.FinishedAt;
         await context.SaveChangesAsync(token);
     }
-
-    private static string FriendlyName(string value) => FriendlyNamePattern().Replace(value.Replace('_', ' '), "$1 $2");
-
-    [GeneratedRegex("(?<=[a-z])(?=[A-Z])")]
-    private static partial Regex FriendlyNamePattern();
 }

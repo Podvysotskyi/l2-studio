@@ -65,6 +65,7 @@ public static class StudioMessagingConfigurationExtensions
 
     private static void RouteControlMessages(WolverineOptions options)
     {
+        options.PublishMessage<RunContentImport>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverTextures>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverStaticMeshes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<DiscoverAnimations>().ToPostgresqlQueue(ControlQueue);
@@ -81,6 +82,11 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<ActivateAssetRelease>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Npcs>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Items>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemTypes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemActions>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemBodyParts>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemMaterials>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemCrystalTypes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Skills>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Players>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1NpcTypes>().ToPostgresqlQueue(ControlQueue);

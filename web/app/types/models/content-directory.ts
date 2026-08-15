@@ -115,12 +115,19 @@ export interface SkillRecord {
   id: number
   levels: number
   name: string
-  skillOperateTypeId: number | null
-  skillOperateType: string | null
-  skillTargetTypeId: number | null
-  skillTargetType: string | null
+  skillOperateTypeName: string | null
+  skillOperateTypeDisplayName: string | null
+  skillTargetTypeName: string | null
+  skillTargetTypeDisplayName: string | null
   iconCount: number
 }
+
+export interface SkillLookupRecord {
+  name: string
+  displayName: string
+}
+
+export type SkillLookupKind = 'skill-operate-types' | 'skill-target-types'
 
 export interface LookupRecord {
   id: number
@@ -139,5 +146,3 @@ export type NpcVisualFilter = 'with' | 'without'
 export type LookupKind =
   | 'player-races'
   | 'player-sexes'
-  | 'skill-operate-types'
-  | 'skill-target-types'

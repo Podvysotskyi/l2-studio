@@ -6,16 +6,12 @@ from pathlib import Path
 import xml.etree.ElementTree as ElementTree
 
 
-OPERATE_TYPES = {name: f"SkillOperateTypeId.{name}" for name in ("A1", "A2", "A3", "CA1", "CA5", "P", "T")}
+OPERATE_TYPES = {"A1", "A2", "A3", "CA1", "CA5", "P", "T"}
 TARGET_TYPES = {
-    "AREA": "Area", "AREA_CORPSE_MOB": "AreaCorpseMob", "AREA_SUMMON": "AreaSummon",
-    "AURA": "Aura", "AURA_CORPSE_MOB": "AuraCorpseMob", "BEHIND_AURA": "BehindAura",
-    "CLAN": "Clan", "CLAN_MEMBER": "ClanMember", "CORPSE": "Corpse", "CORPSE_CLAN": "CorpseClan",
-    "CORPSE_MOB": "CorpseMob", "ENEMY_SUMMON": "EnemySummon", "FRONT_AREA": "FrontArea",
-    "FRONT_AURA": "FrontAura", "GROUND": "Ground", "HOLY": "Holy", "NONE": "None", "ONE": "One",
-    "OWNER_PET": "OwnerPet", "PARTY": "Party", "PARTY_CLAN": "PartyClan", "PARTY_MEMBER": "PartyMember",
-    "PARTY_NOT_ME": "PartyNotMe", "PC_BODY": "PcBody", "SELF": "Self", "SERVITOR": "Servitor",
-    "UNLOCKABLE": "Unlockable"
+    "AREA", "AREA_CORPSE_MOB", "AREA_SUMMON", "AURA", "AURA_CORPSE_MOB", "BEHIND_AURA",
+    "CLAN", "CLAN_MEMBER", "CORPSE", "CORPSE_CLAN", "CORPSE_MOB", "ENEMY_SUMMON",
+    "FRONT_AREA", "FRONT_AURA", "GROUND", "HOLY", "NONE", "ONE", "OWNER_PET", "PARTY",
+    "PARTY_CLAN", "PARTY_MEMBER", "PARTY_NOT_ME", "PC_BODY", "SELF", "SERVITOR", "UNLOCKABLE"
 }
 
 
@@ -40,13 +36,13 @@ def icon_definitions(skill: ElementTree.Element, levels: int) -> list[str]:
     return [f"new({level}, {csharp_string(name)})" for level, name in enumerate(values, 1)]
 
 
-def enum_value(value: str | None, values: dict[str, str], enum_name: str) -> str:
+def lookup_value(value: str | None, values: set[str], lookup_name: str) -> str:
     if value is None or not value.strip():
         return "null"
     value = value.strip()
     if value not in values:
-        raise ValueError(f"Unknown {enum_name} '{value}'.")
-    return f"{enum_name}Id.{values[value]}" if enum_name == "SkillTargetType" else values[value]
+        raise ValueError(f"Unknown {lookup_name} '{value}'.")
+    return csharp_string(value)
 
 
 def expression(skill: ElementTree.Element) -> str:
@@ -54,8 +50,8 @@ def expression(skill: ElementTree.Element) -> str:
     levels = int(skill.attrib["levels"])
     if levels < 1 or levels > 255:
         raise ValueError(f"Skill {identifier} has unsupported level count {levels}.")
-    operate_type = enum_value(skill.findtext("operateType"), OPERATE_TYPES, "SkillOperateType")
-    target_type = enum_value(skill.findtext("targetType"), TARGET_TYPES, "SkillTargetType")
+    operate_type = lookup_value(skill.findtext("operateType"), OPERATE_TYPES, "SkillOperateType")
+    target_type = lookup_value(skill.findtext("targetType"), TARGET_TYPES, "SkillTargetType")
     icons = ", ".join(icon_definitions(skill, levels))
     return f"        new({identifier}, {levels}, {csharp_string(skill.attrib['name'])}, {operate_type}, {target_type}, [{icons}]),"
 
@@ -72,7 +68,7 @@ def main() -> None:
             # Mobius loads custom skill files after the base catalogue; duplicate
             # identifiers therefore resolve to the custom definition.
             skills[int(skill.attrib["id"])] = skill
-    lines = ["using L2.Studio.Context.Identifiers;", "", "namespace L2.Studio.Worker;", "", "public sealed partial class C1SkillCatalog", "{", "    private static readonly SkillDefinition[] Definitions =", "    ["]
+    lines = ["namespace L2.Studio.Worker;", "", "public sealed partial class C1SkillCatalog", "{", "    private static readonly SkillDefinition[] Definitions =", "    ["]
     lines.extend(expression(skill) for _, skill in sorted(skills.items()))
     lines.extend(["    ];", "}", ""])
     args.output.parent.mkdir(parents=True, exist_ok=True)

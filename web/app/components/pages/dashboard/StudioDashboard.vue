@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import type { AssetImportKind } from '~/types/studio'
-import type { AssetImportJob } from '../../../types/models/asset-import-job'
+import type { ImportJob, ImportJobStatus } from '../../../types/models/import-job'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useDashboardStore } from '../../../stores/dashboard'
@@ -122,11 +121,13 @@ const lookupCatalogs = computed(() => [
   }
 ])
 
-function kindLabel(kind: AssetImportKind) {
-  return assets.value.find((asset) => asset.kind === kind)?.label ?? kind
+function targetLabel(job: ImportJob) {
+  if (job.category === 'asset')
+    return assets.value.find((asset) => asset.kind === job.target)?.label ?? job.target
+  return job.target.split('-').map(part => part[0]?.toUpperCase() + part.slice(1)).join(' ')
 }
 
-function statusColor(status: AssetImportJob['status']) {
+function statusColor(status: ImportJobStatus) {
   if (status === 'succeeded') return 'success'
   if (status === 'succeeded_with_warnings') return 'warning'
   if (status === 'failed') return 'error'
@@ -410,7 +411,7 @@ onMounted(() => void dashboard.load())
                   Recent import activity
                 </h2>
                 <p class="text-xs text-muted">
-                  Latest jobs across every asset collection
+                  Latest content and asset jobs
                 </p>
               </div>
             </div>
@@ -431,14 +432,14 @@ onMounted(() => void dashboard.load())
             class="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6"
           >
             <UBadge color="neutral" variant="subtle">
-              {{ kindLabel(job.kind) }}
+              {{ targetLabel(job) }}
             </UBadge>
             <UBadge :color="statusColor(job.status)" variant="subtle">
               {{ job.status.replaceAll('_', ' ') }}
             </UBadge>
             <span class="min-w-32 flex-1 text-xs text-muted"
-              >{{ job.completedFileCount.toLocaleString() }} /
-              {{ job.discoveredFileCount.toLocaleString() }} completed</span
+              >{{ job.completedCount.toLocaleString() }} /
+              {{ job.totalCount.toLocaleString() }} completed</span
             >
             <time
               class="text-xs text-dimmed"
@@ -454,7 +455,7 @@ onMounted(() => void dashboard.load())
           {{
             loading
               ? 'Loading import activity…'
-              : 'No asset imports have been recorded.'
+              : 'No imports have been recorded.'
           }}
         </div>
       </UCard>
@@ -500,7 +501,7 @@ onMounted(() => void dashboard.load())
             <dd class="max-w-44 text-right text-xs text-highlighted">
               {{
                 latestFinishedJob
-                  ? `${kindLabel(latestFinishedJob.kind)} · ${formatDate(latestFinishedJob.finishedAt)}`
+                  ? `${targetLabel(latestFinishedJob)} · ${formatDate(latestFinishedJob.finishedAt)}`
                   : 'No completed imports'
               }}
             </dd>

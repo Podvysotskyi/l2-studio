@@ -4,8 +4,8 @@ public sealed record SkillSummary(
     int Id,
     short Levels,
     string Name,
-    int? SkillOperateTypeId,
-    string? SkillOperateType,
-    int? SkillTargetTypeId,
-    string? SkillTargetType,
+    string? SkillOperateTypeName,
+    string? SkillOperateTypeDisplayName,
+    string? SkillTargetTypeName,
+    string? SkillTargetTypeDisplayName,
     int IconCount);

@@ -74,6 +74,9 @@ public sealed class WorkerJobTests
         Assert.Equal(catalog.Skills.Count, catalog.Skills.Select(skill => skill.Id).Distinct().Count());
         Assert.Equal(7, catalog.OperateTypes.Count);
         Assert.Equal(27, catalog.TargetTypes.Count);
+        Assert.Contains(catalog.OperateTypes, value => value is { Name: "A1", DisplayName: "A1" });
+        Assert.Contains(catalog.TargetTypes, value => value is
+            { Name: "AREA_CORPSE_MOB", DisplayName: "Area Corpse Mob" });
         Assert.Contains(catalog.Skills, skill => skill is
         {
             Id: 1, Levels: 37, Name: "Triple Slash", Icons.Count: 37
@@ -86,6 +89,40 @@ public sealed class WorkerJobTests
         {
             Assert.InRange(skill.Levels, (short)1, (short)255);
             Assert.All(skill.Icons, icon => Assert.InRange(icon.Level, (short)1, skill.Levels));
+            if (skill.OperateTypeName is not null)
+                Assert.Contains(catalog.OperateTypes, value => value.Name == skill.OperateTypeName);
+            if (skill.TargetTypeName is not null)
+                Assert.Contains(catalog.TargetTypes, value => value.Name == skill.TargetTypeName);
+        });
+    }
+
+    [Fact]
+    public void DefinesCompleteImportableC1ItemLookupCatalog()
+    {
+        ItemLookupCatalog catalog = new C1ItemCatalog();
+
+        Assert.Equal(3, catalog.Types.Count);
+        Assert.Equal(6, catalog.Actions.Count);
+        Assert.Equal(14, catalog.BodyParts.Count);
+        Assert.Equal(23, catalog.Materials.Count);
+        Assert.Equal(5, catalog.CrystalTypes.Count);
+        Assert.Contains(catalog.Types, definition => definition is { Name: "Weapon", DisplayName: "Weapon" });
+        Assert.Contains(catalog.Actions, definition => definition is { Name: "SKILL_MAINTAIN", DisplayName: "Skill Maintain" });
+        Assert.Contains(catalog.Materials, definition => definition is { Name: "SCALE_OF_DRAGON", DisplayName: "Scale Of Dragon" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "lhand", DisplayName: "Left Hand" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "rhand", DisplayName: "Right Hand" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "hand", DisplayName: "Hand" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "ear", DisplayName: "Ear" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "finger", DisplayName: "Finger" });
+        Assert.DoesNotContain(catalog.BodyParts, definition => definition.Name is "lrhand" or "rear;lear" or "rfinger;lfinger");
+
+        Assert.All(((C1ItemCatalog)catalog).Items, item =>
+        {
+            Assert.Contains(catalog.Types, definition => definition.Name == item.TypeName);
+            if (item.ActionName is not null) Assert.Contains(catalog.Actions, definition => definition.Name == item.ActionName);
+            if (item.BodyPartName is not null) Assert.Contains(catalog.BodyParts, definition => definition.Name == item.BodyPartName);
+            if (item.MaterialName is not null) Assert.Contains(catalog.Materials, definition => definition.Name == item.MaterialName);
+            if (item.CrystalTypeName is not null) Assert.Contains(catalog.CrystalTypes, definition => definition.Name == item.CrystalTypeName);
         });
     }
 
@@ -125,7 +162,7 @@ public sealed class WorkerJobTests
     }
 
     [Fact]
-    public void IdentifiesMissingC1LookupPrerequisites()
+    public void IdentifiesMissingC1NpcLookupPrerequisites()
     {
         var missing = NpcImportHandlers.MissingC1Lookups(
             new HashSet<string>(StringComparer.Ordinal),
@@ -135,6 +172,21 @@ public sealed class WorkerJobTests
         Assert.Contains(missing, value => value.StartsWith("NPC types (", StringComparison.Ordinal));
         Assert.Contains(missing, value => value.Contains("NPC races (ANIMAL", StringComparison.Ordinal));
         Assert.DoesNotContain(missing, value => value.StartsWith("NPC sexes (", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void IdentifiesMissingC1ItemLookupPrerequisites()
+    {
+        var catalog = new C1ItemCatalog();
+        var missing = ItemImportHandlers.MissingC1Lookups(
+            new HashSet<string>(catalog.Types.Select(definition => definition.Name), StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(catalog.BodyParts.Select(definition => definition.Name), StringComparer.Ordinal),
+            new HashSet<string>(catalog.Materials.Select(definition => definition.Name), StringComparer.Ordinal),
+            new HashSet<string>(catalog.CrystalTypes.Select(definition => definition.Name), StringComparer.Ordinal));
+
+        Assert.Contains(missing, value => value.StartsWith("item actions (", StringComparison.Ordinal));
+        Assert.DoesNotContain(missing, value => value.StartsWith("item types (", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -154,7 +206,7 @@ public sealed class WorkerJobTests
             .Where(type => type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0)
             .ToArray();
 
-        Assert.Equal(10, handlerTypes.Length);
+        Assert.Equal(12, handlerTypes.Length);
         Assert.All(handlerTypes, type => Assert.Equal("L2.Studio.Worker", type.Namespace));
         Assert.DoesNotContain(typeof(AssetImportJobProcessor).Assembly.GetTypes(), type =>
             type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0);

@@ -5,20 +5,18 @@ import { useStudioDialogs } from '../../../composables/use-studio-dialogs'
 import {
   getAssetImportJob,
   getAssetImportJobs,
-  getNpcLookupImportJob,
-  getNpcLookupImportJobs,
   getNpcLookupDirectory,
   startAssetImport,
-  updateNpcDefinition,
-  startNpcLookupImport
+  deleteNpcDefinition,
+  updateNpcDefinition
 } from '../../../services/studio-api'
 import type { NpcLookupRecord, NpcRecord, NpcVisualFilter } from '../../../types/models/content-directory'
 import type { AssetImportJob } from '../../../types/models/asset-import-job'
-import type { NpcLookupImportMode, NpcLookupImportRun } from '../../../types/models/npc-lookup-import'
 import type { UpdateNpcRequest } from '../../../types/requests/update-npc-request'
 import { selectedGameVersionKey } from '../../../utils/game-version'
-import { assetImportProgressItem, npcLookupImportProgressItem } from '../../../utils/import-progress'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 import { npcRaceNoneValue } from '../../../utils/npc-directory'
+import { loadDirectoryOptions } from '../../../utils/directory-pages'
 
 const query = defineModel<string>('query', { required: true })
 const page = defineModel<number>('page', { required: true })
@@ -38,11 +36,8 @@ defineProps<{
 const emit = defineEmits<{ refresh: [] }>()
 
 const importStatusError = ref<string>()
-const latestRun = ref<NpcLookupImportRun>()
 const latestAppearanceJob = ref<AssetImportJob>()
-const queueingMode = ref<NpcLookupImportMode>()
 const queueingAppearances = ref(false)
-const progressRunId = ref<string>()
 const progressAppearanceJobId = ref<string>()
 const importDrawerOpen = ref(false)
 const selectedNpc = ref<NpcRecord>()
@@ -54,6 +49,7 @@ const lookupsLoading = ref(false)
 const lookupsLoaded = ref(false)
 const lookupsError = ref<string>()
 const saving = ref(false)
+const deletingId = ref<number>()
 const editError = ref<string>()
 const notifications = useStudioToasts()
 const dialogs = useStudioDialogs()
@@ -67,19 +63,12 @@ const editForm = reactive<UpdateNpcRequest>({
 })
 let pollTimer: ReturnType<typeof setTimeout> | undefined
 
-const activeRun = computed(() => latestRun.value
-  ? ['queued', 'running'].includes(latestRun.value.status)
-  : false)
 const activeAppearanceJob = computed(() => latestAppearanceJob.value
   ? ['queued', 'discovering', 'running'].includes(latestAppearanceJob.value.status)
   : false)
-const hasActiveImport = computed(() => activeRun.value || activeAppearanceJob.value)
 const progressItems = computed(() => {
   const items = []
-  const run = latestRun.value
   const appearanceJob = latestAppearanceJob.value
-  if (run && run.id === progressRunId.value)
-    items.push(npcLookupImportProgressItem(run, 'NPC definitions'))
   if (appearanceJob && appearanceJob.id === progressAppearanceJobId.value)
     items.push(assetImportProgressItem(appearanceJob, 'NPC appearances'))
   return items
@@ -100,10 +89,28 @@ const visualFilterOptions = [
   { label: 'Has appearance', value: 'with' },
   { label: 'No appearance', value: 'without' }
 ]
-const hasFilters = computed(() => Boolean(
-  npcTypeName.value || npcRaceName.value || npcSexName.value || visualFilter.value
-))
-
+const tableFilterValues = computed({
+  get: () => ({
+    npcTypeName: npcTypeName.value,
+    npcRaceName: npcRaceName.value,
+    npcSexName: npcSexName.value,
+    visualFilter: visualFilter.value
+  }),
+  set: (value: Record<string, string | number | boolean | undefined>) => {
+    npcTypeName.value = stringValue(value.npcTypeName)
+    npcRaceName.value = stringValue(value.npcRaceName)
+    npcSexName.value = stringValue(value.npcSexName)
+    visualFilter.value = value.visualFilter === 'with' || value.visualFilter === 'without'
+      ? value.visualFilter
+      : undefined
+  }
+})
+const tableFilters = computed(() => [
+  { key: 'npcTypeName', placeholder: 'All types', ariaLabel: 'Filter by NPC type', items: typeFilterOptions.value, loading: lookupsLoading.value },
+  { key: 'npcRaceName', placeholder: 'All races', ariaLabel: 'Filter by NPC race', items: raceFilterOptions.value, loading: lookupsLoading.value },
+  { key: 'npcSexName', placeholder: 'All sexes', ariaLabel: 'Filter by NPC sex', items: sexFilterOptions.value, loading: lookupsLoading.value },
+  { key: 'visualFilter', placeholder: 'All appearances', ariaLabel: 'Filter by appearance availability', items: visualFilterOptions }
+])
 const columns: TableColumn<NpcRecord>[] = [
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'name', header: 'NPC' },
@@ -118,25 +125,15 @@ const columns: TableColumn<NpcRecord>[] = [
 async function loadLatestImports(schedule = true) {
   if (!isC1) return
   try {
-    const [runs, appearanceJobs] = await Promise.all([
-      getNpcLookupImportJobs('npcs', 1),
-      getAssetImportJobs('npcappearances', 1)
-    ])
-    const latest = runs[0]
-    const latestAppearance = appearanceJobs[0]
-    latestRun.value = latest
+    const latestAppearance = (await getAssetImportJobs('npcappearances', 1))[0]
     latestAppearanceJob.value = latestAppearance
-    if (latest && ['queued', 'running'].includes(latest.status) && latest.id !== progressRunId.value) {
-      progressRunId.value = latest.id
-      importDrawerOpen.value = true
-    }
     if (latestAppearance && ['queued', 'discovering', 'running'].includes(latestAppearance.status) &&
       latestAppearance.id !== progressAppearanceJobId.value) {
       progressAppearanceJobId.value = latestAppearance.id
       importDrawerOpen.value = true
     }
     importStatusError.value = undefined
-    if (schedule && hasActiveImport.value) schedulePoll()
+    if (schedule && activeAppearanceJob.value) schedulePoll()
   } catch {
     importStatusError.value = 'NPC import progress could not be loaded.'
   }
@@ -148,54 +145,16 @@ function schedulePoll() {
 }
 
 async function pollRun() {
-  if (!isC1 || !hasActiveImport.value) return
-  const run = activeRun.value ? latestRun.value : undefined
+  if (!isC1 || !activeAppearanceJob.value) return
   const appearanceJob = activeAppearanceJob.value ? latestAppearanceJob.value : undefined
   try {
-    const [nextRun, nextAppearanceJob] = await Promise.all([
-      run ? getNpcLookupImportJob('npcs', run.id) : Promise.resolve(undefined),
-      appearanceJob
-        ? getAssetImportJob('npcappearances', appearanceJob.id)
-        : Promise.resolve(undefined)
-    ])
-    if (nextRun) {
-      latestRun.value = nextRun
-      if (nextRun.status === 'succeeded') emit('refresh')
-    }
+    const nextAppearanceJob = appearanceJob
+      ? await getAssetImportJob('npcappearances', appearanceJob.id)
+      : undefined
     if (nextAppearanceJob) latestAppearanceJob.value = nextAppearanceJob
-    if (hasActiveImport.value) schedulePoll()
+    if (activeAppearanceJob.value) schedulePoll()
   } catch {
     importStatusError.value = 'Active NPC import progress could not be refreshed.'
-  }
-}
-
-async function queueImport(mode: NpcLookupImportMode) {
-  if (!isC1) return
-  if (mode === 'restore_defaults') {
-    const confirmed = await dialogs.confirm({
-      title: 'Restore default NPC definitions?',
-      description: 'Built-in C1 NPC names, levels, types, races, and sexes will be reset to their catalog defaults. Extra NPC records will be preserved.',
-      confirmLabel: 'Restore defaults',
-      confirmColor: 'warning'
-    })
-    if (!confirmed) return
-  }
-  queueingMode.value = mode
-  importStatusError.value = undefined
-  try {
-    latestRun.value = await startNpcLookupImport('npcs', mode)
-    progressRunId.value = latestRun.value.id
-    importDrawerOpen.value = true
-    schedulePoll()
-  } catch {
-    notifications.error({
-      title: mode === 'restore_defaults'
-        ? 'NPC defaults could not be restored'
-        : 'NPC import could not be queued',
-      description: 'Import NPC types, races, and sexes first, then try again.'
-    })
-  } finally {
-    queueingMode.value = undefined
   }
 }
 
@@ -246,9 +205,9 @@ async function loadLookups() {
   lookupsError.value = undefined
   try {
     const [types, races, sexes] = await Promise.all([
-      getNpcLookupDirectory('npc-types'),
-      getNpcLookupDirectory('npc-races'),
-      getNpcLookupDirectory('npc-sexes')
+      loadDirectoryOptions((page, pageSize) => getNpcLookupDirectory('npc-types', { page, pageSize })),
+      loadDirectoryOptions((page, pageSize) => getNpcLookupDirectory('npc-races', { page, pageSize })),
+      loadDirectoryOptions((page, pageSize) => getNpcLookupDirectory('npc-sexes', { page, pageSize }))
     ])
     npcTypes.value = types
     npcRaces.value = races
@@ -261,11 +220,8 @@ async function loadLookups() {
   }
 }
 
-function clearFilters() {
-  npcTypeName.value = undefined
-  npcRaceName.value = undefined
-  npcSexName.value = undefined
-  visualFilter.value = undefined
+function stringValue(value: string | number | boolean | undefined) {
+  return typeof value === 'string' ? value : undefined
 }
 
 async function saveNpc() {
@@ -305,6 +261,26 @@ async function saveNpc() {
   }
 }
 
+async function remove(npc: NpcRecord) {
+  const confirmed = await dialogs.confirm({
+    title: `Delete ${npc.name ?? `NPC #${npc.id}`} ?`,
+    description: `NPC #${npc.id} and its definition-owned status and statistics will be permanently removed. A later import can restore the source record.`,
+    confirmLabel: 'Delete NPC',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
+  deletingId.value = npc.id
+  try {
+    await deleteNpcDefinition(npc.id)
+    notifications.success({ title: 'NPC definition deleted' })
+    emit('refresh')
+  } catch {
+    notifications.error({ title: 'NPC definition could not be deleted' })
+  } finally {
+    deletingId.value = undefined
+  }
+}
+
 onMounted(() => {
   void loadLatestImports()
   void loadLookups()
@@ -313,22 +289,17 @@ onUnmounted(() => clearTimeout(pollTimer))
 </script>
 
 <template>
-  <div class="space-y-6">
-    <StudioPageHeader
-      eyebrow="Game content"
+  <StudioContentDirectoryLayout
       title="NPC definitions"
       description="Browse normalized NPC records and the lookup values that classify their server behavior."
       icon="i-lucide-users-round"
+      import-target="npcs"
+      import-label="NPCs"
+      :loading="loading"
+      :error="error"
+      @refresh="emit('refresh')"
     >
       <template #actions>
-        <UButton
-          v-if="isC1"
-          label="Import missing NPCs"
-          icon="i-lucide-play"
-          :loading="queueingMode === 'add_missing'"
-          :disabled="Boolean(activeRun) || Boolean(queueingMode)"
-          @click="queueImport('add_missing')"
-        />
         <UButton
           v-if="isC1"
           label="Import NPC appearances"
@@ -339,112 +310,35 @@ onUnmounted(() => clearTimeout(pollTimer))
           :disabled="queueingAppearances"
           @click="queueAppearanceImport"
         />
-        <UButton
-          v-if="isC1"
-          label="Restore defaults"
-          icon="i-lucide-rotate-ccw"
-          color="warning"
-          variant="outline"
-          :loading="queueingMode === 'restore_defaults'"
-          :disabled="Boolean(activeRun) || Boolean(queueingMode)"
-          @click="queueImport('restore_defaults')"
-        />
-        <UButton
-          label="Refresh"
-          icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="outline"
-          :loading="loading"
-          @click="emit('refresh')"
-        />
       </template>
-    </StudioPageHeader>
-
-    <UAlert
-      v-if="error || importStatusError"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-circle-alert"
-      title="NPC directory unavailable"
-      :description="error ?? importStatusError"
-    >
-      <template #actions>
-        <UButton color="error" variant="soft" size="sm" @click="emit('refresh')">
-          Try again
-        </UButton>
+      <template #alerts>
+        <UAlert v-if="importStatusError" color="error" variant="subtle" title="NPC appearance import unavailable" :description="importStatusError" />
       </template>
-    </UAlert>
 
-    <UCard v-else :ui="{ body: 'p-0 sm:p-0' }">
-      <div class="space-y-3 border-b border-default px-4 py-3">
-        <div class="flex flex-wrap items-center justify-between gap-4">
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+      <StudioDataTable
+        v-model:query="query"
+        v-model:filter-values="tableFilterValues"
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :data="items"
+        :total="total"
+        :columns="columns"
+        :filters="tableFilters"
+        :loading="loading"
+        empty="No NPC definitions match this search."
+        search-placeholder="Search NPC name"
+        search-aria-label="Search NPC name"
+        :page-size-options="[10, 25, 50, 100]"
+        table-class="min-w-[58rem]"
+      >
+        <template #toolbar-start>
           <div>
             <p class="text-sm font-medium text-highlighted">NPC catalog</p>
-            <p class="text-xs text-muted">
-              {{ total.toLocaleString() }} definitions
-            </p>
+            <p class="text-xs text-muted">{{ total.toLocaleString() }} definitions</p>
+            <p v-if="lookupsError" class="mt-1 text-xs text-error">{{ lookupsError }}</p>
           </div>
-          <UInput
-            v-model="query"
-            icon="i-lucide-search"
-            placeholder="Search NPC name"
-            aria-label="Search NPC name"
-            maxlength="100"
-            class="w-full sm:w-80"
-          />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <USelect
-            v-model="npcTypeName"
-            :items="typeFilterOptions"
-            :loading="lookupsLoading"
-            placeholder="All types"
-            class="w-full sm:w-44"
-            aria-label="Filter by NPC type"
-          />
-          <USelect
-            v-model="npcRaceName"
-            :items="raceFilterOptions"
-            :loading="lookupsLoading"
-            placeholder="All races"
-            class="w-full sm:w-44"
-            aria-label="Filter by NPC race"
-          />
-          <USelect
-            v-model="npcSexName"
-            :items="sexFilterOptions"
-            :loading="lookupsLoading"
-            placeholder="All sexes"
-            class="w-full sm:w-40"
-            aria-label="Filter by NPC sex"
-          />
-          <USelect
-            v-model="visualFilter"
-            :items="visualFilterOptions"
-            placeholder="All appearances"
-            class="w-full sm:w-48"
-            aria-label="Filter by appearance availability"
-          />
-          <UButton
-            v-if="hasFilters"
-            label="Clear filters"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            @click="clearFilters"
-          />
-        </div>
-        <p v-if="lookupsError" class="text-xs text-error">{{ lookupsError }}</p>
-      </div>
-
-      <div class="overflow-x-auto">
-        <UTable
-          :data="items"
-          :columns="columns"
-          :loading="loading"
-          empty="No NPC definitions match this search."
-          class="min-w-[58rem]"
-        >
+        </template>
           <template #id-cell="{ row }">
             <code class="text-xs text-muted">{{ row.original.id }}</code>
           </template>
@@ -481,34 +375,16 @@ onUnmounted(() => clearTimeout(pollTimer))
             <span class="text-sm">{{ row.original.npcSexDisplayName }}</span>
           </template>
           <template #actions-cell="{ row }">
-            <div class="flex justify-end gap-1">
-              <UButton
-                label="Edit"
-                icon="i-lucide-pencil"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                @click="edit(row.original)"
-              />
-              <UButton
-                label="View"
-                icon="i-lucide-arrow-up-right"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :to="`/authoring/npcs/${row.original.id}`"
-              />
-            </div>
+            <StudioTableRowActions
+              :view-to="`/authoring/npcs/${row.original.id}`"
+              :show-edit="true"
+              :show-delete="true"
+              :delete-loading="deletingId === row.original.id"
+              @edit="edit(row.original)"
+              @delete="remove(row.original)"
+            />
           </template>
-        </UTable>
-      </div>
-
-      <StudioTableFooter
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="[10, 25, 50, 100]"
-      />
+      </StudioDataTable>
     </UCard>
 
     <StudioImportProgressDrawer
@@ -542,5 +418,5 @@ onUnmounted(() => clearTimeout(pollTimer))
         </form>
       </template>
     </UModal>
-  </div>
+  </StudioContentDirectoryLayout>
 </template>

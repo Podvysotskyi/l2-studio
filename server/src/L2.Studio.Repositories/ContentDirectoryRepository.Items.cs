@@ -2,6 +2,7 @@ using L2.Studio.Context.Entities;
 using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
 using Microsoft.EntityFrameworkCore;
+using L2.Studio.Repositories.Interfaces.Models;
 
 namespace L2.Studio.Repositories;
 
@@ -62,16 +63,43 @@ public sealed partial class ContentDirectoryRepository
             .SingleAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ItemLookupSummary>> GetItemLookupsAsync(string gameVersion, string kind, CancellationToken cancellationToken)
+    public async Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken)
     {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await context.Items.SingleOrDefaultAsync(value =>
+            value.GameVersion == gameVersion && value.Id == id, cancellationToken);
+        if (item is null) return false;
+        context.Items.Remove(item);
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(
+        string gameVersion,
+        string kind,
+        DirectoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var query = request.Query ?? string.Empty;
+        var pattern = $"%{EscapeLikePattern(query)}%";
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return kind switch
         {
-            "item-types" => await context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion).OrderBy(value => value.Name).Select(value => new ItemLookupSummary(value.Name, value.DisplayName)).ToListAsync(cancellationToken),
-            "item-actions" => await context.ItemActions.AsNoTracking().Where(value => value.GameVersion == gameVersion).OrderBy(value => value.Name).Select(value => new ItemLookupSummary(value.Name, value.DisplayName)).ToListAsync(cancellationToken),
-            "item-body-parts" => await context.ItemBodyParts.AsNoTracking().Where(value => value.GameVersion == gameVersion).OrderBy(value => value.Name).Select(value => new ItemLookupSummary(value.Name, value.DisplayName)).ToListAsync(cancellationToken),
-            "item-materials" => await context.ItemMaterials.AsNoTracking().Where(value => value.GameVersion == gameVersion).OrderBy(value => value.Name).Select(value => new ItemLookupSummary(value.Name, value.DisplayName)).ToListAsync(cancellationToken),
-            "item-crystal-types" => await context.ItemCrystalTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion).OrderBy(value => value.Name).Select(value => new ItemLookupSummary(value.Name, value.DisplayName)).ToListAsync(cancellationToken),
+            "item-types" => await PageAsync(context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
+                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
+            "item-actions" => await PageAsync(context.ItemActions.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
+                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
+            "item-body-parts" => await PageAsync(context.ItemBodyParts.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
+                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
+            "item-materials" => await PageAsync(context.ItemMaterials.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
+                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
+            "item-crystal-types" => await PageAsync(context.ItemCrystalTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
+                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
@@ -88,6 +116,34 @@ public sealed partial class ContentDirectoryRepository
             case "item-crystal-types": return await Update(context, context.ItemCrystalTypes, gameVersion, name, displayName, cancellationToken);
             default: throw new ArgumentOutOfRangeException(nameof(kind));
         }
+    }
+
+    public async Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var usageCount = kind switch
+        {
+            "item-types" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemTypeName == name, cancellationToken),
+            "item-actions" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemActionName == name, cancellationToken),
+            "item-body-parts" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemBodyPartName == name, cancellationToken),
+            "item-materials" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemMaterialName == name, cancellationToken),
+            "item-crystal-types" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemCrystalTypeName == name, cancellationToken),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
+        if (usageCount > 0) throw new ContentDeleteConflictException("item definitions", usageCount);
+
+        var deleted = kind switch
+        {
+            "item-types" => await Delete(context.ItemTypes, gameVersion, name, cancellationToken),
+            "item-actions" => await Delete(context.ItemActions, gameVersion, name, cancellationToken),
+            "item-body-parts" => await Delete(context.ItemBodyParts, gameVersion, name, cancellationToken),
+            "item-materials" => await Delete(context.ItemMaterials, gameVersion, name, cancellationToken),
+            "item-crystal-types" => await Delete(context.ItemCrystalTypes, gameVersion, name, cancellationToken),
+            _ => false
+        };
+        if (!deleted) return false;
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private static IQueryable<ItemSummary> ProjectItems(IQueryable<Item> items) => items.Select(item => new ItemSummary(
@@ -123,5 +179,14 @@ public sealed partial class ContentDirectoryRepository
         typeof(TEntity).GetProperty(nameof(ItemType.DisplayName))!.SetValue(entity, displayName);
         await context.SaveChangesAsync(token);
         return new ItemLookupSummary(name, displayName);
+    }
+
+    private static async Task<bool> Delete<TEntity>(DbSet<TEntity> set, string gameVersion, string name, CancellationToken token)
+        where TEntity : class
+    {
+        var entity = await set.FindAsync([gameVersion, name], token);
+        if (entity is null) return false;
+        set.Remove(entity);
+        return true;
     }
 }

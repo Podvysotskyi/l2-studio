@@ -33,6 +33,11 @@ STATS = [
     ("pDef", "PhysicalDefence"), ("rEvas", "Evasion"), ("rShld", "ShieldRate"),
     ("randomDamage", "RandomDamage"), ("sDef", "ShieldDefence"),
 ]
+BODY_PART_NAMES = {
+    "lrhand": "hand",
+    "rear;lear": "ear",
+    "rfinger;lfinger": "finger",
+}
 
 
 def csharp_string(value: str | None) -> str:
@@ -57,6 +62,8 @@ def decimal(value: str | None) -> str:
 
 def expression(item: ElementTree.Element) -> str:
     sets = {node.attrib["name"]: node.attrib["val"] for node in item.findall("set")}
+    if "bodypart" in sets:
+        sets["bodypart"] = BODY_PART_NAMES.get(sets["bodypart"], sets["bodypart"])
     values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item.attrib['type'])}"]
     for source, (target, kind) in FIELDS.items():
         values.append(f"{target} = {csharp(sets.get(source), kind)}")
@@ -68,10 +75,32 @@ def expression(item: ElementTree.Element) -> str:
     return "        new() { " + ", ".join(values) + " },"
 
 
+def lookup_expression(name: str) -> str:
+    return f"        {csharp_string(name)},"
+
+
+def lookup_lines(items: dict[int, ElementTree.Element]) -> list[str]:
+    definitions = list(items.values())
+    lookups = [
+        ("TypeNames", {item.attrib["type"] for item in definitions}),
+        ("ActionNames", {item.find("set[@name='default_action']").attrib["val"] for item in definitions if item.find("set[@name='default_action']") is not None}),
+        ("BodyPartNames", {BODY_PART_NAMES.get(item.find("set[@name='bodypart']").attrib["val"], item.find("set[@name='bodypart']").attrib["val"]) for item in definitions if item.find("set[@name='bodypart']") is not None}),
+        ("MaterialNames", {item.find("set[@name='material']").attrib["val"] for item in definitions if item.find("set[@name='material']") is not None}),
+        ("CrystalTypeNames", {item.find("set[@name='crystal_type']").attrib["val"] for item in definitions if item.find("set[@name='crystal_type']") is not None}),
+    ]
+    lines = ["namespace L2.Studio.Worker;", "", "public sealed partial class C1ItemCatalog", "{"]
+    for field, names in lookups:
+        lines.extend([f"    private static readonly string[] {field} =", "    ["])
+        lines.extend(lookup_expression(name) for name in sorted(names))
+        lines.extend(["    ];", ""])
+    return [*lines, "}", ""]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("items_root", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("lookups_output", type=Path)
     args = parser.parse_args()
     paths = sorted(args.items_root.glob("*.xml")) + sorted((args.items_root / "custom").glob("*.xml"))
     items: dict[int, ElementTree.Element] = {}
@@ -86,6 +115,8 @@ def main() -> None:
     lines.extend(["    ];", "}", ""])
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    args.lookups_output.parent.mkdir(parents=True, exist_ok=True)
+    args.lookups_output.write_text("\n".join(lookup_lines(items)), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

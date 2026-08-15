@@ -9,6 +9,7 @@ import {
   buildPlayerClassHierarchy,
   flattenPlayerClassHierarchy
 } from '../../../utils/player-class'
+import { deletePlayerClass, updatePlayerClass } from '../../../services/studio-api'
 
 const props = defineProps<{
   records: PlayerClassRecord[]
@@ -16,7 +17,15 @@ const props = defineProps<{
   error?: string
 }>()
 
-defineEmits<{ refresh: [] }>()
+const emit = defineEmits<{ refresh: [] }>()
+const dialogs = useStudioDialogs()
+const notifications = useStudioToasts()
+const selectedClass = ref<PlayerClassNode>()
+const editOpen = ref(false)
+const saving = ref(false)
+const deletingId = ref<number>()
+const editError = ref<string>()
+const editForm = reactive({ name: '', isMage: false, parentClassId: undefined as number | undefined })
 
 const query = ref('')
 const expandedIds = ref<Set<number>>(new Set())
@@ -28,13 +37,20 @@ const columns: TableColumn<PlayerClassNode>[] = [
   { accessorKey: 'isMage', header: 'Archetype' },
   { id: 'availability', header: 'Race and sex' },
   { accessorKey: 'parentName', header: 'Parent class' },
-  { id: 'subclasses', header: 'Direct subclasses' }
+  { id: 'subclasses', header: 'Direct subclasses' },
+  { id: 'actions', header: '' }
 ]
 const roots = computed(() => buildPlayerClassHierarchy(props.records))
 const visibleRows = computed(() =>
   flattenPlayerClassHierarchy(roots.value, expandedIds.value, query.value)
 )
 const searching = computed(() => query.value.trim().length > 0)
+const parentOptions = computed(() => [
+  { label: 'No parent class', value: undefined },
+  ...props.records
+    .filter(record => record.id !== selectedClass.value?.id)
+    .map(record => ({ label: `${record.name} (${record.id})`, value: record.id }))
+])
 const matchCount = computed(() => {
   const term = query.value.trim().toLocaleLowerCase()
   if (!term) return props.records.length
@@ -87,49 +103,71 @@ function expandAll() {
 function collapseAll() {
   expandedIds.value = new Set()
 }
+
+function edit(record: PlayerClassNode) {
+  selectedClass.value = record
+  editForm.name = record.name
+  editForm.isMage = record.isMage
+  editForm.parentClassId = record.parentClassId ?? undefined
+  editError.value = undefined
+  editOpen.value = true
+}
+
+async function save() {
+  const record = selectedClass.value
+  const name = editForm.name.trim()
+  if (!record) return
+  if (!name || name.length > 64) {
+    editError.value = 'Name must contain between 1 and 64 characters.'
+    return
+  }
+  saving.value = true
+  editError.value = undefined
+  try {
+    await updatePlayerClass(record.id, { name, isMage: editForm.isMage, parentClassId: editForm.parentClassId ?? null })
+    editOpen.value = false
+    notifications.success({ title: 'Player class saved' })
+    emit('refresh')
+  } catch {
+    editError.value = 'Player class could not be saved. The selected parent must be available for every class variant.'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function remove(record: PlayerClassNode) {
+  const confirmed = await dialogs.confirm({
+    title: `Delete ${record.name}?`,
+    description: 'This removes every race and sex variant. Delete or reassign child classes first.',
+    confirmLabel: 'Delete class',
+    confirmColor: 'error'
+  })
+  if (!confirmed) return
+  deletingId.value = record.id
+  try {
+    await deletePlayerClass(record.id)
+    notifications.success({ title: 'Player class deleted' })
+    emit('refresh')
+  } catch {
+    notifications.error({ title: 'Player class could not be deleted', description: 'It may still have child classes.' })
+  } finally {
+    deletingId.value = undefined
+  }
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-    <StudioPageHeader
-      eyebrow="Game content"
+  <StudioContentDirectoryLayout
       title="Player classes"
       description="Explore the canonical Interlude class progression from base professions through third classes."
       icon="i-lucide-git-branch"
+      import-target="player-classes"
+      import-label="player classes"
+      :loading="loading"
+      :error="error"
+      @refresh="$emit('refresh')"
     >
-      <template #actions>
-        <UButton
-          label="Refresh"
-          icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="outline"
-          :loading="loading"
-          @click="$emit('refresh')"
-        />
-      </template>
-    </StudioPageHeader>
-
-    <UAlert
-      v-if="error"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-circle-alert"
-      title="Player class hierarchy unavailable"
-      :description="error"
-    >
-      <template #actions>
-        <UButton
-          color="error"
-          variant="soft"
-          size="sm"
-          @click="$emit('refresh')"
-        >
-          Try again
-        </UButton>
-      </template>
-    </UAlert>
-
-    <UCard v-else :ui="{ body: 'p-0 sm:p-0' }">
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
       <div
         class="flex flex-wrap items-center justify-between gap-4 border-b border-default px-4 py-3"
       >
@@ -174,13 +212,13 @@ function collapseAll() {
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <UTable
+      <StudioDataTable
           :data="visibleRows"
           :columns="columns"
           :loading="loading"
+          pagination-mode="none"
           empty="No player classes match this search."
-          class="min-w-[64rem]"
+          table-class="min-w-[64rem]"
         >
           <template #name-cell="{ row }">
             <div
@@ -261,8 +299,27 @@ function collapseAll() {
               {{ row.original.children.length }}
             </span>
           </template>
-        </UTable>
-      </div>
+          <template #actions-cell="{ row }">
+            <StudioTableRowActions
+              :show-edit="true"
+              :show-delete="true"
+              :delete-loading="deletingId === row.original.id"
+              @edit="edit(row.original)"
+              @delete="remove(row.original)"
+            />
+          </template>
+      </StudioDataTable>
     </UCard>
-  </div>
+    <UModal v-model:open="editOpen" title="Edit player class">
+      <template #body>
+        <form class="space-y-4" @submit.prevent="save">
+          <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
+          <UFormField label="Name" required><UInput v-model="editForm.name" maxlength="64" class="w-full" /></UFormField>
+          <UFormField label="Archetype"><USelect v-model="editForm.isMage" :items="[{ label: 'Fighter', value: false }, { label: 'Mage', value: true }]" class="w-full" /></UFormField>
+          <UFormField label="Parent class"><USelect v-model="editForm.parentClassId" :items="parentOptions" class="w-full" /></UFormField>
+          <div class="flex justify-end gap-3 pt-2"><UButton label="Cancel" color="neutral" variant="outline" @click="editOpen = false" /><UButton type="submit" label="Save changes" icon="i-lucide-save" :loading="saving" /></div>
+        </form>
+      </template>
+    </UModal>
+  </StudioContentDirectoryLayout>
 </template>

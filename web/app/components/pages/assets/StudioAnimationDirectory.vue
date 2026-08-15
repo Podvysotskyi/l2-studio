@@ -176,6 +176,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer))
         </div>
       </template>
     </USlideover>
-    <StudioImportProgressDrawer v-model:open="importDrawerOpen" title="Animation import" :items="progressItems" />
+    <StudioImportProgressDrawer v-model:open="importDrawerOpen" :items="progressItems" />
   </div>
 </template>

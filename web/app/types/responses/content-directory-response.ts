@@ -1,15 +1,12 @@
 import type { NpcRecord, SkillRecord } from '../models/content-directory'
 
-export interface NpcPage {
-  items: NpcRecord[]
+export interface DirectoryPage<TItem> {
+  items: TItem[]
   total: number
   page: number
   pageSize: number
 }
 
-export interface SkillPage {
-  items: SkillRecord[]
-  total: number
-  page: number
-  pageSize: number
-}
+export type NpcPage = DirectoryPage<NpcRecord>
+
+export type SkillPage = DirectoryPage<SkillRecord>

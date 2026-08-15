@@ -20,14 +20,16 @@ describe('Lookup and player-class stores', () => {
   })
 
   it('loads a lookup catalog and clears its loading state', async () => {
-    vi.mocked(getLookupDirectory).mockResolvedValue([{ id: 0, name: 'Human' }])
+    vi.mocked(getLookupDirectory).mockResolvedValue({
+      items: [{ id: 0, name: 'Human' }], total: 1, page: 1, pageSize: 100
+    })
     const store = useLookupDirectoryStore()
 
     const load = store.load('player-races', 'Player race')
     expect(store.isLoading('player-races')).toBe(true)
     await load
 
-    expect(getLookupDirectory).toHaveBeenCalledWith('player-races')
+    expect(getLookupDirectory).toHaveBeenCalledWith('player-races', { page: 1, pageSize: 100 })
     expect(store.records['player-races']).toEqual([{ id: 0, name: 'Human' }])
     expect(store.isLoading('player-races')).toBe(false)
     expect(store.errors['player-races']).toBeUndefined()

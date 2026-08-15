@@ -19,9 +19,9 @@ describe('NPC lookup directory store', () => {
   })
 
   it('loads name-keyed records', async () => {
-    vi.mocked(getNpcLookupDirectory).mockResolvedValue([
-      { name: 'DARK_ELF', displayName: 'Dark Elf' }
-    ])
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue({
+      items: [{ name: 'DARK_ELF', displayName: 'Dark Elf' }], total: 1, page: 1, pageSize: 100
+    })
     const store = useNpcLookupDirectoryStore()
 
     await store.load('npc-races', 'Race values')
@@ -33,9 +33,9 @@ describe('NPC lookup directory store', () => {
   })
 
   it('replaces the edited record without changing its canonical name', async () => {
-    vi.mocked(getNpcLookupDirectory).mockResolvedValue([
-      { name: 'ETC', displayName: 'Etc' }
-    ])
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue({
+      items: [{ name: 'ETC', displayName: 'Etc' }], total: 1, page: 1, pageSize: 100
+    })
     vi.mocked(updateNpcLookupDisplayName).mockResolvedValue({
       name: 'ETC',
       displayName: 'Other'

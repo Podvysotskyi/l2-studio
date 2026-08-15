@@ -199,6 +199,15 @@ function statusIcon(status: ImportProgressStatus) {
                       <UBadge :color="statusColor(item.status)" variant="subtle" size="sm">
                         {{ statusLabel(item.status) }}
                       </UBadge>
+                      <UButton
+                        v-if="item.to"
+                        label="View job"
+                        :to="item.to"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        trailing-icon="i-lucide-arrow-up-right"
+                      />
                     </div>
                   </div>
                   <div v-if="!isActiveImportStatus(item.status)" class="mt-2 flex flex-wrap gap-2">

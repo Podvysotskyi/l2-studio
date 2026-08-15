@@ -18,6 +18,21 @@ authoritative gameplay outcomes.
 - The asset server exposes only generated public output. Original resources and
   Worker staging remain private.
 
+## Import jobs and content directories
+
+Content and asset imports share the `import_jobs` lifecycle, status vocabulary,
+timestamps, abandonment handling, and query API. Category-specific columns and
+asset work items remain on the same EF hierarchy, while the browser consumes a
+single paged history contract.
+
+Every content directory imports one explicit target. `add_missing` preserves
+all existing values; `restore_defaults` overwrites source-backed values for the
+target but preserves custom-only rows. Handlers may insert missing dependency
+lookups, but never restore a dependency as a side effect. The Nuxt directory
+layout owns the standard header, actions, confirmation modal, dismissible import
+progress drawer, refresh behavior, and table region. Individual pages own columns,
+filters, editing, and whether pagination is enabled.
+
 ## Cross-product boundaries
 
 Every authored and generated record is scoped by a stable game-version key.

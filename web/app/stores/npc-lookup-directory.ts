@@ -18,7 +18,7 @@ export const useNpcLookupDirectoryStore = defineStore('npc-lookup-directory', ()
     loadingKinds.value = [...new Set([...loadingKinds.value, kind])]
     errors.value[kind] = undefined
     try {
-      records.value[kind] = await getNpcLookupDirectory(kind)
+      records.value[kind] = (await getNpcLookupDirectory(kind, { page: 1, pageSize: 100 })).items
     } catch {
       errors.value[kind] = `The ${label.toLowerCase()} catalog could not be loaded.`
     } finally {

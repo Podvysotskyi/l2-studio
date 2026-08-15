@@ -2,37 +2,41 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getAssetCatalogs,
-  getAssetImportJobs,
+  getImportJobs,
   getLookupDirectory,
   getNpcLookupDirectory,
   getNpcDirectory,
   getPlayerClasses,
-  getSkillDirectory
+  getSkillDirectory,
+  getSkillLookupDirectory
 } from '../../app/services/studio-api'
 import { useDashboardStore } from '../../app/stores/dashboard'
 
 vi.mock('../../app/services/studio-api', () => ({
   getAssetCatalogs: vi.fn(),
-  getAssetImportJobs: vi.fn(),
+  getImportJobs: vi.fn(),
   getLookupDirectory: vi.fn(),
   getNpcLookupDirectory: vi.fn(),
   getNpcDirectory: vi.fn(),
   getPlayerClasses: vi.fn(),
-  getSkillDirectory: vi.fn()
+  getSkillDirectory: vi.fn(),
+  getSkillLookupDirectory: vi.fn()
 }))
 
 describe('Dashboard store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(getAssetCatalogs).mockReset()
-    vi.mocked(getAssetImportJobs).mockReset()
+    vi.mocked(getImportJobs).mockReset()
     vi.mocked(getLookupDirectory).mockReset()
     vi.mocked(getNpcLookupDirectory).mockReset()
     vi.mocked(getNpcDirectory).mockReset()
     vi.mocked(getPlayerClasses).mockReset()
     vi.mocked(getSkillDirectory).mockReset()
-    vi.mocked(getLookupDirectory).mockResolvedValue([])
-    vi.mocked(getNpcLookupDirectory).mockResolvedValue([])
+    vi.mocked(getSkillLookupDirectory).mockReset()
+    vi.mocked(getLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
+    vi.mocked(getSkillLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
   })
 
   it('aggregates content, asset, and recent-job summaries', async () => {
@@ -49,8 +53,9 @@ describe('Dashboard store', () => {
       pageSize: 1
     })
     vi.mocked(getPlayerClasses).mockResolvedValue([])
-    vi.mocked(getLookupDirectory).mockResolvedValue([])
-    vi.mocked(getNpcLookupDirectory).mockResolvedValue([])
+    vi.mocked(getLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
+    vi.mocked(getNpcLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
+    vi.mocked(getSkillLookupDirectory).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 })
     vi.mocked(getAssetCatalogs).mockResolvedValue([
       {
         kind: 'textures',
@@ -65,11 +70,15 @@ describe('Dashboard store', () => {
         publishedAt: '2026-08-11T12:00:00Z'
       }
     ])
-    vi.mocked(getAssetImportJobs).mockImplementation(async kind => [
-      job(`${kind}-job`, kind, kind === 'textures'
-        ? '2026-08-11T13:00:00Z'
-        : '2026-08-11T12:00:00Z')
-    ])
+    vi.mocked(getImportJobs).mockResolvedValue({
+      items: [
+        job('textures-job', 'asset', 'textures', '2026-08-11T13:00:00Z'),
+        job('items-job', 'content', 'items', '2026-08-11T12:00:00Z')
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 25
+    })
     const store = useDashboardStore()
 
     await store.load()
@@ -83,7 +92,7 @@ describe('Dashboard store', () => {
       groups: 2,
       available: true
     })
-    expect(store.jobs).toHaveLength(6)
+    expect(store.jobs).toHaveLength(2)
     expect(store.jobs[0]?.id).toBe('textures-job')
     expect(store.loading).toBe(false)
     expect(store.contentError).toBe(false)
@@ -94,7 +103,7 @@ describe('Dashboard store', () => {
   it('keeps partial dashboard results and reports independent failures', async () => {
     vi.mocked(getNpcDirectory).mockRejectedValue(new Error('Unavailable'))
     vi.mocked(getAssetCatalogs).mockRejectedValue(new Error('Unavailable'))
-    vi.mocked(getAssetImportJobs).mockRejectedValue(new Error('Unavailable'))
+    vi.mocked(getImportJobs).mockRejectedValue(new Error('Unavailable'))
     const store = useDashboardStore()
 
     await store.load()
@@ -106,22 +115,22 @@ describe('Dashboard store', () => {
   })
 })
 
-function job(id: string, kind: Parameters<typeof getAssetImportJobs>[0], requestedAt: string) {
+function job(id: string, category: 'asset' | 'content', target: string, requestedAt: string) {
   return {
     id,
-    kind,
-    triggerType: 'full_scan' as const,
+    category,
+    target,
+    operation: category === 'asset' ? 'full_scan' : 'add_missing',
     status: 'succeeded' as const,
     requestedSourceKey: null,
+    force: false,
     requestedAt,
     startedAt: requestedAt,
     discoveryFinishedAt: requestedAt,
     finishedAt: requestedAt,
-    discoveredFileCount: 1,
-    completedFileCount: 1,
-    succeededFileCount: 1,
-    warningFileCount: 0,
-    failedFileCount: 0,
+    totalCount: 1,
+    completedCount: 1,
+    metrics: [],
     error: null
   }
 }

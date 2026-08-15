@@ -6,20 +6,22 @@ import {
   getAssetArtifact,
   getAssetArtifacts,
   getAssetImportJobs,
+  getImportJob,
+  getImportJobs,
   getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
   getNpcDefinition,
   getNpcAppearanceManifest,
   getNpcLookupDirectory,
-  getNpcLookupImportJob,
-  getNpcLookupImportJobs,
+  getSkillLookupDirectory,
   getStudioServiceInfo,
   startAssetFileImport,
   startAssetResourceImport,
   startAssetImport,
-  startNpcLookupImport,
+  startContentImport,
   updateNpcLookupDisplayName,
+  updateSkillLookupDisplayName,
   updateNpcDefinition,
   rebuildStaleAssetSources,
   verifyAssetArtifact
@@ -80,6 +82,22 @@ describe('Studio API service', () => {
     })
   })
 
+  it('loads and updates name-keyed skill lookups', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
+
+    await getSkillLookupDirectory('skill-target-types', { query: 'area', pageSize: 25 })
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/skill-target-types',
+      { query: { query: 'area', page: 1, pageSize: 25 } }
+    )
+
+    await updateSkillLookupDisplayName('skill-target-types', 'AREA_CORPSE_MOB', 'Area Corpse Mob')
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/game-versions/c1/content/skill-target-types/AREA_CORPSE_MOB',
+      { method: 'PATCH', body: { displayName: 'Area Corpse Mob' } }
+    )
+  })
+
   it('loads one NPC appearance manifest reference through the asset API', async () => {
     fetchMock.mockResolvedValue({ manifestUrl: '/versions/c1/npc/manifest.json' })
 
@@ -113,6 +131,25 @@ describe('Studio API service', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/game-versions/c1/assets/mappreviews/imports/preview%20run'
     )
+  })
+
+  it('loads and starts universal import jobs', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
+
+    await getImportJobs({ category: 'content', target: 'item-materials', status: 'running' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/imports', {
+      query: {
+        category: 'content', target: 'item-materials', status: 'running', page: 1, pageSize: 25
+      }
+    })
+
+    await getImportJob('run id')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/imports/run%20id')
+
+    await startContentImport('item-materials', 'restore_defaults')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/imports/content/item-materials', {
+      method: 'POST', body: { mode: 'restore_defaults' }
+    })
   })
 
   it('loads per-file progress and filtered diagnostics', async () => {
@@ -268,10 +305,12 @@ describe('Studio API service', () => {
     )
   })
 
-  it('reads, edits, and imports NPC lookups through version-scoped APIs', async () => {
-    fetchMock.mockResolvedValue([])
+  it('reads and edits NPC lookups through version-scoped APIs', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
     await getNpcLookupDirectory('npc-types')
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npc-types')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npc-types', {
+      query: { page: 1, pageSize: 25 }
+    })
 
     await updateNpcLookupDisplayName('npc-races', 'DARK_ELF', 'Dark Elf')
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -279,44 +318,5 @@ describe('Studio API service', () => {
       { method: 'PATCH', body: { displayName: 'Dark Elf' } }
     )
 
-    await getNpcLookupImportJobs('npc-races')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-races/imports',
-      { query: { limit: 1 } }
-    )
-    await getNpcLookupImportJob('npc-races', 'run-id')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-races/imports/run-id'
-    )
-    await startNpcLookupImport('npc-races')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-races/imports',
-      { method: 'POST' }
-    )
-    await startNpcLookupImport('npc-sexes')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-sexes/imports',
-      { method: 'POST' }
-    )
-    await getNpcLookupImportJobs('npcs')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npcs/imports',
-      { query: { limit: 1 } }
-    )
-    await startNpcLookupImport('npcs')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npcs/imports',
-      { method: 'POST' }
-    )
-    await startNpcLookupImport('npc-types', 'add_missing')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-types/imports',
-      { method: 'POST', body: { mode: 'add_missing' } }
-    )
-    await startNpcLookupImport('npc-types', 'restore_defaults')
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/game-versions/c1/content/npc-types/imports',
-      { method: 'POST', body: { mode: 'restore_defaults' } }
-    )
   })
 })

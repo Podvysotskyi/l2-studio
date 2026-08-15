@@ -9,14 +9,15 @@ import {
 } from '../../app/utils/studio-navigation'
 
 describe('Studio navigation', () => {
-  it('organizes authoring, library, and pipeline destinations by workflow', () => {
+  it('organizes authoring, delivery, pipeline, and storage destinations by workflow', () => {
     expect(groupLabels()).toEqual([
       'Players',
       'NPCs',
       'Skills',
       'Items',
       'Asset library',
-      'Pipeline'
+      'Pipeline',
+      'Storage'
     ])
     expect(group('Players').children?.map(item => item.label)).toEqual([
       'Classes',
@@ -43,10 +44,14 @@ describe('Studio navigation', () => {
       'Scenes'
     ])
     expect(group('Pipeline').children?.map(item => item.label)).toEqual([
-      'File storage',
       'Import jobs',
-      'Artifact registry',
+      'Stale resources',
       'Releases'
+    ])
+    expect(group('Storage').children?.map(item => item.label)).toEqual([
+      'Original resources',
+      'Generated assets',
+      'Artifact registry'
     ])
   })
 
@@ -61,13 +66,18 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/library/static-meshes')
     expect(routes).toContain('/library/animations')
     expect(routes).toContain('/library/maps')
-    expect(routes).toContain('/pipeline/storage')
+    expect(routes).toContain('/pipeline/stale-resources')
     expect(routes).toContain('/pipeline/releases')
-    expect(routes).toContain('/monitoring/stale-resources')
+    expect(routes).toContain('/storage/original-resources')
+    expect(routes).toContain('/storage/generated-assets')
+    expect(routes).toContain('/storage/artifact-registry')
     expect(routes).not.toContain('/content/npcs')
     expect(routes).not.toContain('/assets/maps')
     expect(routes).not.toContain('/storage')
     expect(routes).not.toContain('/releases')
+    expect(routes).not.toContain('/pipeline/storage')
+    expect(routes).not.toContain('/pipeline/artifacts')
+    expect(routes).not.toContain('/monitoring/stale-resources')
   })
 
   it('finds the group containing the current route', () => {
@@ -84,6 +94,10 @@ describe('Studio navigation', () => {
       .toBe(studioNavigationGroups.library)
     expect(studioRouteGroup('/pipeline/imports'))
       .toBe(studioNavigationGroups.pipeline)
+    expect(studioRouteGroup('/pipeline/stale-resources'))
+      .toBe(studioNavigationGroups.pipeline)
+    expect(studioRouteGroup('/storage/original-resources'))
+      .toBe(studioNavigationGroups.storage)
     expect(studioRouteGroup('/assets/maps')).toBeUndefined()
   })
 
@@ -113,7 +127,10 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/library/maps/17_25')).toBe('Map')
     expect(studioRouteTitle('/library/scenes/lobby')).toBe('Client scene')
     expect(studioRouteTitle('/pipeline/releases')).toBe('Asset releases')
-    expect(studioRouteTitle('/monitoring/stale-resources')).toBe('Stale resources')
+    expect(studioRouteTitle('/pipeline/stale-resources')).toBe('Stale resources')
+    expect(studioRouteTitle('/storage/original-resources')).toBe('Original resources')
+    expect(studioRouteTitle('/storage/generated-assets')).toBe('Generated assets')
+    expect(studioRouteTitle('/storage/artifact-registry')).toBe('Generated-asset registry')
   })
 })
 

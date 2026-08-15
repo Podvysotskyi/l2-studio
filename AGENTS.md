@@ -27,7 +27,7 @@ docker compose build
 - Keep .NET production projects in `server/src`, project-owned unit-test projects in `server/tests`, and the solution, shared build properties, package versions, and Dockerfile in `server/`.
 - `L2.Studio.Api` owns controllers, request filters, and HTTP composition. `L2.Studio.Worker` remains a thin process host.
 - `L2.Studio.Configurations` owns service registration, CORS, health checks, service identity, and host composition.
-- `L2.Studio.Contracts` owns browser-facing DTOs; `L2.Studio.Context` owns EF Core entities and model mapping; `L2.Studio.Migrations` owns migrations and seed data.
+- `L2.Studio.Contracts` owns browser-facing DTOs; `L2.Studio.Context` owns EF Core entities and model mapping; `L2.Studio.Migrations` owns migrations and seed data. Put table, column, length, primary-key, and generated-value metadata on entities with data annotations. Reserve Fluent API for relationships, alternate keys, indexes, defaults, provider-specific types, and constraints.
 - `L2.Studio.Repositories.Interfaces` owns persistence abstractions and shared import models. `L2.Studio.Repositories` owns runtime persistence implementations and path validation.
 - `L2.Studio.Services` owns import orchestration, manifests, preview generation, and asset processing. `L2.Tools.*` conversion libraries are Studio solution projects; preserve their public names and namespaces.
 - Name test projects after the production project they verify: `{ProjectName}.Tests`. Keep each test in its owning project’s test assembly; repository tests must not require a database connection.

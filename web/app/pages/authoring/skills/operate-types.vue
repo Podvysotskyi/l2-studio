@@ -1,8 +1,9 @@
 <template>
-  <StudioCatalog
+  <SkillLookupDirectory
     kind="skill-operate-types"
+    import-target="skill-operate-types"
     title="Skill operate types"
-    description="Review the enum-backed modes that determine how skills are activated."
+    description="Review the canonical modes that determine how skills are activated."
     icon="i-lucide-play"
     item-label="Operate types"
   />

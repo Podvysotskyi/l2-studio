@@ -1,5 +1,6 @@
 using L2.Studio.Context;
 using L2.Studio.Context.Entities;
+using L2.Studio.Context.Identifiers;
 using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
 using Microsoft.EntityFrameworkCore;
@@ -156,6 +157,70 @@ public sealed class ContentDirectoryRepositoryTests
         Assert.Collection(unraced.Items, npc => Assert.Equal(2, npc.Id));
         Assert.Equal(1, withoutVisuals.Total);
         Assert.Collection(withoutVisuals.Items, npc => Assert.Equal(2, npc.Id));
+    }
+
+    [Fact]
+    public async Task SearchesNameKeyedSkillLookupsAndFiltersPlayerAppearancesByNumericIds()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var human = new PlayerRace { GameVersion = "c1", Id = PlayerRaceId.Human, Name = "Human" };
+            var male = new PlayerSex { GameVersion = "c1", Id = PlayerSexId.Male, Name = "Male" };
+            var female = new PlayerSex { GameVersion = "c1", Id = PlayerSexId.Female, Name = "Female" };
+            var operateType = new SkillOperateType
+            {
+                GameVersion = "c1", Name = "A1", DisplayName = "Active"
+            };
+            var targetType = new SkillTargetType
+            {
+                GameVersion = "c1", Name = "ONE", DisplayName = "One"
+            };
+            context.AddRange(
+                human,
+                male,
+                female,
+                new PlayerFace
+                {
+                    GameVersion = "c1", Id = 1, Name = "Human male", PlayerRaceId = human.Id,
+                    PlayerRace = human, PlayerSexId = male.Id, PlayerSex = male
+                },
+                new PlayerFace
+                {
+                    GameVersion = "c1", Id = 2, Name = "Human female", PlayerRaceId = human.Id,
+                    PlayerRace = human, PlayerSexId = female.Id, PlayerSex = female
+                },
+                operateType,
+                targetType,
+                new Skill
+                {
+                    GameVersion = "c1", Id = 1, Levels = 1, Name = "Triple Slash",
+                    SkillOperateTypeName = operateType.Name, SkillOperateType = operateType,
+                    SkillTargetTypeName = targetType.Name, SkillTargetType = targetType
+                });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var races = await repository.SearchPlayerLookupsAsync(
+            "c1", "player-races", new DirectoryRequest(Query: "0"), CancellationToken.None);
+        var appearances = await repository.SearchPlayerAppearancesAsync(
+            "c1", "player-faces", new PlayerAppearanceDirectoryRequest(PlayerRaceId: 0, PlayerSexId: 0), CancellationToken.None);
+        var operateTypes = await repository.SearchSkillLookupsAsync(
+            "c1", "skill-operate-types", new DirectoryRequest(), CancellationToken.None);
+        var skills = await repository.SearchSkillsAsync("c1", string.Empty, 1, 25, CancellationToken.None);
+
+        Assert.Collection(races.Items, item => Assert.Equal(new PlayerLookupSummary(0, "Human"), item));
+        Assert.Collection(appearances.Items, item => Assert.Equal("Human male", item.Name));
+        Assert.Collection(operateTypes.Items, item => Assert.Equal(new SkillLookupSummary("A1", "Active"), item));
+        Assert.Collection(skills.Items, item => Assert.Equal(
+            new SkillSummary(1, 1, "Triple Slash", "A1", "Active", "ONE", "One", 0), item));
+
+        var updated = await repository.UpdateSkillLookupDisplayNameAsync(
+            "c1", "skill-operate-types", "A1", "Single target", CancellationToken.None);
+        Assert.Equal(new SkillLookupSummary("A1", "Single target"), updated);
     }
 
     private sealed class TestContextFactory(DbContextOptions<GameContentDbContext> options)

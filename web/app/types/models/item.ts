@@ -1,5 +1,4 @@
 export type ItemLookupKind = 'item-types' | 'item-actions' | 'item-body-parts' | 'item-materials' | 'item-crystal-types'
-export type ItemImportMode = 'add_missing' | 'restore_defaults'
 
 export interface ItemLookupRecord { name: string; displayName: string }
 export interface ItemStatsRecord {
@@ -19,8 +18,3 @@ export interface ItemRecord {
   stats: ItemStatsRecord | null
 }
 export interface ItemPage { items: ItemRecord[]; total: number; page: number; pageSize: number }
-export interface ItemImportRun {
-  id: string; mode: ItemImportMode; status: 'queued' | 'running' | 'succeeded' | 'failed'
-  requestedAt: string; startedAt: string | null; finishedAt: string | null; totalCount: number
-  insertedCount: number; existingCount: number; restoredCount: number; error: string | null
-}

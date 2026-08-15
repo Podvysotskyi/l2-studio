@@ -9,6 +9,11 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
   const query = ref('')
   const page = ref(1)
   const pageSize = ref(25)
+  const itemTypeName = ref<string>()
+  const itemActionName = ref<string>()
+  const itemBodyPartName = ref<string>()
+  const itemMaterialName = ref<string>()
+  const itemCrystalTypeName = ref<string>()
   const loading = ref(true)
   const error = ref<string>()
   let requestVersion = 0
@@ -17,7 +22,16 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     loading.value = true
     error.value = undefined
     try {
-      const response = await getItemDirectory({ query: query.value, page: page.value, pageSize: pageSize.value })
+      const response = await getItemDirectory({
+        query: query.value,
+        page: page.value,
+        pageSize: pageSize.value,
+        itemTypeName: itemTypeName.value,
+        itemActionName: itemActionName.value,
+        itemBodyPartName: itemBodyPartName.value,
+        itemMaterialName: itemMaterialName.value,
+        itemCrystalTypeName: itemCrystalTypeName.value
+      })
       if (version !== requestVersion) return
       items.value = response.items
       total.value = response.total
@@ -27,5 +41,19 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
       if (version === requestVersion) loading.value = false
     }
   }
-  return { items, total, query, page, pageSize, loading, error, load }
+  return {
+    items,
+    total,
+    query,
+    page,
+    pageSize,
+    itemTypeName,
+    itemActionName,
+    itemBodyPartName,
+    itemMaterialName,
+    itemCrystalTypeName,
+    loading,
+    error,
+    load
+  }
 })

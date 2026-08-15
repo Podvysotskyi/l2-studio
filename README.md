@@ -99,6 +99,14 @@ source root and publishes files below `versions/{version}/` in the asset root.
 Studio does not generate bootstrap content at startup; import or author each
 version's content explicitly.
 
+Content directory pages share one layout and import contract. Each page queues
+only its own target through `POST /api/game-versions/{version}/imports/content/{target}`
+using either `add_missing` (preserve authored values) or `restore_defaults`
+(restore source-backed values while preserving custom-only rows). Required
+lookup dependencies are added if missing. Content and asset runs are stored in
+the same durable `import_jobs` history and can be filtered or inspected under
+**Pipeline → Import jobs**.
+
 ## Checks
 
 Run validation through Docker from the repository root:
@@ -116,9 +124,9 @@ Do not run `npm test`, `npm run typecheck`, `npm run build`, `dotnet test`, `dot
 
 Studio owns its database and migrations. Reset a development database after the August 2026 server reorganization and `l2-studio` database rename because Studio uses the consolidated `InitialStudioContent` migration baseline.
 
-The per-file import and generated-artifact migrations are a clean baseline:
-reset existing Studio development databases instead of attempting to retain
-retired import or catalog rows. Generated URLs use immutable
+The content, universal import-job, and generated-artifact schema is a clean
+baseline: reset existing Studio development databases instead of attempting to
+retain retired import or catalog rows. Generated URLs use immutable
 `versions/{version}/{source-directory}/{source-file}/{build-fingerprint}` locations.
 
 ## Configuration and safety

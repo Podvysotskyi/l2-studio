@@ -1,3 +1,3 @@
 namespace L2.Studio.Contracts;
 
-public sealed record SkillLookupSummary(int Id, string Name);
+public sealed record SkillLookupSummary(string Name, string DisplayName);

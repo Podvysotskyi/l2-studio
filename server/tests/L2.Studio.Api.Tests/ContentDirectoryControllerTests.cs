@@ -3,6 +3,7 @@ using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
 using Microsoft.AspNetCore.Mvc;
 using L2.Studio.Repositories.Interfaces;
+using L2.Studio.Repositories.Interfaces.Models;
 using Xunit;
 
 namespace L2.Studio.Api.Tests;
@@ -47,15 +48,17 @@ public sealed class ContentDirectoryControllerTests
     [Fact]
     public async Task DelegatesLookupRequestsToTheMatchingRepositoryMethod()
     {
-        var expected = new[] { new NpcLookupSummary("Humanoid", "Humanoid") };
-        var repository = new StubContentDirectoryRepository { NpcTypes = expected };
+        var expected = new DirectoryPage<NpcLookupSummary>([new("Humanoid", "Humanoid")], 1, 2, 50);
+        var repository = new StubContentDirectoryRepository { NpcLookups = expected };
         var controller = new ContentDirectoryController(repository);
         using var cancellation = new CancellationTokenSource();
 
-        var result = await controller.GetNpcTypes("interlude", cancellation.Token);
+        var result = await controller.GetNpcTypes("interlude", new DirectoryRequest("  Humanoid  ", 2, 50), cancellation.Token);
 
         Assert.Same(expected, result);
-        Assert.Equal(cancellation.Token, repository.NpcTypesToken);
+        Assert.Equal("npc-types", repository.NpcLookupKind);
+        Assert.Equal("Humanoid", repository.NpcLookupRequest?.Query);
+        Assert.Equal(cancellation.Token, repository.NpcLookupToken);
     }
 
     [Fact]
@@ -80,6 +83,21 @@ public sealed class ContentDirectoryControllerTests
         var result = await controller.UpdateNpcSex(
             "c1", "ETC", new UpdateNpcLookupRequest("  "), CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task TrimsAndUpdatesSkillLookupDisplayNames()
+    {
+        var repository = new StubContentDirectoryRepository();
+        var controller = new ContentDirectoryController(repository);
+
+        var result = await controller.UpdateSkillTargetType(
+            "c1", "AREA_CORPSE_MOB", new UpdateNpcLookupRequest("  Area Corpse Mob  "), CancellationToken.None);
+
+        var response = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(new SkillLookupSummary("AREA_CORPSE_MOB", "Area Corpse Mob"), response.Value);
+        Assert.Equal("skill-target-types", repository.UpdatedKind);
+        Assert.Equal("Area Corpse Mob", repository.UpdatedDisplayName);
     }
 
     [Fact]
@@ -133,6 +151,22 @@ public sealed class ContentDirectoryControllerTests
         Assert.IsType<BadRequestObjectResult>(blankName.Result);
     }
 
+    [Fact]
+    public async Task DeletesDefinitionsAndReportsDependencyConflicts()
+    {
+        var deleted = await new ContentDirectoryController(new StubContentDirectoryRepository { NpcDeleted = true })
+            .DeleteNpc("c1", 100, CancellationToken.None);
+        Assert.IsType<NoContentResult>(deleted);
+
+        var conflict = await new ContentDirectoryController(new StubContentDirectoryRepository
+        {
+            NpcDeleteException = new ContentDeleteConflictException("NPC definitions", 2)
+        }).DeleteNpc("c1", 100, CancellationToken.None);
+        var response = Assert.IsType<ConflictObjectResult>(conflict);
+        var problem = Assert.IsType<ProblemDetails>(response.Value);
+        Assert.Equal("This record is used by 2 NPC definitions.", problem.Detail);
+    }
+
     private static NpcSummary Npc() => new(100, 1, 10, "Goblin", "Monster", "Monster", "HUMANOID", "Humanoid", "MALE", "Male", false);
 
     private sealed class StubContentDirectoryRepository : IContentDirectoryRepository
@@ -140,19 +174,25 @@ public sealed class ContentDirectoryControllerTests
         public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, ItemDirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new ItemDirectoryPage([], 0, request.Page, request.PageSize));
         public Task<ItemSummary?> GetItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult<ItemSummary?>(null);
         public Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemSummary?>(null);
-        public Task<IReadOnlyList<ItemLookupSummary>> GetItemLookupsAsync(string gameVersion, string kind, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ItemLookupSummary>>([]);
+        public Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemLookupSummary>([], 0, request.Page, request.PageSize));
         public Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken) => Task.FromResult<ItemLookupSummary?>(new(name, displayName));
+        public Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken) => Task.FromResult(false);
         public NpcDirectoryPage Npcs { get; init; } = new([], 0, 1, 25);
-        public IReadOnlyList<NpcLookupSummary> NpcTypes { get; init; } = [];
+        public DirectoryPage<NpcLookupSummary> NpcLookups { get; init; } = new([], 0, 1, 25);
         public NpcSummary? Npc { get; init; }
         public NpcSummary? UpdatedNpc { get; init; }
+        public bool NpcDeleted { get; init; }
+        public Exception? NpcDeleteException { get; init; }
         public string? NpcQuery { get; private set; }
         public int NpcPage { get; private set; }
         public int NpcPageSize { get; private set; }
         public CancellationToken NpcToken { get; private set; }
         public NpcDirectoryRequest? NpcRequest { get; private set; }
         public string? SkillQuery { get; private set; }
-        public CancellationToken NpcTypesToken { get; private set; }
+        public string? NpcLookupKind { get; private set; }
+        public DirectoryRequest? NpcLookupRequest { get; private set; }
+        public CancellationToken NpcLookupToken { get; private set; }
         public string? UpdatedKind { get; private set; }
         public string? UpdatedDisplayName { get; private set; }
         public int NpcId { get; private set; }
@@ -190,35 +230,53 @@ public sealed class ContentDirectoryControllerTests
             UpdatedNpcSexName = npcSexName;
             return Task.FromResult(UpdatedNpc);
         }
-
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcTypesAsync(string gameVersion, CancellationToken cancellationToken)
+        public Task<bool> DeleteNpcAsync(string gameVersion, int id, CancellationToken cancellationToken)
         {
-            NpcTypesToken = cancellationToken;
-            return Task.FromResult(NpcTypes);
+            if (NpcDeleteException is not null) throw NpcDeleteException;
+            return Task.FromResult(NpcDeleted);
         }
 
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
-        public Task<IReadOnlyList<NpcLookupSummary>> GetNpcSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NpcLookupSummary>>([]);
+        public Task<DirectoryPage<NpcLookupSummary>> SearchNpcLookupsAsync(
+            string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken)
+        {
+            NpcLookupKind = kind;
+            NpcLookupRequest = request;
+            NpcLookupToken = cancellationToken;
+            return Task.FromResult(NpcLookups);
+        }
+
         public Task<NpcLookupSummary?> UpdateNpcLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken)
         {
             UpdatedKind = kind;
             UpdatedDisplayName = displayName;
             return Task.FromResult<NpcLookupSummary?>(new(name, displayName));
         }
+        public Task<bool> DeleteNpcLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<IReadOnlyList<PlayerClassSummary>> GetPlayerClassesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerClassSummary>>([]);
-        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerRacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
-        public Task<IReadOnlyList<PlayerLookupSummary>> GetPlayerSexesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerLookupSummary>>([]);
-        public Task<IReadOnlyList<PlayerAppearanceSummary>> GetPlayerFacesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerAppearanceSummary>>([]);
-        public Task<IReadOnlyList<PlayerAppearanceSummary>> GetPlayerHairStylesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerAppearanceSummary>>([]);
-        public Task<IReadOnlyList<PlayerAppearanceSummary>> GetPlayerHairColorsAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PlayerAppearanceSummary>>([]);
+        public Task<PlayerClassSummary?> UpdatePlayerClassAsync(string gameVersion, int id, UpdatePlayerClassRequest request, CancellationToken cancellationToken) => Task.FromResult<PlayerClassSummary?>(null);
+        public Task<bool> DeletePlayerClassAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DirectoryPage<PlayerLookupSummary>> SearchPlayerLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<PlayerLookupSummary>([], 0, request.Page, request.PageSize));
+        public Task<PlayerLookupSummary?> UpdatePlayerLookupNameAsync(string gameVersion, string kind, int id, string name, CancellationToken cancellationToken) => Task.FromResult<PlayerLookupSummary?>(null);
+        public Task<bool> DeletePlayerLookupAsync(string gameVersion, string kind, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DirectoryPage<PlayerAppearanceSummary>> SearchPlayerAppearancesAsync(string gameVersion, string kind, PlayerAppearanceDirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<PlayerAppearanceSummary>([], 0, request.Page, request.PageSize));
+        public Task<PlayerAppearanceSummary?> UpdatePlayerAppearanceNameAsync(string gameVersion, string kind, int id, int playerRaceId, int playerSexId, string name, CancellationToken cancellationToken) => Task.FromResult<PlayerAppearanceSummary?>(null);
+        public Task<bool> DeletePlayerAppearanceAsync(string gameVersion, string kind, int id, int playerRaceId, int playerSexId, CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task<SkillDirectoryPage> SearchSkillsAsync(string gameVersion, string query, int page, int pageSize, CancellationToken cancellationToken)
         {
             SkillQuery = query;
             return Task.FromResult(new SkillDirectoryPage([], 0, page, pageSize));
         }
+        public Task<SkillSummary?> UpdateSkillAsync(string gameVersion, int id, UpdateSkillRequest request, CancellationToken cancellationToken) => Task.FromResult<SkillSummary?>(null);
+        public Task<bool> DeleteSkillAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillOperateTypesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
-        public Task<IReadOnlyList<SkillLookupSummary>> GetSkillTargetTypesAsync(string gameVersion, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillLookupSummary>>([]);
+        public Task<DirectoryPage<SkillLookupSummary>> SearchSkillLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<SkillLookupSummary>([], 0, request.Page, request.PageSize));
+        public Task<SkillLookupSummary?> UpdateSkillLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken)
+        {
+            UpdatedKind = kind;
+            UpdatedDisplayName = displayName;
+            return Task.FromResult<SkillLookupSummary?>(new(name, displayName));
+        }
+        public Task<bool> DeleteSkillLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken) => Task.FromResult(false);
     }
 }

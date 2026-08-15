@@ -6,7 +6,8 @@ export const studioNavigationGroups = {
   items: 'items',
   skills: 'skills',
   library: 'library',
-  pipeline: 'pipeline'
+  pipeline: 'pipeline',
+  storage: 'storage'
 } as const
 
 export type StudioNavigationGroup =
@@ -173,19 +174,14 @@ export const studioNavigation: NavigationMenuItem[] = [
     icon: 'i-lucide-workflow',
     children: [
       {
-        label: 'File storage',
-        icon: 'i-lucide-hard-drive',
-        to: '/pipeline/storage'
-      },
-      {
         label: 'Import jobs',
         icon: 'i-lucide-history',
         to: '/pipeline/imports'
       },
       {
-        label: 'Artifact registry',
-        icon: 'i-lucide-library-big',
-        to: '/pipeline/artifacts'
+        label: 'Stale resources',
+        icon: 'i-lucide-triangle-alert',
+        to: '/pipeline/stale-resources'
       },
       {
         label: 'Releases',
@@ -195,13 +191,26 @@ export const studioNavigation: NavigationMenuItem[] = [
     ]
   },
   {
-    label: 'Monitoring',
-    type: 'label'
-  },
-  {
-    label: 'Stale resources',
-    icon: 'i-lucide-triangle-alert',
-    to: '/monitoring/stale-resources'
+    label: 'Storage',
+    value: studioNavigationGroups.storage,
+    icon: 'i-lucide-hard-drive',
+    children: [
+      {
+        label: 'Original resources',
+        icon: 'i-lucide-archive',
+        to: '/storage/original-resources'
+      },
+      {
+        label: 'Generated assets',
+        icon: 'i-lucide-package-open',
+        to: '/storage/generated-assets'
+      },
+      {
+        label: 'Artifact registry',
+        icon: 'i-lucide-library-big',
+        to: '/storage/artifact-registry'
+      }
+    ]
   }
 ]
 
@@ -214,6 +223,7 @@ export function studioRouteGroup(path: string): StudioNavigationGroup | undefine
     return studioNavigationGroups.skills
   if (path.startsWith('/library/')) return studioNavigationGroups.library
   if (path.startsWith('/pipeline/')) return studioNavigationGroups.pipeline
+  if (path.startsWith('/storage/')) return studioNavigationGroups.storage
   return undefined
 }
 
@@ -260,9 +270,10 @@ export function studioRouteTitle(path: string) {
   if (path === '/library/scenes') return 'Scenes'
   if (path.startsWith('/library/scenes/')) return 'Client scene'
   if (path === '/pipeline/imports') return 'Asset import jobs'
-  if (path === '/pipeline/artifacts') return 'Generated-asset registry'
+  if (path === '/pipeline/stale-resources') return 'Stale resources'
   if (path === '/pipeline/releases') return 'Asset releases'
-  if (path === '/pipeline/storage') return 'File storage'
-  if (path === '/monitoring/stale-resources') return 'Stale resources'
+  if (path === '/storage/original-resources') return 'Original resources'
+  if (path === '/storage/generated-assets') return 'Generated assets'
+  if (path === '/storage/artifact-registry') return 'Generated-asset registry'
   return 'Studio'
 }

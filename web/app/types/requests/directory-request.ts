@@ -11,3 +11,16 @@ export interface NpcDirectoryRequest extends DirectoryRequest {
   npcSexName?: string
   hasVisuals?: boolean
 }
+
+export interface ItemDirectoryRequest extends DirectoryRequest {
+  itemTypeName?: string
+  itemActionName?: string
+  itemBodyPartName?: string
+  itemMaterialName?: string
+  itemCrystalTypeName?: string
+}
+
+export interface PlayerAppearanceDirectoryRequest extends DirectoryRequest {
+  playerRaceId?: number
+  playerSexId?: number
+}

@@ -13,10 +13,7 @@ public static class PlayerImportJobValues
     {
         AddMissing, RestoreDefaults
     };
-    public static readonly IReadOnlySet<string> ActiveStatuses = new HashSet<string>(StringComparer.Ordinal)
-    {
-        Queued, Running
-    };
+    public static readonly string[] ActiveStatuses = [Queued, Running];
     public static readonly IReadOnlySet<string> TerminalStatuses = new HashSet<string>(StringComparer.Ordinal)
     {
         Succeeded, Failed

@@ -2,18 +2,19 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
   getAssetCatalogs,
-  getAssetImportJobs,
+  getImportJobs,
   getLookupDirectory,
   getNpcLookupDirectory,
   getNpcDirectory,
   getPlayerClasses,
-  getSkillDirectory
+  getSkillDirectory,
+  getSkillLookupDirectory
 } from '../services/studio-api'
 import type {
   AssetCatalogSummary,
   AssetImportKind
 } from '../types/models/asset-catalog'
-import type { AssetImportJob } from '../types/models/asset-import-job'
+import type { ImportJob } from '../types/models/import-job'
 import type { LookupKind } from '../types/models/content-directory'
 
 export interface DashboardAssetSummary {
@@ -37,7 +38,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const jobsError = ref(false)
   const counts = ref(emptyContentCounts())
   const assets = ref<DashboardAssetSummary[]>(createEmptyAssetSummaries())
-  const jobs = ref<AssetImportJob[]>([])
+  const jobs = ref<ImportJob[]>([])
 
   async function load() {
     loading.value = true
@@ -48,7 +49,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   async function loadContentSummary() {
     try {
       const lookupCount = async (kind: LookupKind) =>
-        (await getLookupDirectory(kind)).length
+        (await getLookupDirectory(kind, { page: 1, pageSize: 1 })).total
       const [
         npcs,
         skills,
@@ -66,11 +67,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
         getPlayerClasses(),
         lookupCount('player-races'),
         lookupCount('player-sexes'),
-        getNpcLookupDirectory('npc-races').then(items => items.length),
-        getNpcLookupDirectory('npc-sexes').then(items => items.length),
-        getNpcLookupDirectory('npc-types').then(items => items.length),
-        lookupCount('skill-operate-types'),
-        lookupCount('skill-target-types')
+        getNpcLookupDirectory('npc-races', { page: 1, pageSize: 1 }).then(page => page.total),
+        getNpcLookupDirectory('npc-sexes', { page: 1, pageSize: 1 }).then(page => page.total),
+        getNpcLookupDirectory('npc-types', { page: 1, pageSize: 1 }).then(page => page.total),
+        getSkillLookupDirectory('skill-operate-types', { page: 1, pageSize: 1 }).then(page => page.total),
+        getSkillLookupDirectory('skill-target-types', { page: 1, pageSize: 1 }).then(page => page.total)
       ])
       counts.value = {
         npcs: npcs.total,
@@ -104,25 +105,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   async function loadJobs() {
     try {
-      const kinds = [
-        'textures',
-        'music',
-        'staticmeshes',
-        'animations',
-        'maps',
-        'scenes'
-      ] as const
-      jobs.value = (
-        await Promise.all(
-          kinds.map((kind) => getAssetImportJobs(kind, 10))
-        )
-      )
-        .flat()
-        .sort(
-          (left, right) =>
-            new Date(right.requestedAt).getTime() -
-            new Date(left.requestedAt).getTime()
-        )
+      jobs.value = (await getImportJobs({ page: 1, pageSize: 25 })).items
       jobsError.value = false
     } catch {
       jobsError.value = true

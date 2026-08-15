@@ -15,6 +15,7 @@ import { useRoute } from 'vue-router'
 import {
   getAssetCatalogEntry,
   getAssetImportJob,
+  getAssetImportJobs,
   startAssetFileImport
 } from '../../../services/studio-api'
 import { getPublishedManifestWithRaw } from '../../../services/published-assets'
@@ -36,6 +37,7 @@ import {
 import { filterMapActors } from '../../../utils/map-actors'
 import { filterMapPlayerStarts } from '../../../utils/map-spawns'
 import { paginate } from '../../../utils/directory'
+import { assetImportProgressItem } from '../../../utils/import-progress'
 
 interface MapPreviewApi {
   focusActor(name: string): void
@@ -97,6 +99,7 @@ const skyZonePreviewOpen = ref(false)
 const selectedSkyZoneName = ref<string>()
 const skyZonePreviewError = ref<string>()
 const mapPreviewJobError = ref<string>()
+const importDrawerOpen = ref(false)
 const notifications = useStudioToasts()
 let mapPreviewPollTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -213,6 +216,9 @@ const mapPreviewJobActive = computed(() =>
     ? ['queued', 'discovering', 'running'].includes(mapPreviewJob.value.status)
     : false
 )
+const progressItems = computed(() => mapPreviewJob.value
+  ? [assetImportProgressItem(mapPreviewJob.value, 'Map preview')]
+  : [])
 
 watch([query, pageSize], () => (page.value = 1))
 watch([spawnQuery, spawnPageSize], () => (spawnPage.value = 1))
@@ -368,6 +374,19 @@ async function pollMapPreviewJob() {
   }
 }
 
+async function loadActiveMapPreviewJob() {
+  try {
+    const jobs = await getAssetImportJobs('mappreviews', 20)
+    const activeJob = jobs.find(job => ['queued', 'discovering', 'running'].includes(job.status))
+    if (!activeJob) return
+    mapPreviewJob.value = activeJob
+    importDrawerOpen.value = true
+    scheduleMapPreviewPoll()
+  } catch {
+    mapPreviewJobError.value = 'Map preview generation status could not be loaded.'
+  }
+}
+
 async function regenerateMapPreview() {
   const entry = catalogEntry.value
   if (!entry || mapPreviewJobActive.value) return
@@ -379,7 +398,7 @@ async function regenerateMapPreview() {
       entry.sourceKey,
       true
     )
-    notifications.success({ title: 'Map preview regeneration queued' })
+    importDrawerOpen.value = true
     await pollMapPreviewJob()
   } catch {
     mapPreviewJobError.value = 'Map preview regeneration could not be queued.'
@@ -407,6 +426,7 @@ async function loadMap() {
   mapPreview.value = undefined
   mapPreviewJob.value = undefined
   mapPreviewJobError.value = undefined
+  importDrawerOpen.value = false
   selectedActorName.value = undefined
   selectedPlayerStartName.value = undefined
   selectedBspName.value = undefined
@@ -445,6 +465,7 @@ async function loadMap() {
     manifest.value = publishedManifest.resolved
     terrainLayerStates.value = createTerrainLayerStates(manifest.value.terrains)
     await loadMapPreview(entry)
+    await loadActiveMapPreviewJob()
   } catch {
     error.value = 'Map “' + routeName.value + '” could not be loaded.'
   } finally {
@@ -1828,5 +1849,6 @@ async function loadMap() {
         </div>
       </template>
     </UModal>
+    <StudioImportProgressDrawer v-model:open="importDrawerOpen" :items="progressItems" />
   </div>
 </template>

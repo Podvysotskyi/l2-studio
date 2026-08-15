@@ -16,12 +16,17 @@ import {
   visibleStorageEntries
 } from '../../../utils/storage-browser'
 import { storageUploadPath } from '../../../utils/storage-upload'
+import { paginate } from '../../../utils/directory'
 
-const kind = ref<StorageKind>('resources')
+const props = defineProps<{ kind: StorageKind }>()
+
+const kind = computed(() => props.kind)
 const currentPath = ref('')
 const entries = ref<StorageEntry[]>([])
 const query = ref('')
 const sort = ref<StorageSort>('name-asc')
+const page = ref(1)
+const pageSize = ref(25)
 const loading = ref(false)
 const loadError = ref<string>()
 const uploads = ref<StorageUploadItem[]>([])
@@ -34,6 +39,7 @@ const notifications = useStudioToasts()
 
 const writable = computed(() => kind.value === 'resources')
 const visibleEntries = computed(() => visibleStorageEntries(entries.value, query.value, sort.value))
+const displayedEntries = computed(() => paginate(visibleEntries.value, page.value, pageSize.value))
 const selectedEntries = computed(() =>
   entries.value.filter(entry => selectedPaths.value.includes(entry.path))
 )
@@ -42,6 +48,18 @@ const activeUploads = computed(() =>
 )
 const resourceStorageDescription = computed(() =>
   `Upload destination: ${currentPath.value ? `/${currentPath.value}` : 'version root'}`
+)
+const storagePage = computed(() => kind.value === 'resources'
+  ? {
+      title: 'Original resources',
+      description: 'Manage original resources for the selected game version.',
+      icon: 'i-lucide-archive'
+    }
+  : {
+      title: 'Generated assets',
+      description: 'Inspect generated assets for the selected game version.',
+      icon: 'i-lucide-package-open'
+    }
 )
 const uploadMenuItems = computed(() => [[
   {
@@ -61,6 +79,7 @@ const uploadMenuItems = computed(() => [[
 watch(kind, () => {
   currentPath.value = ''
   query.value = ''
+  page.value = 1
   selectedPaths.value = []
   void load()
 })
@@ -85,6 +104,7 @@ async function load() {
 function navigate(path: string) {
   currentPath.value = path
   query.value = ''
+  page.value = 1
   selectedPaths.value = []
   void load()
 }
@@ -350,43 +370,28 @@ function requestMessage(reason: unknown, fallback: string) {
 }
 
 onMounted(() => void load())
+watch(query, () => { page.value = 1 })
+watch([visibleEntries, pageSize], () => {
+  const lastPage = Math.max(1, Math.ceil(visibleEntries.value.length / pageSize.value))
+  if (page.value > lastPage) page.value = lastPage
+})
 </script>
 
 <template>
   <div class="space-y-5">
     <StudioPageHeader
       eyebrow="Storage"
-      title="File storage"
-      description="Manage original resources and inspect generated assets for the selected game version."
-      icon="i-lucide-hard-drive"
+      :title="storagePage.title"
+      :description="storagePage.description"
+      :icon="storagePage.icon"
     />
 
     <input ref="fileInput" class="hidden" type="file" multiple @change="selectedFiles($event, false)">
     <input ref="folderInput" class="hidden" type="file" multiple webkitdirectory @change="selectedFiles($event, true)">
 
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="inline-flex rounded-lg bg-elevated p-1 ring-1 ring-default">
-        <UButton
-          label="Original resources"
-          icon="i-lucide-archive"
-          size="sm"
-          :variant="kind === 'resources' ? 'solid' : 'ghost'"
-          :color="kind === 'resources' ? 'primary' : 'neutral'"
-          @click="kind = 'resources'"
-        />
-        <UButton
-          label="Generated assets"
-          icon="i-lucide-package-open"
-          size="sm"
-          :variant="kind === 'assets' ? 'solid' : 'ghost'"
-          :color="kind === 'assets' ? 'primary' : 'neutral'"
-          @click="kind = 'assets'"
-        />
-      </div>
-      <div class="flex items-center gap-2 text-sm text-muted">
-        <UIcon :name="writable ? 'i-lucide-pencil-line' : 'i-lucide-lock-keyhole'" class="size-4" />
-        <span>{{ writable ? resourceStorageDescription : 'Generated assets are read-only.' }}</span>
-      </div>
+    <div class="flex items-center gap-2 text-sm text-muted">
+      <UIcon :name="writable ? 'i-lucide-pencil-line' : 'i-lucide-lock-keyhole'" class="size-4" />
+      <span>{{ writable ? resourceStorageDescription : 'Generated assets are read-only.' }}</span>
     </div>
 
     <UAlert
@@ -399,8 +404,10 @@ onMounted(() => void load())
     />
 
     <StudioStorageExplorer
-      :entries="visibleEntries"
-      :total-entries="entries.length"
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :entries="displayedEntries"
+      :total-entries="visibleEntries.length"
       :current-path="currentPath"
       :loading="loading"
       :writable="writable"

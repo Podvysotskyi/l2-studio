@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import type { StorageEntry } from '../../../types/models/storage'
 import { droppedStorageFiles } from '../../../utils/storage-browser'
 
@@ -10,6 +11,8 @@ const props = defineProps<{
   writable: boolean
   query: string
   selectedPaths: string[]
+  page: number
+  pageSize: number
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +25,8 @@ const emit = defineEmits<{
   'select-entry': [path: string, selected: boolean]
   'select-all': [paths: string[], selected: boolean]
   'update:query': [value: string]
+  'update:page': [value: number]
+  'update:pageSize': [value: number]
   'drop-files': [files: File[]]
   'reject-folder-drop': []
   'choose-files': []
@@ -30,6 +35,14 @@ const emit = defineEmits<{
 
 const dragDepth = ref(0)
 const dragActive = ref(false)
+const page = computed({
+  get: () => props.page,
+  set: (value: number) => emit('update:page', value)
+})
+const pageSize = computed({
+  get: () => props.pageSize,
+  set: (value: number) => emit('update:pageSize', value)
+})
 const breadcrumbs = computed(() => {
   const parts = props.currentPath ? props.currentPath.split('/') : []
   return [
@@ -50,6 +63,13 @@ const someVisibleSelected = computed(() =>
   props.entries.some(entry => props.selectedPaths.includes(entry.path)) &&
   !allVisibleSelected.value
 )
+const columns = computed<TableColumn<StorageEntry>[]>(() => [
+  ...(props.writable ? [{ id: 'selection', header: '' }] : []),
+  { accessorKey: 'name', header: 'Name' },
+  { id: 'size', header: 'Size' },
+  { id: 'modifiedAt', header: 'Modified' },
+  { id: 'actions', header: '' }
+])
 
 function parentPath(path: string) {
   return path.split('/').slice(0, -1).join('/')
@@ -257,111 +277,58 @@ function formatModified(value: string) {
       </div>
 
       <template v-else-if="entries.length">
-        <div class="hidden overflow-x-auto sm:block">
-          <table class="w-full text-left text-sm">
-            <thead class="border-b border-default bg-elevated/50 text-xs text-muted">
-              <tr>
-                <th class="px-4 py-3 font-medium">
-                  <div class="flex items-center gap-3">
-                    <UCheckbox
-                      v-if="writable"
-                      :model-value="allVisibleSelected"
-                      :indeterminate="someVisibleSelected"
-                      aria-label="Select all visible entries"
-                      @update:model-value="emit('select-all', entries.map(entry => entry.path), Boolean($event))"
-                    />
-                    <span>Name</span>
-                  </div>
-                </th>
-                <th class="px-4 py-3 font-medium">Size</th>
-                <th class="px-4 py-3 font-medium">Modified</th>
-                <th class="w-32 px-4 py-3 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-default">
-              <tr v-if="currentPath" class="hover:bg-elevated/30">
-                <td colspan="4" class="px-4 py-2.5">
-                  <button
-                    type="button"
-                    class="flex items-center gap-2 text-sm text-muted hover:text-highlighted"
-                    @click="emit('navigate', parentPath(currentPath))"
-                  >
-                    <UIcon name="i-lucide-corner-left-up" class="size-4" />
-                    Parent directory
-                  </button>
-                </td>
-              </tr>
-              <tr
-                v-for="entry in entries"
-                :key="entry.path"
-                class="h-13 hover:bg-elevated/30"
-                :class="selectedPaths.includes(entry.path) ? 'bg-primary/5' : ''"
-              >
-                <td class="max-w-md px-4 py-2.5">
-                  <div class="flex max-w-full items-center gap-3">
-                    <UCheckbox
-                      v-if="writable"
-                      :model-value="selectedPaths.includes(entry.path)"
-                      :aria-label="`Select ${entry.name}`"
-                      @update:model-value="emit('select-entry', entry.path, Boolean($event))"
-                    />
-                    <button
-                      type="button"
-                      class="flex min-w-0 flex-1 items-center gap-3 text-left"
-                      :class="entry.type === 'directory' ? 'cursor-pointer' : 'cursor-default'"
-                      @click="open(entry)"
-                    >
-                      <span
-                        class="grid size-8 shrink-0 place-items-center rounded-lg"
-                        :class="entry.type === 'directory' ? 'bg-primary/10 text-primary' : 'bg-elevated text-muted'"
-                      >
-                        <UIcon
-                          :name="entry.type === 'directory' ? 'i-lucide-folder' : 'i-lucide-file'"
-                          class="size-4"
-                        />
-                      </span>
-                      <span class="truncate font-medium text-highlighted">{{ entry.name }}</span>
-                    </button>
-                  </div>
-                </td>
-                <td class="whitespace-nowrap px-4 py-2.5 text-muted">
-                  {{ formatSize(entry.size) }}
-                </td>
-                <td class="whitespace-nowrap px-4 py-2.5 text-muted">
-                  {{ formatModified(entry.modifiedAt) }}
-                </td>
-                <td class="px-4 py-2.5">
-                  <div class="flex items-center justify-end gap-1">
-                    <UButton
-                      v-if="entry.type === 'file'"
-                      label="Download"
-                      icon="i-lucide-download"
-                      color="neutral"
-                      variant="ghost"
-                      size="sm"
-                      @click="emit('download', entry)"
-                    />
-                    <UDropdownMenu
-                      v-if="desktopMenu(entry).length"
-                      :items="desktopMenu(entry)"
-                      :content="{ align: 'end' }"
-                    >
-                      <UButton
-                        icon="i-lucide-ellipsis"
-                        :aria-label="`Actions for ${entry.name}`"
-                        color="neutral"
-                        variant="ghost"
-                        size="sm"
-                      />
-                    </UDropdownMenu>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="currentPath" class="hidden border-b border-default px-4 py-2.5 sm:block">
+          <button type="button" class="flex items-center gap-2 text-sm text-muted hover:text-highlighted" @click="emit('navigate', parentPath(currentPath))">
+            <UIcon name="i-lucide-corner-left-up" class="size-4" />
+            Parent directory
+          </button>
         </div>
-
-        <div class="divide-y divide-default sm:hidden">
+        <StudioDataTable
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :data="entries"
+          :total="totalEntries"
+          :columns="columns"
+          pagination-mode="server"
+          :page-size-options="[10, 25, 50, 100]"
+          empty="No storage entries are available."
+          table-class="min-w-[46rem]"
+        >
+          <template #selection-header>
+            <UCheckbox
+              :model-value="allVisibleSelected"
+              :indeterminate="someVisibleSelected"
+              aria-label="Select all visible entries"
+              @update:model-value="emit('select-all', entries.map(entry => entry.path), Boolean($event))"
+            />
+          </template>
+          <template #selection-cell="{ row }">
+            <UCheckbox
+              :model-value="selectedPaths.includes(row.original.path)"
+              :aria-label="`Select ${row.original.name}`"
+              @update:model-value="emit('select-entry', row.original.path, Boolean($event))"
+            />
+          </template>
+          <template #name-cell="{ row }">
+            <button type="button" class="flex min-w-0 items-center gap-3 text-left" :class="row.original.type === 'directory' ? 'cursor-pointer' : 'cursor-default'" @click="open(row.original)">
+              <span class="grid size-8 shrink-0 place-items-center rounded-lg" :class="row.original.type === 'directory' ? 'bg-primary/10 text-primary' : 'bg-elevated text-muted'">
+                <UIcon :name="row.original.type === 'directory' ? 'i-lucide-folder' : 'i-lucide-file'" class="size-4" />
+              </span>
+              <span class="truncate font-medium text-highlighted">{{ row.original.name }}</span>
+            </button>
+          </template>
+          <template #size-cell="{ row }"><span class="whitespace-nowrap text-muted">{{ formatSize(row.original.size) }}</span></template>
+          <template #modifiedAt-cell="{ row }"><span class="whitespace-nowrap text-muted">{{ formatModified(row.original.modifiedAt) }}</span></template>
+          <template #actions-cell="{ row }">
+            <div class="flex justify-end gap-1">
+              <UButton v-if="row.original.type === 'file'" label="Download" icon="i-lucide-download" color="neutral" variant="ghost" size="sm" @click="emit('download', row.original)" />
+              <UDropdownMenu v-if="desktopMenu(row.original).length" :items="desktopMenu(row.original)" :content="{ align: 'end' }">
+                <UButton icon="i-lucide-ellipsis" :aria-label="`Actions for ${row.original.name}`" color="neutral" variant="ghost" size="sm" />
+              </UDropdownMenu>
+            </div>
+          </template>
+          <template #mobile>
+            <div class="divide-y divide-default">
           <button
             v-if="currentPath"
             type="button"
@@ -414,7 +381,9 @@ function formatModified(value: string) {
               />
             </UDropdownMenu>
           </div>
-        </div>
+            </div>
+          </template>
+        </StudioDataTable>
       </template>
 
       <div

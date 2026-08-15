@@ -17,6 +17,11 @@ Worker replica processes heavy file work sequentially for the current
 milestone. Diagnostics and discovered, completed, succeeded, warning, and failed
 counts are stored as queryable rows.
 
+Asset runs participate in Studio's universal import-job history together with
+content reconciliation runs. Asset-specific work items and diagnostics remain
+available when a universal job is opened; the common job record owns category,
+target, operation, status, lifecycle timestamps, aggregate progress, and errors.
+
 Supported asset families currently include textures, static meshes, Chronicle
 1 skeletal animations and NPC appearances, sounds, music, maps, scenes, and generated map previews. Conversion failures are
 isolated to their source and remain visible in the catalog and diagnostics.
