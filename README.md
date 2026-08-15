@@ -6,6 +6,10 @@ See [docs/architecture.md](docs/architecture.md) for product boundaries and
 [docs/asset-pipeline.md](docs/asset-pipeline.md) for the current import,
 artifact, release, and media contracts.
 
+Use the [Studio development guide](docs/development/README.md) when adding pages,
+entities, endpoints, jobs, tools, configuration, or tests. It identifies the
+canonical vertical-slice patterns and reusable web building blocks.
+
 ## Architecture
 
 Studio is organized into focused .NET projects:

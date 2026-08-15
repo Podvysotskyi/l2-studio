@@ -8,6 +8,11 @@ Keep [docs/architecture.md](docs/architecture.md) and
 [docs/asset-pipeline.md](docs/asset-pipeline.md) aligned when their product or
 published-format boundaries change.
 
+Before extending Studio, read [docs/development/README.md](docs/development/README.md)
+and the linked web, server, or jobs guide for the affected surface. Treat those
+recipes as the canonical pattern for new code; do not copy an older variation
+without confirming that it remains intentional.
+
 ## Commands
 
 Run development, validation, and builds through Docker from the repository root:
@@ -16,6 +21,8 @@ Run development, validation, and builds through Docker from the repository root:
 docker compose up --build
 docker build --target validate --build-arg APP_ENV=production web
 docker build --target unit-tests --file server/Dockerfile .
+docker build --target api-production --tag l2-studio-api-validate --file server/Dockerfile .
+docker build --target worker-production --tag l2-studio-worker-validate --file server/Dockerfile .
 docker compose config
 docker compose build
 ```
@@ -58,4 +65,4 @@ original resources into the repository or commit them.
 
 Use UTF-8 and LF endings. TypeScript and Vue use two-space indentation, single quotes, no semicolons, and no trailing commas. Preserve established C# formatting and nullable-reference-type safety.
 
-Keep each top-level C# class, interface, record, record struct, struct, enum, or delegate in its own same-named `.cs` file across production and test projects. Private nested implementation helpers, generated EF migration files, `Program.cs`, global usings, assembly metadata, and intentional partial-class fragments are exempt. Audit this layout whenever server C# code changes.
+Keep each top-level C# class, interface, record, record struct, struct, enum, or delegate in its own same-named `.cs` file across production and test projects. Private nested implementation helpers, generated EF migration files, `Program.cs`, global usings, assembly metadata, and intentional `TypeName.Concern.cs` partial-class fragments are exempt. The server Docker build enforces this layout.

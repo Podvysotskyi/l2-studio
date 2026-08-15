@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.102 AS build
 WORKDIR /workspace
 COPY global.json ./
 COPY server/ server/
+RUN perl server/tools/check-csharp-layout.pl
 RUN dotnet restore server/L2.Studio.slnx
 RUN dotnet build server/L2.Studio.slnx --configuration Release --no-restore -m:1
 
