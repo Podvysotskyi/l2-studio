@@ -2,13 +2,16 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getLookupDirectory,
+  getItemLookups,
   getPlayerClasses
 } from '../../app/services/studio-api'
 import { useLookupDirectoryStore } from '../../app/stores/lookup-directory'
+import { useItemTypeDirectoryStore } from '../../app/stores/item-type-directory'
 import { usePlayerClassDirectoryStore } from '../../app/stores/player-class-directory'
 
 vi.mock('../../app/services/studio-api', () => ({
   getLookupDirectory: vi.fn(),
+  getItemLookups: vi.fn(),
   getPlayerClasses: vi.fn()
 }))
 
@@ -16,6 +19,7 @@ describe('Lookup and player-class stores', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(getLookupDirectory).mockReset()
+    vi.mocked(getItemLookups).mockReset()
     vi.mocked(getPlayerClasses).mockReset()
   })
 
@@ -75,6 +79,30 @@ describe('Lookup and player-class stores', () => {
     expect(store.error).toBe(
       'The player class hierarchy could not be loaded from the Studio API.'
     )
+    expect(store.loading).toBe(false)
+  })
+
+  it('loads every page of the item type hierarchy', async () => {
+    vi.mocked(getItemLookups)
+      .mockResolvedValueOnce({
+        items: [{ name: 'Weapon', displayName: 'Weapon', parentTypeName: null, parentTypeDisplayName: null }],
+        total: 101,
+        page: 1,
+        pageSize: 100
+      })
+      .mockResolvedValueOnce({
+        items: [{ name: 'SWORD', displayName: 'Sword', parentTypeName: 'Weapon', parentTypeDisplayName: 'Weapon' }],
+        total: 101,
+        page: 2,
+        pageSize: 100
+      })
+    const store = useItemTypeDirectoryStore()
+
+    await store.load()
+
+    expect(getItemLookups).toHaveBeenNthCalledWith(1, 'item-types', { page: 1, pageSize: 100 })
+    expect(getItemLookups).toHaveBeenNthCalledWith(2, 'item-types', { page: 2, pageSize: 100 })
+    expect(store.records.map(record => record.name)).toEqual(['Weapon', 'SWORD'])
     expect(store.loading).toBe(false)
   })
 })

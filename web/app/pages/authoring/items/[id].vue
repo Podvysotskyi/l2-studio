@@ -1,37 +1,77 @@
 <script setup lang="ts">
 import { getItemDefinition } from '~/services/studio-api'
-import type { ItemRecord } from '~/types/models/item'
+import type { ItemDetailRecord } from '~/types/models/item'
 
 const route = useRoute()
-const item = ref<ItemRecord>()
+const item = ref<ItemDetailRecord>()
+const loading = ref(true)
 const error = ref<string>()
 const typeLabel = computed(() => {
   if (!item.value) return ''
-  if (!item.value.itemParentTypeName) return item.value.itemTypeDisplayName
-  return `${item.value.itemParentTypeDisplayName ?? item.value.itemParentTypeName} › ${item.value.itemTypeDisplayName}`
+  if (!item.value.item.itemParentTypeName) return item.value.item.itemTypeDisplayName
+  return `${item.value.item.itemParentTypeDisplayName ?? item.value.item.itemParentTypeName} › ${item.value.item.itemTypeDisplayName}`
 })
+const itemId = computed(() => {
+  const value = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
+  const id = Number(value)
+  return Number.isSafeInteger(id) && id >= 0 ? id : undefined
+})
+const activeTab = computed(() => route.path.endsWith('/skills') ? 'skills' : 'overview')
+const tabs = [
+  { label: 'Overview', icon: 'i-lucide-notebook-tabs', value: 'overview' },
+  { label: 'Skills', icon: 'i-lucide-sparkles', value: 'skills' }
+]
 
 async function load() {
+  if (itemId.value === undefined) {
+    item.value = undefined
+    loading.value = false
+    error.value = 'The item identifier is invalid.'
+    return
+  }
+  loading.value = true
   try {
-    item.value = await getItemDefinition(Number(route.params.id))
+    item.value = await getItemDefinition(itemId.value)
     error.value = undefined
   } catch {
+    item.value = undefined
     error.value = 'The item definition could not be loaded.'
+  } finally {
+    loading.value = false
   }
 }
 
-watch(() => route.params.id, () => void load(), { immediate: true })
+function selectTab(value: string | number) {
+  if (itemId.value === undefined) return
+  const suffix = value === 'overview' ? '' : `/${value}`
+  void navigateTo(`/authoring/items/${itemId.value}${suffix}`)
+}
+
+watch(itemId, () => void load(), { immediate: true })
 </script>
 
 <template>
-  <div class="space-y-4">
-    <UAlert v-if="error" color="error" :description="error" />
+  <div class="space-y-6">
+    <StudioPageHeader
+      eyebrow="Game content"
+      :title="item ? item.item.name : 'Item definition'"
+      :description="item ? `ID: ${item.item.id} · ${typeLabel}` : 'View and curate a normalized item record.'"
+      icon="i-lucide-swords"
+    >
+      <template #actions>
+        <UButton label="Back to items" icon="i-lucide-arrow-left" color="neutral" variant="outline" to="/authoring/items" />
+      </template>
+    </StudioPageHeader>
+
+    <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" title="Item definition unavailable" :description="error">
+      <template #actions><UButton color="error" variant="soft" size="sm" @click="load">Try again</UButton></template>
+    </UAlert>
+
     <template v-else-if="item">
-      <UPageHeader :title="item.name" :description="`Item #${item.id} · ${typeLabel}`" />
-      <UCard><dl class="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2"><template v-for="[label, value] in [['Type', typeLabel], ['Action', item.itemActionDisplayName], ['Handler', item.handlerDisplayName], ['Body part', item.itemBodyPartDisplayName], ['Material', item.itemMaterialDisplayName], ['Crystal type', item.itemCrystalTypeDisplayName], ['Icon', item.icon], ['Weight', item.weight], ['Price', item.price]]" :key="label"><dt class="text-muted">{{ label }}</dt><dd class="font-medium text-highlighted">{{ value ?? '—' }}</dd></template></dl></UCard>
-      <UCard v-if="item.skills.length"><template #header>Item skills</template><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="border-b border-default text-muted"><tr><th class="p-2">Skill</th><th class="p-2">Level</th><th class="p-2">Type</th><th class="p-2">Chance</th></tr></thead><tbody><tr v-for="skill in item.skills" :key="`${skill.skillId}-${skill.skillLevel}`" class="border-b border-default"><td class="p-2 font-medium text-highlighted">{{ skill.skillName ? `${skill.skillName} (#${skill.skillId})` : `#${skill.skillId}` }}</td><td class="p-2">{{ skill.skillLevel }}</td><td class="p-2">{{ skill.itemSkillTypeDisplayName ?? '—' }}</td><td class="p-2">{{ skill.chance == null ? '—' : `${skill.chance}%` }}</td></tr></tbody></table></div></UCard>
-      <UCard v-if="item.attackGeometry"><template #header>Client attack geometry</template><dl class="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2"><template v-for="[label, value] in [['Start offset X', item.attackGeometry.offsetX], ['Start offset Y', item.attackGeometry.offsetY], ['Sweep radius', item.attackGeometry.radius], ['Forward length', item.attackGeometry.length]]" :key="label"><dt class="text-muted">{{ label }}</dt><dd class="font-medium text-highlighted">{{ value }}</dd></template></dl></UCard>
-      <UCard v-if="item.stats"><template #header>Statistics</template><pre class="text-xs">{{ item.stats }}</pre></UCard>
+      <UTabs :items="tabs" :model-value="activeTab" :content="false" variant="link" @update:model-value="selectTab" />
+      <NuxtPage :item="item" @changed="load" />
     </template>
+
+    <UCard v-else :ui="{ body: 'p-6' }"><USkeleton class="h-6 w-48" /></UCard>
   </div>
 </template>

@@ -27,6 +27,11 @@ import {
   updateSkillLookupDisplayName,
   updateNpcDefinition,
   updateItemDefinition,
+  setItemPrimarySkill,
+  clearItemPrimarySkill,
+  createItemSkill,
+  updateItemSkill,
+  deleteItemSkill,
   rebuildStaleAssetSources,
   verifyAssetArtifact
 } from '../../app/services/studio-api'
@@ -111,6 +116,35 @@ describe('Studio API service', () => {
     await getItemLookups('item-skill-types', { query: ' critical ' })
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-skill-types', {
       query: { query: 'critical', page: 1, pageSize: 25 }
+    })
+  })
+
+  it('manages primary and attached item skills through the content API', async () => {
+    fetchMock.mockResolvedValue({})
+
+    await setItemPrimarySkill(3028, { skillId: 3005, skillLevel: 1 })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/primary-skill', {
+      method: 'PUT', body: { skillId: 3005, skillLevel: 1 }
+    })
+
+    await createItemSkill(3028, { skillId: 3005, skillLevel: 1, itemSkillTypeName: 'ON_CRITICAL_SKILL', chance: 50 })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills', {
+      method: 'POST', body: { skillId: 3005, skillLevel: 1, itemSkillTypeName: 'ON_CRITICAL_SKILL', chance: 50 }
+    })
+
+    await updateItemSkill(3028, 3005, 1, { itemSkillTypeName: null, chance: null })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills/3005/1', {
+      method: 'PATCH', body: { itemSkillTypeName: null, chance: null }
+    })
+
+    await deleteItemSkill(3028, 3005, 1)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills/3005/1', {
+      method: 'DELETE'
+    })
+
+    await clearItemPrimarySkill(3028)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/primary-skill', {
+      method: 'DELETE'
     })
   })
 

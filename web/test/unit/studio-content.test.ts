@@ -15,6 +15,10 @@ import {
   buildPlayerClassHierarchy,
   flattenPlayerClassHierarchy
 } from '../../app/utils/player-class'
+import {
+  buildItemTypeHierarchy,
+  flattenItemTypeHierarchy
+} from '../../app/utils/item-type'
 
 const humanAvailability = [
   {
@@ -62,6 +66,26 @@ describe('Studio content utilities', () => {
     expect(flattenPlayerClassHierarchy(roots, new Set(), 'female')).toHaveLength(
       5
     )
+  })
+
+  it('builds and searches the item type hierarchy with ancestor paths', () => {
+    const roots = buildItemTypeHierarchy([
+      { name: 'SWORD', displayName: 'Sword', parentTypeName: 'Weapon', parentTypeDisplayName: 'Weapon' },
+      { name: 'Weapon', displayName: 'Weapon', parentTypeName: null, parentTypeDisplayName: null },
+      { name: 'Armor', displayName: 'Armor', parentTypeName: null, parentTypeDisplayName: null },
+      { name: 'HEAVY', displayName: 'Heavy armor', parentTypeName: 'Armor', parentTypeDisplayName: 'Armor' }
+    ])
+
+    expect(roots.map(root => root.name)).toEqual(['Armor', 'Weapon'])
+    expect(flattenItemTypeHierarchy(roots, new Set(['Weapon']))).toMatchObject([
+      { name: 'Armor' },
+      { name: 'Weapon' },
+      { name: 'SWORD', depth: 1 }
+    ])
+    expect(flattenItemTypeHierarchy(roots, new Set(), 'sword')).toMatchObject([
+      { name: 'Weapon' },
+      { name: 'SWORD' }
+    ])
   })
 
   it('accepts only positive integer query values', () => {

@@ -461,11 +461,13 @@ public sealed partial class ContentDirectoryRepository(
     {
         var offset = ((long)page - 1) * pageSize;
         var searchPattern = $"%{EscapeLikePattern(query)}%";
+        var hasNumericQuery = int.TryParse(query, out var skillId);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var skills = context.Skills
             .AsNoTracking()
             .Where(skill => skill.GameVersion == gameVersion &&
-                (query == string.Empty || EF.Functions.ILike(skill.Name, searchPattern, "\\")));
+                (query == string.Empty || (hasNumericQuery && skill.Id == skillId) ||
+                    EF.Functions.ILike(skill.Name, searchPattern, "\\")));
         var total = await skills.LongCountAsync(cancellationToken);
         if (offset > int.MaxValue)
         {

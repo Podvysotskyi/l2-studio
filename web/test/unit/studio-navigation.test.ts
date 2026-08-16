@@ -124,6 +124,7 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
     expect(studioRouteTitle('/authoring/items/1')).toBe('Item definition')
+    expect(studioRouteTitle('/authoring/items/1/skills')).toBe('Item skills')
     expect(studioRouteTitle('/authoring/items/handlers')).toBe('Item handlers')
     expect(studioRouteTitle('/authoring/items/skill-types')).toBe('Item skill types')
     expect(studioRouteTitle('/authoring/skills/operate-types'))

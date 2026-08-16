@@ -212,12 +212,14 @@ public sealed class ContentDirectoryRepositoryTests
         var operateTypes = await repository.SearchSkillLookupsAsync(
             "c1", "skill-operate-types", new DirectoryRequest(), CancellationToken.None);
         var skills = await repository.SearchSkillsAsync("c1", string.Empty, 1, 25, CancellationToken.None);
+        var numericSkills = await repository.SearchSkillsAsync("c1", "1", 1, 25, CancellationToken.None);
 
         Assert.Collection(races.Items, item => Assert.Equal(new PlayerLookupSummary(0, "Human"), item));
         Assert.Collection(appearances.Items, item => Assert.Equal("Human male", item.Name));
         Assert.Collection(operateTypes.Items, item => Assert.Equal(new SkillLookupSummary("A1", "Active"), item));
         Assert.Collection(skills.Items, item => Assert.Equal(
             new SkillSummary(1, 1, "Triple Slash", "A1", "Active", "ONE", "One", 0), item));
+        Assert.Collection(numericSkills.Items, item => Assert.Equal(1, item.Id));
 
         var updated = await repository.UpdateSkillLookupDisplayNameAsync(
             "c1", "skill-operate-types", "A1", "Single target", CancellationToken.None);
@@ -243,7 +245,9 @@ public sealed class ContentDirectoryRepositoryTests
                 new Item
                 {
                     GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name,
-                    ItemType = type, HandlerName = handler.Name, ItemHandler = handler,
+                    ItemType = type, HandlerName = handler.Name, ItemHandler = handler, ItemSkill = "3005-1",
+                    DisplayId = 19, Soulshots = 2, MpConsume = 5, UseCondition = "weapon",
+                    IsSellable = true, UseWeaponSkillsOnly = true,
                     Skills =
                     {
                         new ItemSkill
@@ -267,6 +271,52 @@ public sealed class ContentDirectoryRepositoryTests
         Assert.Equal("ItemSkills", item.HandlerName);
         Assert.Equal("Item Skills", item.HandlerDisplayName);
         Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_CRITICAL_SKILL", "On Critical Skill", 50), Assert.Single(item.Skills));
+
+        var detail = await repository.GetItemAsync("c1", 1, CancellationToken.None);
+        Assert.Equal(19, detail?.Properties.DisplayId);
+        Assert.Equal(2, detail?.Properties.Soulshots);
+        Assert.Equal(5, detail?.Properties.MpConsume);
+        Assert.Equal("weapon", detail?.Properties.UseCondition);
+        Assert.True(detail?.Properties.IsSellable);
+        Assert.True(detail?.Properties.UseWeaponSkillsOnly);
+        Assert.Equal(new ItemPrimarySkillSummary("3005-1", 3005, 1, "Bleed"), detail?.PrimarySkill);
+    }
+
+    [Fact]
+    public async Task ManagesItemSkillsAndValidatesTheSelectedSkillLevel()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var type = new ItemType { GameVersion = "c1", Name = "EtcItem", DisplayName = "Etc item" };
+            var skillType = new ItemSkillType { GameVersion = "c1", Name = "ON_ENCHANT_4", DisplayName = "On enchant 4" };
+            context.AddRange(type, skillType,
+                new Skill { GameVersion = "c1", Id = 3005, Levels = 2, Name = "Bleed" },
+                new Item { GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name, ItemType = type });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var primary = await repository.SetItemPrimarySkillAsync(
+            "c1", 1, new SetItemPrimarySkillRequest(3005, 2), CancellationToken.None);
+        Assert.Equal(new ItemPrimarySkillSummary("3005-2", 3005, 2, "Bleed"), primary);
+
+        var created = await repository.CreateItemSkillAsync(
+            "c1", 1, new CreateItemSkillRequest(3005, 1, "ON_ENCHANT_4", 50), CancellationToken.None);
+        Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_ENCHANT_4", "On enchant 4", 50), created);
+
+        await Assert.ThrowsAsync<ItemSkillConflictException>(() => repository.CreateItemSkillAsync(
+            "c1", 1, new CreateItemSkillRequest(3005, 1, null, null), CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateItemSkillAsync(
+            "c1", 1, new CreateItemSkillRequest(3005, 3, null, null), CancellationToken.None));
+
+        var updated = await repository.UpdateItemSkillAsync(
+            "c1", 1, 3005, 1, new UpdateItemSkillRequest(null, null), CancellationToken.None);
+        Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", null, null, null), updated);
+        Assert.True(await repository.DeleteItemSkillAsync("c1", 1, 3005, 1, CancellationToken.None));
+        Assert.True(await repository.ClearItemPrimarySkillAsync("c1", 1, CancellationToken.None));
     }
 
     [Fact]

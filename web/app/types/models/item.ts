@@ -19,6 +19,18 @@ export interface ItemSkillRecord {
   skillId: number; skillLevel: number; skillName: string | null
   itemSkillTypeName: string | null; itemSkillTypeDisplayName: string | null; chance: number | null
 }
+export interface ItemPrimarySkillRecord {
+  value: string; skillId: number | null; skillLevel: number | null; skillName: string | null
+}
+export interface ItemPropertiesRecord {
+  displayId: number | null; crystalCount: number | null; soulshots: number | null; spiritshots: number | null
+  mpConsume: number | null; reducedMpConsume: string | null; reuseDelay: number | null; recipeId: number | null
+  itemSkill: string | null; useCondition: string | null; elementEnabled: boolean | null; enchantEnabled: boolean | null
+  forNpc: boolean | null; immediateEffect: boolean | null; isAttackWeapon: boolean | null; isForceEquip: boolean | null
+  isDepositable: boolean | null; isDestroyable: boolean | null; isDropable: boolean | null; isMagicWeapon: boolean | null
+  isOlyRestricted: boolean | null; isQuestItem: boolean | null; isSellable: boolean | null; isStackable: boolean | null
+  isTradable: boolean | null; useWeaponSkillsOnly: boolean | null
+}
 export interface ItemRecord {
   id: number; name: string; itemTypeName: string; itemTypeDisplayName: string
   itemParentTypeName: string | null; itemParentTypeDisplayName: string | null
@@ -30,5 +42,10 @@ export interface ItemRecord {
   handlerName: string | null; handlerDisplayName: string | null
   skills: ItemSkillRecord[]; attackGeometry: ItemAttackGeometryRecord | null
   stats: ItemStatsRecord | null
+}
+export interface ItemDetailRecord {
+  item: ItemRecord
+  properties: ItemPropertiesRecord
+  primarySkill: ItemPrimarySkillRecord | null
 }
 export interface ItemPage { items: ItemRecord[]; total: number; page: number; pageSize: number }

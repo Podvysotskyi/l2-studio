@@ -21,7 +21,7 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
         }, token);
 
     [HttpGet("items/{id:int}")]
-    public async Task<ActionResult<L2.Studio.Contracts.ItemSummary>> GetItem(string gameVersion, int id, CancellationToken token)
+    public async Task<ActionResult<L2.Studio.Contracts.ItemDetailSummary>> GetItem(string gameVersion, int id, CancellationToken token)
     {
         var item = await repository.GetItemAsync(gameVersion, id, token);
         return item is null ? NotFound() : Ok(item);
@@ -60,6 +60,103 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
             return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]> { ["definition"] = [exception.Message] }));
         }
     }
+
+    [HttpPut("items/{itemId:int}/primary-skill")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemPrimarySkillSummary>> SetItemPrimarySkill(
+        string gameVersion,
+        int itemId,
+        SetItemPrimarySkillRequest request,
+        CancellationToken token)
+    {
+        if (request.SkillId <= 0 || request.SkillLevel is < 1 or > 255)
+            return BadRequest(ItemSkillValidationProblem());
+        try
+        {
+            var skill = await repository.SetItemPrimarySkillAsync(gameVersion, itemId, request, token);
+            return skill is null ? NotFound() : Ok(skill);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["primarySkill"] = [exception.Message]
+            }));
+        }
+    }
+
+    [HttpDelete("items/{itemId:int}/primary-skill")]
+    public async Task<IActionResult> ClearItemPrimarySkill(string gameVersion, int itemId, CancellationToken token) =>
+        await repository.ClearItemPrimarySkillAsync(gameVersion, itemId, token) ? new NoContentResult() : new NotFoundResult();
+
+    [HttpPost("items/{itemId:int}/skills")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemSkillSummary>> CreateItemSkill(
+        string gameVersion,
+        int itemId,
+        CreateItemSkillRequest request,
+        CancellationToken token)
+    {
+        var itemSkillTypeName = TrimOptional(request.ItemSkillTypeName);
+        if (!ValidItemSkillRequest(request.SkillId, request.SkillLevel, itemSkillTypeName, request.Chance))
+            return BadRequest(ItemSkillValidationProblem());
+        try
+        {
+            var skill = await repository.CreateItemSkillAsync(gameVersion, itemId, request with
+            {
+                ItemSkillTypeName = itemSkillTypeName
+            }, token);
+            return skill is null ? NotFound() : CreatedAtAction(nameof(GetItem), new { gameVersion, id = itemId }, skill);
+        }
+        catch (ItemSkillConflictException exception)
+        {
+            return Conflict(new ProblemDetails { Title = "Item skill already exists", Detail = exception.Message, Status = StatusCodes.Status409Conflict });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["skill"] = [exception.Message]
+            }));
+        }
+    }
+
+    [HttpPatch("items/{itemId:int}/skills/{skillId:int}/{skillLevel:int}")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemSkillSummary>> UpdateItemSkill(
+        string gameVersion,
+        int itemId,
+        int skillId,
+        short skillLevel,
+        UpdateItemSkillRequest request,
+        CancellationToken token)
+    {
+        var itemSkillTypeName = TrimOptional(request.ItemSkillTypeName);
+        if (!ValidItemSkillRequest(skillId, skillLevel, itemSkillTypeName, request.Chance))
+            return BadRequest(ItemSkillValidationProblem());
+        try
+        {
+            var skill = await repository.UpdateItemSkillAsync(gameVersion, itemId, skillId, skillLevel, request with
+            {
+                ItemSkillTypeName = itemSkillTypeName
+            }, token);
+            return skill is null ? NotFound() : Ok(skill);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["itemSkillTypeName"] = [exception.Message]
+            }));
+        }
+    }
+
+    [HttpDelete("items/{itemId:int}/skills/{skillId:int}/{skillLevel:int}")]
+    public async Task<IActionResult> DeleteItemSkill(
+        string gameVersion,
+        int itemId,
+        int skillId,
+        short skillLevel,
+        CancellationToken token) =>
+        await repository.DeleteItemSkillAsync(gameVersion, itemId, skillId, skillLevel, token) ? new NoContentResult() : new NotFoundResult();
+
     [HttpDelete("items/{id:int}")]
     public Task<IActionResult> DeleteItem(string gameVersion, int id, CancellationToken token) =>
         Delete(() => repository.DeleteItemAsync(gameVersion, id, token));
@@ -384,6 +481,21 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
             errors["npcSexName"] = ["Sex must contain between 1 and 64 characters."];
         return errors;
     }
+
+    private static bool ValidItemSkillRequest(
+        int skillId,
+        short skillLevel,
+        string? itemSkillTypeName,
+        int? chance) =>
+        skillId > 0 &&
+        skillLevel is >= 1 and <= 255 &&
+        (itemSkillTypeName is null || itemSkillTypeName.Length <= 64) &&
+        (chance is null || chance is >= 0 and <= 100);
+
+    private static ValidationProblemDetails ItemSkillValidationProblem() => new(new Dictionary<string, string[]>
+    {
+        ["itemSkill"] = ["Skill ID and level are required, the type must not exceed 64 characters, and chance must be between 0 and 100."]
+    });
 
     private static string? TrimOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

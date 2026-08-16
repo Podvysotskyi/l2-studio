@@ -249,6 +249,7 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/npcs/types') return 'NPC types'
   if (path === '/authoring/items') return 'Item definitions'
   if (/^\/authoring\/items\/\d+$/.test(path)) return 'Item definition'
+  if (/^\/authoring\/items\/\d+\/skills$/.test(path)) return 'Item skills'
   if (path === '/authoring/items/types') return 'Item types'
   if (path === '/authoring/items/actions') return 'Item actions'
   if (path === '/authoring/items/body-parts') return 'Item body parts'
