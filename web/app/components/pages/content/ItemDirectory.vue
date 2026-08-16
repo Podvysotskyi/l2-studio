@@ -35,9 +35,6 @@ const editForm = reactive({
   icon: '',
   weight: null as number | null,
   price: null as number | null,
-  weaponType: '',
-  armorType: '',
-  etcItemType: '',
   hasAttackGeometry: false,
   attackGeometryOffsetX: 0,
   attackGeometryOffsetY: 0,
@@ -144,9 +141,6 @@ async function edit(item: ItemRecord) {
     icon: item.icon ?? '',
     weight: item.weight,
     price: item.price,
-    weaponType: item.weaponType ?? '',
-    armorType: item.armorType ?? '',
-    etcItemType: item.etcItemType ?? '',
     hasAttackGeometry: item.attackGeometry !== null,
     attackGeometryOffsetX: item.attackGeometry?.offsetX ?? 0,
     attackGeometryOffsetY: item.attackGeometry?.offsetY ?? 0,
@@ -194,7 +188,7 @@ function lookupFilter(key: string, placeholder: string, kind: ItemLookupKind) {
     ariaLabel: placeholder,
     loading: filtersLoading.value,
     items: (lookupOptions.value[kind] ?? []).map(item => ({
-      label: item.displayName === item.name ? item.name : `${item.displayName} (${item.name})`,
+      label: lookupLabel(item),
       value: item.name
     }))
   }
@@ -202,13 +196,27 @@ function lookupFilter(key: string, placeholder: string, kind: ItemLookupKind) {
 
 function lookupSelectOptions(kind: ItemLookupKind) {
   return (lookupOptions.value[kind] ?? []).map(item => ({
-    label: item.displayName === item.name ? item.name : `${item.displayName} (${item.name})`,
+    label: lookupLabel(item),
     value: item.name
   }))
 }
 
 function optionalLookupSelectOptions(kind: ItemLookupKind) {
   return [{ label: 'Unassigned', value: null }, ...lookupSelectOptions(kind)]
+}
+
+function lookupLabel(item: ItemLookupRecord) {
+  const label = item.displayName === item.name ? item.name : `${item.displayName} (${item.name})`
+  if (!item.parentTypeName) return label
+  const parent = item.parentTypeDisplayName === item.parentTypeName
+    ? item.parentTypeName
+    : `${item.parentTypeDisplayName} (${item.parentTypeName})`
+  return `${parent} › ${label}`
+}
+
+function itemTypeLabel(item: ItemRecord) {
+  if (!item.itemParentTypeName) return item.itemTypeDisplayName
+  return `${item.itemParentTypeDisplayName ?? item.itemParentTypeName} › ${item.itemTypeDisplayName}`
 }
 
 function stringValue(value: string | number | boolean | undefined) {
@@ -265,6 +273,9 @@ onMounted(() => void loadFilters())
         <template #itemBodyPartDisplayName-cell="{ row }">
           {{ row.original.itemBodyPartDisplayName ?? '—' }}
         </template>
+        <template #itemTypeDisplayName-cell="{ row }">
+          {{ itemTypeLabel(row.original) }}
+        </template>
         <template #handlerDisplayName-cell="{ row }">
           {{ row.original.handlerDisplayName ?? '—' }}
         </template>
@@ -292,9 +303,6 @@ onMounted(() => void loadFilters())
             <UFormField label="Icon"><UInput v-model="editForm.icon" class="w-full" /></UFormField>
             <UFormField label="Weight"><UInput v-model.number="editForm.weight" type="number" class="w-full" /></UFormField>
             <UFormField label="Price"><UInput v-model.number="editForm.price" type="number" class="w-full" /></UFormField>
-            <UFormField label="Weapon type"><UInput v-model="editForm.weaponType" class="w-full" /></UFormField>
-            <UFormField label="Armor type"><UInput v-model="editForm.armorType" class="w-full" /></UFormField>
-            <UFormField label="Etc item type"><UInput v-model="editForm.etcItemType" class="w-full" /></UFormField>
             <div class="col-span-full space-y-3 rounded-md border border-default p-3">
               <UCheckbox v-model="editForm.hasAttackGeometry" label="Client attack geometry" />
               <div v-if="editForm.hasAttackGeometry" class="grid grid-cols-1 gap-4 md:grid-cols-2">

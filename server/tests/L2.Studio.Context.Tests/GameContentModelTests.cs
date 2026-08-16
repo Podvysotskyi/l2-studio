@@ -94,6 +94,25 @@ public sealed class GameContentModelTests
     }
 
     [Fact]
+    public void ModelsHierarchicalItemTypesAndSingleItemTypeReference()
+    {
+        using var context = CreateContext();
+        var itemType = Entity<ItemType>(context);
+        var item = Entity<Item>(context);
+
+        Assert.Equal("parent_type_name", itemType.FindProperty(nameof(ItemType.ParentTypeName))!.GetColumnName());
+        Assert.True(itemType.FindProperty(nameof(ItemType.ParentTypeName))!.IsNullable);
+        Assert.Contains(itemType.GetIndexes(), index => index.Properties.Select(property => property.Name).SequenceEqual(
+            [nameof(ItemType.GameVersion), nameof(ItemType.ParentTypeName)]));
+        var parent = Assert.Single(itemType.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemType));
+        Assert.Equal(DeleteBehavior.Restrict, parent.DeleteBehavior);
+        Assert.Equal([nameof(ItemType.GameVersion), nameof(ItemType.ParentTypeName)], parent.Properties.Select(property => property.Name));
+        Assert.Null(item.FindProperty("WeaponType"));
+        Assert.Null(item.FindProperty("ArmorType"));
+        Assert.Null(item.FindProperty("EtcItemType"));
+    }
+
+    [Fact]
     public void ModelsItemAttackGeometryAsAnOptionalVersionScopedDependent()
     {
         using var context = CreateContext();

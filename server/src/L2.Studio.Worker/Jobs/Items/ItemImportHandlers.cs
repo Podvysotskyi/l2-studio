@@ -67,7 +67,13 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
         var types = await context.ItemTypes.Where(value => value.GameVersion == gameVersion)
             .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         context.ItemTypes.AddRange(Catalog.Types.Where(value => !types.Contains(value.Name)).Select(value =>
-            new ItemType { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+            new ItemType
+            {
+                GameVersion = gameVersion,
+                Name = value.Name,
+                DisplayName = value.DisplayName,
+                ParentTypeName = value.ParentTypeName
+            }));
         var actions = await context.ItemActions.Where(value => value.GameVersion == gameVersion)
             .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         context.ItemActions.AddRange(Catalog.Actions.Where(value => !actions.Contains(value.Name)).Select(value =>
@@ -150,7 +156,7 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
     private static void Apply(GameContentDbContext? context, Item item, ItemDefinition definition)
     {
         item.Name = definition.Name; item.ItemTypeName = definition.TypeName; item.ItemActionName = definition.ActionName; item.ItemBodyPartName = definition.BodyPartName; item.ItemMaterialName = definition.MaterialName; item.ItemCrystalTypeName = definition.CrystalTypeName;
-        item.Icon = definition.Icon; item.WeaponType = definition.WeaponType; item.ArmorType = definition.ArmorType; item.EtcItemType = definition.EtcItemType; item.DisplayId = definition.DisplayId; item.CrystalCount = definition.CrystalCount; item.Weight = definition.Weight; item.Price = definition.Price; item.Soulshots = definition.Soulshots; item.Spiritshots = definition.Spiritshots; item.MpConsume = definition.MpConsume; item.ReducedMpConsume = definition.ReducedMpConsume; item.ReuseDelay = definition.ReuseDelay; item.RecipeId = definition.RecipeId; item.HandlerName = definition.HandlerName; item.ItemSkill = definition.ItemSkill; item.UseCondition = definition.UseCondition;
+        item.Icon = definition.Icon; item.DisplayId = definition.DisplayId; item.CrystalCount = definition.CrystalCount; item.Weight = definition.Weight; item.Price = definition.Price; item.Soulshots = definition.Soulshots; item.Spiritshots = definition.Spiritshots; item.MpConsume = definition.MpConsume; item.ReducedMpConsume = definition.ReducedMpConsume; item.ReuseDelay = definition.ReuseDelay; item.RecipeId = definition.RecipeId; item.HandlerName = definition.HandlerName; item.ItemSkill = definition.ItemSkill; item.UseCondition = definition.UseCondition;
         item.ElementEnabled = definition.ElementEnabled; item.EnchantEnabled = definition.EnchantEnabled; item.ForNpc = definition.ForNpc; item.ImmediateEffect = definition.ImmediateEffect; item.IsAttackWeapon = definition.IsAttackWeapon; item.IsForceEquip = definition.IsForceEquip; item.IsDepositable = definition.IsDepositable; item.IsDestroyable = definition.IsDestroyable; item.IsDropable = definition.IsDropable; item.IsMagicWeapon = definition.IsMagicWeapon; item.IsOlyRestricted = definition.IsOlyRestricted; item.IsQuestItem = definition.IsQuestItem; item.IsSellable = definition.IsSellable; item.IsStackable = definition.IsStackable; item.IsTradable = definition.IsTradable; item.UseWeaponSkillsOnly = definition.UseWeaponSkillsOnly;
         RestoreSkills(context, item, definition);
         if (definition.AttackGeometry is null)

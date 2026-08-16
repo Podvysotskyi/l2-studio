@@ -9,6 +9,7 @@ public interface IContentDirectoryRepository
     Task<ItemSummary?> GetItemAsync(string gameVersion, int id, CancellationToken cancellationToken);
     Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken);
+    Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
     Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken);
     Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken);
     Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken);

@@ -157,7 +157,7 @@ public sealed class ContentDirectoryControllerTests
         var repository = new StubContentDirectoryRepository();
         var controller = new ContentDirectoryController(repository);
         var request = new UpdateItemRequest(
-            "Crescent Moon Bow", "Weapon", null, null, null, null, null, null, null, "BOW", null, null,
+            "Crescent Moon Bow", "BOW", null, null, null, null, null, null, null,
             null, new UpdateItemAttackGeometryRequest(0, 0, 10, 0));
 
         var result = await controller.UpdateItem("c1", 3028, request, CancellationToken.None);
@@ -181,7 +181,7 @@ public sealed class ContentDirectoryControllerTests
         await controller.UpdateItem(
             "c1", 1660,
             new UpdateItemRequest("Cursed Bone", "EtcItem", "  none  ", null, null, null, null, null, null,
-                null, null, null, "  ItemSkills  ", null),
+                "  ItemSkills  ", null),
             CancellationToken.None);
 
         Assert.Equal("none", repository.UpdatedItemRequest?.ItemActionName);
@@ -216,6 +216,7 @@ public sealed class ContentDirectoryControllerTests
             return Task.FromResult<ItemSummary?>(null);
         }
         public Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemTypeSummary>([], 0, request.Page, request.PageSize));
         public Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemLookupSummary>([], 0, request.Page, request.PageSize));
         public Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken) => Task.FromResult<ItemLookupSummary?>(new(name, displayName));
         public Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken) => Task.FromResult(false);

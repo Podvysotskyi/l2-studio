@@ -26,12 +26,6 @@ public sealed class Item
     public string? ItemCrystalTypeName { get; set; }
     [Column("icon"), MaxLength(256)]
     public string? Icon { get; set; }
-    [Column("weapon_type"), MaxLength(64)]
-    public string? WeaponType { get; set; }
-    [Column("armor_type"), MaxLength(64)]
-    public string? ArmorType { get; set; }
-    [Column("etcitem_type"), MaxLength(64)]
-    public string? EtcItemType { get; set; }
     [Column("display_id")]
     public int? DisplayId { get; set; }
     [Column("crystal_count")]

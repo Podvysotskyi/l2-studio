@@ -3,6 +3,7 @@ using System;
 using L2.Studio.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace L2.Studio.Migrations.Migrations
 {
     [DbContext(typeof(GameContentDbContext))]
-    partial class GameContentDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260816005007_AddHierarchicalItemTypes")]
+    partial class AddHierarchicalItemTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -18,10 +18,15 @@ public sealed class ItemLookupImportHandlers(
         ImportAsync(message.RunId, ItemLookupImportJobValues.ItemTypes, Catalog.Types,
             context => context.ItemTypes, context => context.ItemTypes,
             item => item.Name, item => item.DisplayName,
-            (item, definition) => item.DisplayName = definition.DisplayName,
+            (item, definition) =>
+            {
+                item.DisplayName = definition.DisplayName;
+                item.ParentTypeName = definition.ParentTypeName;
+            },
             (version, definition) => new ItemType
             {
-                GameVersion = version, Name = definition.Name, DisplayName = definition.DisplayName
+                GameVersion = version, Name = definition.Name, DisplayName = definition.DisplayName,
+                ParentTypeName = definition.ParentTypeName
             }, token);
 
     public Task Handle(ImportC1ItemActions message, CancellationToken token) =>
@@ -118,6 +123,11 @@ public sealed class ItemLookupImportHandlers(
                 run.Mode == ItemLookupImportJobValues.RestoreDefaults);
             foreach (var restored in reconciliation.Restored)
                 apply(existing[restored.Key], definitions.Single(definition => definition.Name == restored.Key));
+            if (kind == ItemLookupImportJobValues.ItemTypes && run.Mode == ItemLookupImportJobValues.RestoreDefaults)
+            {
+                foreach (var definition in definitions.Where(definition => existing.ContainsKey(definition.Name)))
+                    apply(existing[definition.Name], definition);
+            }
             set(context).AddRange(reconciliation.Missing.Select(definition => create(run.GameVersion, definition)));
 
             run.TotalCount = definitions.Count;

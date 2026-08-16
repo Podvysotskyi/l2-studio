@@ -323,6 +323,12 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         var itemHandler = modelBuilder.Entity<ItemHandler>();
         var itemSkillType = modelBuilder.Entity<ItemSkillType>();
 
+        itemType.HasIndex(entity => new { entity.GameVersion, entity.ParentTypeName })
+            .HasDatabaseName("ix_item_types_parent_type_name");
+        itemType.HasOne(entity => entity.ParentType).WithMany(entity => entity.ChildTypes)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.ParentTypeName })
+            .OnDelete(DeleteBehavior.Restrict);
+
         var item = modelBuilder.Entity<Item>();
         item.HasIndex(entity => new { entity.GameVersion, entity.Name }).HasDatabaseName("ix_items_name");
         item.HasIndex(entity => new { entity.GameVersion, entity.ItemTypeName }).HasDatabaseName("ix_items_item_type_name");

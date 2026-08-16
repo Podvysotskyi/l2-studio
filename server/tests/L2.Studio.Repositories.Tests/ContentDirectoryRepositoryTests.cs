@@ -3,6 +3,7 @@ using L2.Studio.Context.Entities;
 using L2.Studio.Context.Identifiers;
 using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
+using L2.Studio.Repositories.Interfaces.Models;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -266,6 +267,47 @@ public sealed class ContentDirectoryRepositoryTests
         Assert.Equal("ItemSkills", item.HandlerName);
         Assert.Equal("Item Skills", item.HandlerDisplayName);
         Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_CRITICAL_SKILL", "On Critical Skill", 50), Assert.Single(item.Skills));
+    }
+
+    [Fact]
+    public async Task FiltersItemsByTypeHierarchyAndProtectsParentTypes()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var weapon = new ItemType { GameVersion = "c1", Name = "Weapon", DisplayName = "Weapon" };
+            var sword = new ItemType
+            {
+                GameVersion = "c1", Name = "SWORD", DisplayName = "Sword", ParentTypeName = weapon.Name,
+                ParentType = weapon
+            };
+            var blunt = new ItemType
+            {
+                GameVersion = "c1", Name = "BLUNT", DisplayName = "Blunt", ParentTypeName = weapon.Name,
+                ParentType = weapon
+            };
+            context.AddRange(
+                weapon,
+                sword,
+                blunt,
+                new Item { GameVersion = "c1", Id = 1, Name = "Unclassified", ItemTypeName = weapon.Name, ItemType = weapon },
+                new Item { GameVersion = "c1", Id = 2, Name = "Sword", ItemTypeName = sword.Name, ItemType = sword },
+                new Item { GameVersion = "c1", Id = 3, Name = "Club", ItemTypeName = blunt.Name, ItemType = blunt });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var weapons = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(ItemTypeName: "Weapon"), CancellationToken.None);
+        var swords = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(ItemTypeName: "SWORD"), CancellationToken.None);
+        var types = await repository.SearchItemTypesAsync("c1", new DirectoryRequest(), CancellationToken.None);
+
+        Assert.Equal(3, weapons.Total);
+        Assert.Collection(swords.Items, item => Assert.Equal(2, item.Id));
+        Assert.Contains(types.Items, type => type == new ItemTypeSummary("SWORD", "Sword", "Weapon", "Weapon"));
+        await Assert.ThrowsAsync<ContentDeleteConflictException>(() =>
+            repository.DeleteItemLookupAsync("c1", "item-types", "Weapon", CancellationToken.None));
     }
 
     private sealed class TestContextFactory(DbContextOptions<GameContentDbContext> options)

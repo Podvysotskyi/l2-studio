@@ -16,7 +16,9 @@ public sealed partial class ContentDirectoryRepository
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var items = context.Items.AsNoTracking().Where(item => item.GameVersion == gameVersion &&
             (query == string.Empty || EF.Functions.ILike(item.Name, pattern, "\\")));
-        if (request.ItemTypeName is not null) items = items.Where(item => item.ItemTypeName == request.ItemTypeName);
+        if (request.ItemTypeName is not null)
+            items = items.Where(item => item.ItemTypeName == request.ItemTypeName ||
+                item.ItemType.ParentTypeName == request.ItemTypeName);
         if (request.ItemActionName is not null) items = items.Where(item => item.ItemActionName == request.ItemActionName);
         if (request.ItemBodyPartName is not null) items = items.Where(item => item.ItemBodyPartName == request.ItemBodyPartName);
         if (request.ItemMaterialName is not null) items = items.Where(item => item.ItemMaterialName == request.ItemMaterialName);
@@ -57,9 +59,6 @@ public sealed partial class ContentDirectoryRepository
         item.Icon = Trim(request.Icon);
         item.Weight = request.Weight;
         item.Price = request.Price;
-        item.WeaponType = Trim(request.WeaponType);
-        item.ArmorType = Trim(request.ArmorType);
-        item.EtcItemType = Trim(request.EtcItemType);
         item.HandlerName = Trim(request.HandlerName);
         if (request.AttackGeometry is null)
         {
@@ -102,6 +101,21 @@ public sealed partial class ContentDirectoryRepository
         return true;
     }
 
+    public async Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(
+        string gameVersion,
+        DirectoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var query = request.Query ?? string.Empty;
+        var pattern = $"%{EscapeLikePattern(query)}%";
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await PageAsync(context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\")))
+            .OrderBy(value => value.ParentTypeName == null ? 0 : 1).ThenBy(value => value.ParentTypeName).ThenBy(value => value.Name)
+            .Select(value => new ItemTypeSummary(value.Name, value.DisplayName, value.ParentTypeName,
+                value.ParentType == null ? null : value.ParentType.DisplayName)), request.Page, request.PageSize, cancellationToken);
+    }
+
     public async Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(
         string gameVersion,
         string kind,
@@ -113,9 +127,6 @@ public sealed partial class ContentDirectoryRepository
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return kind switch
         {
-            "item-types" => await PageAsync(context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
-                (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
-                .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
             "item-actions" => await PageAsync(context.ItemActions.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
@@ -159,7 +170,9 @@ public sealed partial class ContentDirectoryRepository
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var usageCount = kind switch
         {
-            "item-types" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemTypeName == name, cancellationToken),
+            "item-types" =>
+                await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemTypeName == name, cancellationToken) +
+                await context.ItemTypes.CountAsync(item => item.GameVersion == gameVersion && item.ParentTypeName == name, cancellationToken),
             "item-actions" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemActionName == name, cancellationToken),
             "item-body-parts" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemBodyPartName == name, cancellationToken),
             "item-materials" => await context.Items.CountAsync(item => item.GameVersion == gameVersion && item.ItemMaterialName == name, cancellationToken),
@@ -168,7 +181,8 @@ public sealed partial class ContentDirectoryRepository
             "item-skill-types" => await context.ItemSkills.CountAsync(item => item.GameVersion == gameVersion && item.ItemSkillTypeName == name, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
-        if (usageCount > 0) throw new ContentDeleteConflictException("item definitions", usageCount);
+        if (usageCount > 0)
+            throw new ContentDeleteConflictException(kind == "item-types" ? "item types or definitions" : "item definitions", usageCount);
 
         var deleted = kind switch
         {
@@ -187,12 +201,13 @@ public sealed partial class ContentDirectoryRepository
     }
 
     private static IQueryable<ItemSummary> ProjectItems(IQueryable<Item> items, IQueryable<Skill> skills) => items.Select(item => new ItemSummary(
-        item.Id, item.Name, item.ItemTypeName, item.ItemType.DisplayName, item.ItemActionName,
+        item.Id, item.Name, item.ItemTypeName, item.ItemType.DisplayName, item.ItemType.ParentTypeName,
+        item.ItemType.ParentType == null ? null : item.ItemType.ParentType.DisplayName, item.ItemActionName,
         item.ItemAction == null ? null : item.ItemAction.DisplayName, item.ItemBodyPartName,
         item.ItemBodyPart == null ? null : item.ItemBodyPart.DisplayName, item.ItemMaterialName,
         item.ItemMaterial == null ? null : item.ItemMaterial.DisplayName, item.ItemCrystalTypeName,
         item.ItemCrystalType == null ? null : item.ItemCrystalType.DisplayName, item.Icon, item.Weight, item.Price,
-        item.WeaponType, item.ArmorType, item.EtcItemType, item.HandlerName,
+        item.HandlerName,
         item.ItemHandler == null ? null : item.ItemHandler.DisplayName,
         item.Skills.OrderBy(value => value.SkillId).ThenBy(value => value.SkillLevel).Select(value => new ItemSkillSummary(
             value.SkillId, value.SkillLevel,

@@ -92,7 +92,7 @@ describe('Studio API service', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/items/3028')
 
     const request = {
-      name: 'Crescent Moon Bow', itemTypeName: 'Weapon', attackGeometry: { offsetX: 0, offsetY: 0, radius: 10, length: 0 }
+      name: 'Crescent Moon Bow', itemTypeName: 'BOW', attackGeometry: { offsetX: 0, offsetY: 0, radius: 10, length: 0 }
     }
     await updateItemDefinition(3028, request)
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028', {

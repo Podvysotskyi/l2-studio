@@ -10,9 +10,6 @@ public sealed record ItemDefinition
     public string? MaterialName { get; init; }
     public string? CrystalTypeName { get; init; }
     public string? Icon { get; init; }
-    public string? WeaponType { get; init; }
-    public string? ArmorType { get; init; }
-    public string? EtcItemType { get; init; }
     public ItemAttackGeometryDefinition? AttackGeometry { get; init; }
     public int? DisplayId { get; init; }
     public int? CrystalCount { get; init; }

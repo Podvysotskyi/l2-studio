@@ -65,8 +65,8 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
         Delete(() => repository.DeleteItemAsync(gameVersion, id, token));
 
     [HttpGet("item-types"), ValidateDirectoryRequest]
-    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemLookupSummary>> GetItemTypes(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
-        repository.SearchItemLookupsAsync(gameVersion, "item-types", Normalized(request), token);
+    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemTypeSummary>> GetItemTypes(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
+        repository.SearchItemTypesAsync(gameVersion, Normalized(request), token);
     [HttpPatch("item-types/{name}")]
     public Task<ActionResult<L2.Studio.Contracts.ItemLookupSummary>> UpdateItemType(string gameVersion, string name, UpdateNpcLookupRequest request, CancellationToken token) => UpdateItemLookup(gameVersion, "item-types", name, request, token);
     [HttpDelete("item-types/{name}")]

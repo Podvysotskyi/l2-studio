@@ -5,7 +5,7 @@ namespace L2.Studio.Worker;
 public abstract partial class ItemLookupCatalog
 {
     protected ItemLookupCatalog(
-        IEnumerable<string> typeNames,
+        IEnumerable<ItemLookupDefinition> types,
         IEnumerable<string> actionNames,
         IEnumerable<string> bodyPartNames,
         IEnumerable<string> materialNames,
@@ -13,7 +13,7 @@ public abstract partial class ItemLookupCatalog
         IEnumerable<string> handlerNames,
         IEnumerable<string> skillTypeNames)
     {
-        Types = Definitions(typeNames);
+        Types = types.Select(definition => definition with { DisplayName = FriendlyName(definition.Name) }).ToArray();
         Actions = Definitions(actionNames);
         BodyParts = Definitions(bodyPartNames, new Dictionary<string, string>(StringComparer.Ordinal)
         {

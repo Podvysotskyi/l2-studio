@@ -101,7 +101,7 @@ public sealed class WorkerJobTests
     {
         ItemLookupCatalog catalog = new C1ItemCatalog();
 
-        Assert.Equal(3, catalog.Types.Count);
+        Assert.Equal(25, catalog.Types.Count);
         Assert.Equal(6, catalog.Actions.Count);
         Assert.Equal(14, catalog.BodyParts.Count);
         Assert.Equal(23, catalog.Materials.Count);
@@ -110,6 +110,12 @@ public sealed class WorkerJobTests
         Assert.Equal(2, catalog.SkillTypes.Count);
         Assert.Equal(158, ((C1ItemCatalog)catalog).Items.Sum(item => item.Skills.Count));
         Assert.Contains(catalog.Types, definition => definition is { Name: "Weapon", DisplayName: "Weapon" });
+        Assert.Contains(catalog.Types, definition => definition is
+            { Name: "SWORD", DisplayName: "Sword", ParentTypeName: "Weapon" });
+        Assert.Contains(catalog.Types, definition => definition is
+            { Name: "HEAVY", DisplayName: "Heavy", ParentTypeName: "Armor" });
+        Assert.Contains(catalog.Types, definition => definition is
+            { Name: "RECIPE", DisplayName: "Recipe", ParentTypeName: "EtcItem" });
         Assert.Contains(catalog.Actions, definition => definition is { Name: "SKILL_MAINTAIN", DisplayName: "Skill Maintain" });
         Assert.Contains(catalog.Materials, definition => definition is { Name: "SCALE_OF_DRAGON", DisplayName: "Scale Of Dragon" });
         Assert.Contains(catalog.BodyParts, definition => definition is { Name: "lhand", DisplayName: "Left Hand" });
@@ -149,6 +155,9 @@ public sealed class WorkerJobTests
                 if (skill.TypeName is not null) Assert.Contains(catalog.SkillTypes, definition => definition.Name == skill.TypeName);
             });
         });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1, TypeName: "SWORD" });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1119, TypeName: "Armor" });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1118, TypeName: "EtcItem" });
     }
 
     [Fact]

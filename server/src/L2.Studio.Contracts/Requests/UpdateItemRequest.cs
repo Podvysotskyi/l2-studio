@@ -10,8 +10,5 @@ public sealed record UpdateItemRequest(
     string? Icon,
     int? Weight,
     long? Price,
-    string? WeaponType,
-    string? ArmorType,
-    string? EtcItemType,
     string? HandlerName,
     UpdateItemAttackGeometryRequest? AttackGeometry);

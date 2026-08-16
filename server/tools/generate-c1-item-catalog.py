@@ -9,8 +9,7 @@ import xml.etree.ElementTree as ElementTree
 FIELDS = {
     "default_action": ("ActionName", "string"), "bodypart": ("BodyPartName", "string"),
     "material": ("MaterialName", "string"), "crystal_type": ("CrystalTypeName", "string"),
-    "icon": ("Icon", "string"), "weapon_type": ("WeaponType", "string"),
-    "armor_type": ("ArmorType", "string"), "etcitem_type": ("EtcItemType", "string"),
+    "icon": ("Icon", "string"),
     "displayId": ("DisplayId", "int"),
     "crystal_count": ("CrystalCount", "int"), "weight": ("Weight", "int"),
     "price": ("Price", "long"), "soulshots": ("Soulshots", "int"), "spiritshots": ("Spiritshots", "int"),
@@ -94,11 +93,23 @@ def skills(item: ElementTree.Element) -> str:
     return "[" + ", ".join(values) + "]"
 
 
+TYPE_SUBTYPE_FIELDS = {
+    "Weapon": "weapon_type",
+    "Armor": "armor_type",
+    "EtcItem": "etcitem_type",
+}
+
+
+def item_type(item: ElementTree.Element, sets: dict[str, str]) -> str:
+    parent = item.attrib["type"]
+    return sets.get(TYPE_SUBTYPE_FIELDS.get(parent, ""), parent)
+
+
 def expression(item: ElementTree.Element) -> str:
     sets = {node.attrib["name"]: node.attrib["val"] for node in item.findall("set")}
     if "bodypart" in sets:
         sets["bodypart"] = BODY_PART_NAMES.get(sets["bodypart"], sets["bodypart"])
-    values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item.attrib['type'])}"]
+    values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item_type(item, sets))}"]
     for source, (target, kind) in FIELDS.items():
         values.append(f"{target} = {csharp(sets.get(source), kind)}")
     values.append(f"AttackGeometry = {attack_geometry(item)}")
@@ -115,10 +126,27 @@ def lookup_expression(name: str) -> str:
     return f"        {csharp_string(name)},"
 
 
+def type_definition_expression(name: str, parent: str | None) -> str:
+    return f"        new({csharp_string(name)}, {csharp_string(name)}, {csharp_string(parent)}),"
+
+
 def lookup_lines(items: dict[int, ElementTree.Element]) -> list[str]:
     definitions = list(items.values())
+    parents = {item.attrib["type"] for item in definitions}
+    children: dict[str, set[str]] = {parent: set() for parent in parents}
+    for item in definitions:
+        parent = item.attrib["type"]
+        subtype = item_type(item, {node.attrib["name"]: node.attrib["val"] for node in item.findall("set")})
+        if subtype != parent:
+            children[parent].add(subtype)
+    child_parents: dict[str, set[str]] = {}
+    for parent, values in children.items():
+        for child in values:
+            child_parents.setdefault(child, set()).add(parent)
+    ambiguous_children = [child for child, value_parents in child_parents.items() if len(value_parents) > 1]
+    if ambiguous_children:
+        raise ValueError(f"Ambiguous item subtype names: {', '.join(sorted(ambiguous_children))}")
     lookups = [
-        ("TypeNames", {item.attrib["type"] for item in definitions}),
         ("ActionNames", {item.find("set[@name='default_action']").attrib["val"] for item in definitions if item.find("set[@name='default_action']") is not None}),
         ("BodyPartNames", {BODY_PART_NAMES.get(item.find("set[@name='bodypart']").attrib["val"], item.find("set[@name='bodypart']").attrib["val"]) for item in definitions if item.find("set[@name='bodypart']") is not None}),
         ("MaterialNames", {item.find("set[@name='material']").attrib["val"] for item in definitions if item.find("set[@name='material']") is not None}),
@@ -127,6 +155,10 @@ def lookup_lines(items: dict[int, ElementTree.Element]) -> list[str]:
         ("SkillTypeNames", {skill.attrib["type"] for item in definitions for skill in item.findall("./skills/skill") if "type" in skill.attrib}),
     ]
     lines = ["namespace L2.Studio.Worker;", "", "public sealed partial class C1ItemCatalog", "{"]
+    lines.extend(["    private static readonly ItemLookupDefinition[] TypeDefinitions =", "    ["])
+    lines.extend(type_definition_expression(parent, None) for parent in sorted(parents))
+    lines.extend(type_definition_expression(child, parent) for parent in sorted(parents) for child in sorted(children[parent]))
+    lines.extend(["    ];", ""])
     for field, names in lookups:
         lines.extend([f"    private static readonly string[] {field} =", "    ["])
         lines.extend(lookup_expression(name) for name in sorted(names))
