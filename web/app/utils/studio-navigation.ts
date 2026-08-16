@@ -124,7 +124,9 @@ export const studioNavigation: NavigationMenuItem[] = [
       { label: 'Actions', icon: 'i-lucide-play', to: '/authoring/items/actions' },
       { label: 'Body parts', icon: 'i-lucide-shirt', to: '/authoring/items/body-parts' },
       { label: 'Materials', icon: 'i-lucide-gem', to: '/authoring/items/materials' },
-      { label: 'Crystal types', icon: 'i-lucide-sparkles', to: '/authoring/items/crystal-types' }
+      { label: 'Crystal types', icon: 'i-lucide-sparkles', to: '/authoring/items/crystal-types' },
+      { label: 'Handlers', icon: 'i-lucide-hand', to: '/authoring/items/handlers' },
+      { label: 'Skill types', icon: 'i-lucide-list-plus', to: '/authoring/items/skill-types' }
     ]
   },
   {
@@ -252,6 +254,8 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/items/body-parts') return 'Item body parts'
   if (path === '/authoring/items/materials') return 'Item materials'
   if (path === '/authoring/items/crystal-types') return 'Item crystal types'
+  if (path === '/authoring/items/handlers') return 'Item handlers'
+  if (path === '/authoring/items/skill-types') return 'Item skill types'
   if (path === '/authoring/players/classes') return 'Player classes'
   if (path === '/authoring/players/races') return 'Player races'
   if (path === '/authoring/players/sexes') return 'Player sexes'

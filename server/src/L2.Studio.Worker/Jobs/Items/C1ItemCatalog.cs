@@ -5,7 +5,9 @@ public sealed partial class C1ItemCatalog() : ItemLookupCatalog(
     ActionNames,
     BodyPartNames,
     MaterialNames,
-    CrystalTypeNames)
+    CrystalTypeNames,
+    HandlerNames,
+    SkillTypeNames)
 {
     public IReadOnlyList<ItemDefinition> Items => Definitions;
 }

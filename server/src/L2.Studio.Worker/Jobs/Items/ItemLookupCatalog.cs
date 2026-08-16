@@ -9,17 +9,22 @@ public abstract partial class ItemLookupCatalog
         IEnumerable<string> actionNames,
         IEnumerable<string> bodyPartNames,
         IEnumerable<string> materialNames,
-        IEnumerable<string> crystalTypeNames)
+        IEnumerable<string> crystalTypeNames,
+        IEnumerable<string> handlerNames,
+        IEnumerable<string> skillTypeNames)
     {
         Types = Definitions(typeNames);
         Actions = Definitions(actionNames);
         BodyParts = Definitions(bodyPartNames, new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["lhand"] = "Left Hand",
-            ["rhand"] = "Right Hand"
+            ["rhand"] = "Right Hand",
+            ["hands"] = "Two Hands"
         });
         Materials = Definitions(materialNames);
         CrystalTypes = Definitions(crystalTypeNames);
+        Handlers = Definitions(handlerNames);
+        SkillTypes = Definitions(skillTypeNames);
     }
 
     public IReadOnlyList<ItemLookupDefinition> Types { get; }
@@ -27,6 +32,8 @@ public abstract partial class ItemLookupCatalog
     public IReadOnlyList<ItemLookupDefinition> BodyParts { get; }
     public IReadOnlyList<ItemLookupDefinition> Materials { get; }
     public IReadOnlyList<ItemLookupDefinition> CrystalTypes { get; }
+    public IReadOnlyList<ItemLookupDefinition> Handlers { get; }
+    public IReadOnlyList<ItemLookupDefinition> SkillTypes { get; }
 
     public static string FriendlyName(string sourceName)
     {

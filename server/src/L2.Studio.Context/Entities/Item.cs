@@ -32,8 +32,6 @@ public sealed class Item
     public string? ArmorType { get; set; }
     [Column("etcitem_type"), MaxLength(64)]
     public string? EtcItemType { get; set; }
-    [Column("damage_range"), MaxLength(64)]
-    public string? DamageRange { get; set; }
     [Column("display_id")]
     public int? DisplayId { get; set; }
     [Column("crystal_count")]
@@ -55,7 +53,7 @@ public sealed class Item
     [Column("recipe_id")]
     public int? RecipeId { get; set; }
     [Column("handler"), MaxLength(64)]
-    public string? Handler { get; set; }
+    public string? HandlerName { get; set; }
     [Column("item_skill"), MaxLength(64)]
     public string? ItemSkill { get; set; }
     [Column("use_condition"), MaxLength(512)]
@@ -97,5 +95,8 @@ public sealed class Item
     public ItemBodyPart? ItemBodyPart { get; set; }
     public ItemMaterial? ItemMaterial { get; set; }
     public ItemCrystalType? ItemCrystalType { get; set; }
+    public ItemHandler? ItemHandler { get; set; }
+    public ItemAttackGeometry? AttackGeometry { get; set; }
+    public ICollection<ItemSkill> Skills { get; } = [];
     public ItemStats? Stats { get; set; }
 }

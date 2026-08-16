@@ -106,15 +106,35 @@ public sealed class WorkerJobTests
         Assert.Equal(14, catalog.BodyParts.Count);
         Assert.Equal(23, catalog.Materials.Count);
         Assert.Equal(5, catalog.CrystalTypes.Count);
+        Assert.Equal(10, catalog.Handlers.Count);
+        Assert.Equal(2, catalog.SkillTypes.Count);
+        Assert.Equal(158, ((C1ItemCatalog)catalog).Items.Sum(item => item.Skills.Count));
         Assert.Contains(catalog.Types, definition => definition is { Name: "Weapon", DisplayName: "Weapon" });
         Assert.Contains(catalog.Actions, definition => definition is { Name: "SKILL_MAINTAIN", DisplayName: "Skill Maintain" });
         Assert.Contains(catalog.Materials, definition => definition is { Name: "SCALE_OF_DRAGON", DisplayName: "Scale Of Dragon" });
         Assert.Contains(catalog.BodyParts, definition => definition is { Name: "lhand", DisplayName: "Left Hand" });
         Assert.Contains(catalog.BodyParts, definition => definition is { Name: "rhand", DisplayName: "Right Hand" });
-        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "hand", DisplayName: "Hand" });
+        Assert.Contains(catalog.BodyParts, definition => definition is { Name: "hands", DisplayName: "Two Hands" });
         Assert.Contains(catalog.BodyParts, definition => definition is { Name: "ear", DisplayName: "Ear" });
         Assert.Contains(catalog.BodyParts, definition => definition is { Name: "finger", DisplayName: "Finger" });
-        Assert.DoesNotContain(catalog.BodyParts, definition => definition.Name is "lrhand" or "rear;lear" or "rfinger;lfinger");
+        Assert.Contains(catalog.Handlers, definition => definition is { Name: "ItemSkills", DisplayName: "Item Skills" });
+        Assert.Contains(catalog.SkillTypes, definition => definition is { Name: "ON_CRITICAL_SKILL", DisplayName: "On Critical Skill" });
+        Assert.DoesNotContain(catalog.BodyParts, definition => definition.Name is "lrhand" or "hand" or "rear;lear" or "rfinger;lfinger");
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        {
+            Id: 3028,
+            AttackGeometry: { OffsetX: 0, OffsetY: 0, Radius: 10, Length: 0 }
+        });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        {
+            Id: 3027,
+            AttackGeometry: { OffsetX: 0, OffsetY: 0, Radius: 44, Length: 120 }
+        });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        {
+            Id: 1660,
+            Skills: [{ SkillId: 3005, SkillLevel: 1, TypeName: "ON_CRITICAL_SKILL", Chance: 50 }]
+        });
 
         Assert.All(((C1ItemCatalog)catalog).Items, item =>
         {
@@ -123,6 +143,11 @@ public sealed class WorkerJobTests
             if (item.BodyPartName is not null) Assert.Contains(catalog.BodyParts, definition => definition.Name == item.BodyPartName);
             if (item.MaterialName is not null) Assert.Contains(catalog.Materials, definition => definition.Name == item.MaterialName);
             if (item.CrystalTypeName is not null) Assert.Contains(catalog.CrystalTypes, definition => definition.Name == item.CrystalTypeName);
+            if (item.HandlerName is not null) Assert.Contains(catalog.Handlers, definition => definition.Name == item.HandlerName);
+            Assert.All(item.Skills, skill =>
+            {
+                if (skill.TypeName is not null) Assert.Contains(catalog.SkillTypes, definition => definition.Name == skill.TypeName);
+            });
         });
     }
 
@@ -183,7 +208,9 @@ public sealed class WorkerJobTests
             new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(catalog.BodyParts.Select(definition => definition.Name), StringComparer.Ordinal),
             new HashSet<string>(catalog.Materials.Select(definition => definition.Name), StringComparer.Ordinal),
-            new HashSet<string>(catalog.CrystalTypes.Select(definition => definition.Name), StringComparer.Ordinal));
+            new HashSet<string>(catalog.CrystalTypes.Select(definition => definition.Name), StringComparer.Ordinal),
+            new HashSet<string>(catalog.Handlers.Select(definition => definition.Name), StringComparer.Ordinal),
+            new HashSet<string>(catalog.SkillTypes.Select(definition => definition.Name), StringComparer.Ordinal));
 
         Assert.Contains(missing, value => value.StartsWith("item actions (", StringComparison.Ordinal));
         Assert.DoesNotContain(missing, value => value.StartsWith("item types (", StringComparison.Ordinal));

@@ -15,11 +15,12 @@ const {
   itemBodyPartName,
   itemMaterialName,
   itemCrystalTypeName,
+  handlerName,
   loading,
   error
 } = storeToRefs(store)
 useDirectoryRouteSync('/authoring/items', { query, page, pageSize }, store.load, {
-  filterRefs: [itemTypeName, itemActionName, itemBodyPartName, itemMaterialName, itemCrystalTypeName],
+  filterRefs: [itemTypeName, itemActionName, itemBodyPartName, itemMaterialName, itemCrystalTypeName, handlerName],
   readFilters: routeQuery => {
     const filters = itemDirectoryRouteState(routeQuery)
     itemTypeName.value = filters.itemTypeName
@@ -27,6 +28,7 @@ useDirectoryRouteSync('/authoring/items', { query, page, pageSize }, store.load,
     itemBodyPartName.value = filters.itemBodyPartName
     itemMaterialName.value = filters.itemMaterialName
     itemCrystalTypeName.value = filters.itemCrystalTypeName
+    handlerName.value = filters.handlerName
   },
   filterQuery: () => itemDirectoryRouteQuery({
     query: query.value,
@@ -36,7 +38,8 @@ useDirectoryRouteSync('/authoring/items', { query, page, pageSize }, store.load,
     itemActionName: itemActionName.value,
     itemBodyPartName: itemBodyPartName.value,
     itemMaterialName: itemMaterialName.value,
-    itemCrystalTypeName: itemCrystalTypeName.value
+    itemCrystalTypeName: itemCrystalTypeName.value,
+    handlerName: handlerName.value
   })
 })
 </script>
@@ -50,6 +53,7 @@ useDirectoryRouteSync('/authoring/items', { query, page, pageSize }, store.load,
     v-model:item-body-part-name="itemBodyPartName"
     v-model:item-material-name="itemMaterialName"
     v-model:item-crystal-type-name="itemCrystalTypeName"
+    v-model:handler-name="handlerName"
     :items="items"
     :total="total"
     :loading="loading"

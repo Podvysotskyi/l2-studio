@@ -13,4 +13,5 @@ public sealed record UpdateItemRequest(
     string? WeaponType,
     string? ArmorType,
     string? EtcItemType,
-    string? DamageRange);
+    string? HandlerName,
+    UpdateItemAttackGeometryRequest? AttackGeometry);

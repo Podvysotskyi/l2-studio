@@ -28,7 +28,8 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             run.StartedAt ??= timeProvider.GetUtcNow();
             run.LastHeartbeatAt = timeProvider.GetUtcNow();
             await EnsureC1LookupsAsync(context, run.GameVersion, token);
-            var existing = await context.Items.Include(item => item.Stats).Where(item => item.GameVersion == run.GameVersion).ToDictionaryAsync(item => item.Id, token);
+            var existing = await context.Items.Include(item => item.AttackGeometry).Include(item => item.Skills).Include(item => item.Stats)
+                .Where(item => item.GameVersion == run.GameVersion).ToDictionaryAsync(item => item.Id, token);
             var missing = Catalog.Items.Where(definition => !existing.ContainsKey(definition.Id)).ToArray();
             context.Items.AddRange(missing.Select(definition => ToEntity(run.GameVersion, definition)));
             var restored = Array.Empty<ItemDefinition>();
@@ -36,6 +37,11 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             {
                 restored = Catalog.Items.Where(definition => existing.ContainsKey(definition.Id)).ToArray();
                 foreach (var definition in restored) Apply(context, existing[definition.Id], definition);
+            }
+            else
+            {
+                foreach (var definition in Catalog.Items.Where(definition => existing.ContainsKey(definition.Id)))
+                    AddMissingSkills(existing[definition.Id], definition);
             }
             run.TotalCount = Catalog.Items.Count;
             run.InsertedCount = missing.Length;
@@ -78,6 +84,14 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         context.ItemCrystalTypes.AddRange(Catalog.CrystalTypes.Where(value => !crystals.Contains(value.Name)).Select(value =>
             new ItemCrystalType { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var handlers = await context.ItemHandlers.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemHandlers.AddRange(Catalog.Handlers.Where(value => !handlers.Contains(value.Name)).Select(value =>
+            new ItemHandler { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
+        var skillTypes = await context.ItemSkillTypes.Where(value => value.GameVersion == gameVersion)
+            .Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        context.ItemSkillTypes.AddRange(Catalog.SkillTypes.Where(value => !skillTypes.Contains(value.Name)).Select(value =>
+            new ItemSkillType { GameVersion = gameVersion, Name = value.Name, DisplayName = value.DisplayName }));
         await context.SaveChangesAsync(token);
     }
 
@@ -91,7 +105,9 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
         var bodyParts = await context.ItemBodyParts.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var materials = await context.ItemMaterials.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
         var crystals = await context.ItemCrystalTypes.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
-        return MissingC1Lookups(types, actions, bodyParts, materials, crystals);
+        var handlers = await context.ItemHandlers.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        var skillTypes = await context.ItemSkillTypes.Where(value => value.GameVersion == gameVersion).Select(value => value.Name).ToHashSetAsync(StringComparer.Ordinal, token);
+        return MissingC1Lookups(types, actions, bodyParts, materials, crystals, handlers, skillTypes);
     }
 
     internal static IReadOnlyList<string> MissingC1Lookups(
@@ -99,7 +115,9 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
         IReadOnlySet<string> actions,
         IReadOnlySet<string> bodyParts,
         IReadOnlySet<string> materials,
-        IReadOnlySet<string> crystals)
+        IReadOnlySet<string> crystals,
+        IReadOnlySet<string> handlers,
+        IReadOnlySet<string> skillTypes)
     {
         return
         [
@@ -107,7 +125,9 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             .. MissingLookupNames("item actions", Catalog.Actions.Select(definition => definition.Name), actions),
             .. MissingLookupNames("item body parts", Catalog.BodyParts.Select(definition => definition.Name), bodyParts),
             .. MissingLookupNames("item materials", Catalog.Materials.Select(definition => definition.Name), materials),
-            .. MissingLookupNames("item crystal types", Catalog.CrystalTypes.Select(definition => definition.Name), crystals)
+            .. MissingLookupNames("item crystal types", Catalog.CrystalTypes.Select(definition => definition.Name), crystals),
+            .. MissingLookupNames("item handlers", Catalog.Handlers.Select(definition => definition.Name), handlers),
+            .. MissingLookupNames("item skill types", Catalog.SkillTypes.Select(definition => definition.Name), skillTypes)
         ];
     }
 
@@ -130,8 +150,34 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
     private static void Apply(GameContentDbContext? context, Item item, ItemDefinition definition)
     {
         item.Name = definition.Name; item.ItemTypeName = definition.TypeName; item.ItemActionName = definition.ActionName; item.ItemBodyPartName = definition.BodyPartName; item.ItemMaterialName = definition.MaterialName; item.ItemCrystalTypeName = definition.CrystalTypeName;
-        item.Icon = definition.Icon; item.WeaponType = definition.WeaponType; item.ArmorType = definition.ArmorType; item.EtcItemType = definition.EtcItemType; item.DamageRange = definition.DamageRange; item.DisplayId = definition.DisplayId; item.CrystalCount = definition.CrystalCount; item.Weight = definition.Weight; item.Price = definition.Price; item.Soulshots = definition.Soulshots; item.Spiritshots = definition.Spiritshots; item.MpConsume = definition.MpConsume; item.ReducedMpConsume = definition.ReducedMpConsume; item.ReuseDelay = definition.ReuseDelay; item.RecipeId = definition.RecipeId; item.Handler = definition.Handler; item.ItemSkill = definition.ItemSkill; item.UseCondition = definition.UseCondition;
+        item.Icon = definition.Icon; item.WeaponType = definition.WeaponType; item.ArmorType = definition.ArmorType; item.EtcItemType = definition.EtcItemType; item.DisplayId = definition.DisplayId; item.CrystalCount = definition.CrystalCount; item.Weight = definition.Weight; item.Price = definition.Price; item.Soulshots = definition.Soulshots; item.Spiritshots = definition.Spiritshots; item.MpConsume = definition.MpConsume; item.ReducedMpConsume = definition.ReducedMpConsume; item.ReuseDelay = definition.ReuseDelay; item.RecipeId = definition.RecipeId; item.HandlerName = definition.HandlerName; item.ItemSkill = definition.ItemSkill; item.UseCondition = definition.UseCondition;
         item.ElementEnabled = definition.ElementEnabled; item.EnchantEnabled = definition.EnchantEnabled; item.ForNpc = definition.ForNpc; item.ImmediateEffect = definition.ImmediateEffect; item.IsAttackWeapon = definition.IsAttackWeapon; item.IsForceEquip = definition.IsForceEquip; item.IsDepositable = definition.IsDepositable; item.IsDestroyable = definition.IsDestroyable; item.IsDropable = definition.IsDropable; item.IsMagicWeapon = definition.IsMagicWeapon; item.IsOlyRestricted = definition.IsOlyRestricted; item.IsQuestItem = definition.IsQuestItem; item.IsSellable = definition.IsSellable; item.IsStackable = definition.IsStackable; item.IsTradable = definition.IsTradable; item.UseWeaponSkillsOnly = definition.UseWeaponSkillsOnly;
+        RestoreSkills(context, item, definition);
+        if (definition.AttackGeometry is null)
+        {
+            if (item.AttackGeometry is not null && context is not null) context.ItemAttackGeometries.Remove(item.AttackGeometry);
+            item.AttackGeometry = null;
+        }
+        else if (item.AttackGeometry is null)
+        {
+            item.AttackGeometry = new ItemAttackGeometry
+            {
+                GameVersion = item.GameVersion,
+                ItemId = item.Id,
+                OffsetX = definition.AttackGeometry.OffsetX,
+                OffsetY = definition.AttackGeometry.OffsetY,
+                Radius = definition.AttackGeometry.Radius,
+                Length = definition.AttackGeometry.Length
+            };
+            if (context is not null) context.ItemAttackGeometries.Add(item.AttackGeometry);
+        }
+        else
+        {
+            item.AttackGeometry.OffsetX = definition.AttackGeometry.OffsetX;
+            item.AttackGeometry.OffsetY = definition.AttackGeometry.OffsetY;
+            item.AttackGeometry.Radius = definition.AttackGeometry.Radius;
+            item.AttackGeometry.Length = definition.AttackGeometry.Length;
+        }
         if (definition.Stats is null)
         {
             if (item.Stats is not null && context is not null) context.ItemStats.Remove(item.Stats);
@@ -156,6 +202,46 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
     private static void Apply(ItemStats stats, ItemStatsDefinition definition)
     {
         stats.AccuracyCombat = definition.AccuracyCombat; stats.CriticalRate = definition.CriticalRate; stats.MagicalAttack = definition.MagicalAttack; stats.MagicalDefence = definition.MagicalDefence; stats.MaximumMp = definition.MaximumMp; stats.PhysicalAttack = definition.PhysicalAttack; stats.PhysicalAttackRange = definition.PhysicalAttackRange; stats.PhysicalAttackSpeed = definition.PhysicalAttackSpeed; stats.PhysicalDefence = definition.PhysicalDefence; stats.Evasion = definition.Evasion; stats.ShieldRate = definition.ShieldRate; stats.RandomDamage = definition.RandomDamage; stats.ShieldDefence = definition.ShieldDefence;
+    }
+
+    private static void AddMissingSkills(Item item, ItemDefinition definition)
+    {
+        var existing = item.Skills.Select(skill => (skill.SkillId, skill.SkillLevel)).ToHashSet();
+        foreach (var skill in definition.Skills.Where(skill => !existing.Contains((skill.SkillId, skill.SkillLevel))))
+            item.Skills.Add(ToEntity(item.GameVersion, item.Id, skill));
+    }
+
+    private static void RestoreSkills(GameContentDbContext? context, Item item, ItemDefinition definition)
+    {
+        var definitions = definition.Skills.ToDictionary(skill => (skill.SkillId, skill.SkillLevel));
+        foreach (var skill in item.Skills.Where(skill => !definitions.ContainsKey((skill.SkillId, skill.SkillLevel))).ToArray())
+        {
+            if (context is not null) context.ItemSkills.Remove(skill);
+            item.Skills.Remove(skill);
+        }
+        foreach (var definitionSkill in definition.Skills)
+        {
+            var skill = item.Skills.SingleOrDefault(value => value.SkillId == definitionSkill.SkillId && value.SkillLevel == definitionSkill.SkillLevel);
+            if (skill is null)
+            {
+                item.Skills.Add(ToEntity(item.GameVersion, item.Id, definitionSkill));
+                continue;
+            }
+            Apply(skill, definitionSkill);
+        }
+    }
+
+    private static ItemSkill ToEntity(string gameVersion, int itemId, ItemSkillDefinition definition)
+    {
+        var skill = new ItemSkill { GameVersion = gameVersion, ItemId = itemId, SkillId = definition.SkillId, SkillLevel = definition.SkillLevel };
+        Apply(skill, definition);
+        return skill;
+    }
+
+    private static void Apply(ItemSkill skill, ItemSkillDefinition definition)
+    {
+        skill.ItemSkillTypeName = definition.TypeName;
+        skill.Chance = definition.Chance;
     }
 
     private async Task MarkFailed(Guid runId, Exception exception, CancellationToken token)

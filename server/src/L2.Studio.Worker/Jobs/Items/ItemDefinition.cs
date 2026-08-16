@@ -13,7 +13,7 @@ public sealed record ItemDefinition
     public string? WeaponType { get; init; }
     public string? ArmorType { get; init; }
     public string? EtcItemType { get; init; }
-    public string? DamageRange { get; init; }
+    public ItemAttackGeometryDefinition? AttackGeometry { get; init; }
     public int? DisplayId { get; init; }
     public int? CrystalCount { get; init; }
     public int? Weight { get; init; }
@@ -24,8 +24,9 @@ public sealed record ItemDefinition
     public string? ReducedMpConsume { get; init; }
     public int? ReuseDelay { get; init; }
     public int? RecipeId { get; init; }
-    public string? Handler { get; init; }
+    public string? HandlerName { get; init; }
     public string? ItemSkill { get; init; }
+    public IReadOnlyList<ItemSkillDefinition> Skills { get; init; } = [];
     public string? UseCondition { get; init; }
     public bool? ElementEnabled { get; init; }
     public bool? EnchantEnabled { get; init; }

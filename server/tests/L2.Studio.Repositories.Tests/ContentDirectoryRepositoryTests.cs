@@ -223,6 +223,51 @@ public sealed class ContentDirectoryRepositoryTests
         Assert.Equal(new SkillLookupSummary("A1", "Single target"), updated);
     }
 
+    [Fact]
+    public async Task ProjectsItemHandlersAndSkillSummaries()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var type = new ItemType { GameVersion = "c1", Name = "EtcItem", DisplayName = "Etc item" };
+            var handler = new ItemHandler { GameVersion = "c1", Name = "ItemSkills", DisplayName = "Item Skills" };
+            var skillType = new ItemSkillType { GameVersion = "c1", Name = "ON_CRITICAL_SKILL", DisplayName = "On Critical Skill" };
+            context.AddRange(
+                type,
+                handler,
+                skillType,
+                new Skill { GameVersion = "c1", Id = 3005, Levels = 1, Name = "Bleed" },
+                new Item
+                {
+                    GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name,
+                    ItemType = type, HandlerName = handler.Name, ItemHandler = handler,
+                    Skills =
+                    {
+                        new ItemSkill
+                        {
+                            GameVersion = "c1", ItemId = 1, SkillId = 3005, SkillLevel = 1,
+                            ItemSkillTypeName = skillType.Name, ItemSkillType = skillType, Chance = 50
+                        }
+                    }
+                },
+                new Item
+                {
+                    GameVersion = "c1", Id = 2, Name = "Other", ItemTypeName = type.Name, ItemType = type
+                });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var page = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(HandlerName: "ItemSkills"), CancellationToken.None);
+
+        var item = Assert.Single(page.Items);
+        Assert.Equal("ItemSkills", item.HandlerName);
+        Assert.Equal("Item Skills", item.HandlerDisplayName);
+        Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_CRITICAL_SKILL", "On Critical Skill", 50), Assert.Single(item.Skills));
+    }
+
     private sealed class TestContextFactory(DbContextOptions<GameContentDbContext> options)
         : IDbContextFactory<GameContentDbContext>
     {

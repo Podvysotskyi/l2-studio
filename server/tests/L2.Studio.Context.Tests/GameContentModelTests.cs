@@ -26,6 +26,10 @@ public sealed class GameContentModelTests
         Assert.Equal("npc_stats_attack", Entity<NpcStatsAttack>(context).GetTableName());
         Assert.Equal("npc_stats_defence", Entity<NpcStatsDefence>(context).GetTableName());
         Assert.Equal("npc_stats_speed", Entity<NpcStatsSpeed>(context).GetTableName());
+        Assert.Equal("item_attack_geometries", Entity<ItemAttackGeometry>(context).GetTableName());
+        Assert.Equal("item_handlers", Entity<ItemHandler>(context).GetTableName());
+        Assert.Equal("item_skill_types", Entity<ItemSkillType>(context).GetTableName());
+        Assert.Equal("item_skills", Entity<ItemSkill>(context).GetTableName());
     }
 
     [Fact]
@@ -87,6 +91,55 @@ public sealed class GameContentModelTests
             key.PrincipalEntityType.ClrType == typeof(SkillTargetType) &&
             key.Properties.Select(property => property.Name).SequenceEqual(
                 [nameof(Skill.GameVersion), nameof(Skill.SkillTargetTypeName)]));
+    }
+
+    [Fact]
+    public void ModelsItemAttackGeometryAsAnOptionalVersionScopedDependent()
+    {
+        using var context = CreateContext();
+        var geometry = Entity<ItemAttackGeometry>(context);
+
+        Assert.Equal(
+            [nameof(ItemAttackGeometry.GameVersion), nameof(ItemAttackGeometry.ItemId)],
+            geometry.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("offset_x", geometry.FindProperty(nameof(ItemAttackGeometry.OffsetX))!.GetColumnName());
+        Assert.Equal("offset_y", geometry.FindProperty(nameof(ItemAttackGeometry.OffsetY))!.GetColumnName());
+        Assert.Equal("radius", geometry.FindProperty(nameof(ItemAttackGeometry.Radius))!.GetColumnName());
+        Assert.Equal("length", geometry.FindProperty(nameof(ItemAttackGeometry.Length))!.GetColumnName());
+        var item = Assert.Single(geometry.GetForeignKeys());
+        Assert.Equal(typeof(Item), item.PrincipalEntityType.ClrType);
+        Assert.Equal(DeleteBehavior.Cascade, item.DeleteBehavior);
+        Assert.Equal(
+            [nameof(ItemAttackGeometry.GameVersion), nameof(ItemAttackGeometry.ItemId)],
+            item.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public void ModelsVersionScopedItemHandlersAndSkills()
+    {
+        using var context = CreateContext();
+
+        var handler = Entity<ItemHandler>(context);
+        var skillType = Entity<ItemSkillType>(context);
+        Assert.Equal([nameof(ItemHandler.GameVersion), nameof(ItemHandler.Name)], handler.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(ItemSkillType.GameVersion), nameof(ItemSkillType.Name)], skillType.FindPrimaryKey()!.Properties.Select(property => property.Name));
+
+        var item = Entity<Item>(context);
+        Assert.Contains(item.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemHandler) &&
+            key.DeleteBehavior == DeleteBehavior.Restrict && key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Item.GameVersion), nameof(Item.HandlerName)]));
+
+        var skill = Entity<ItemSkill>(context);
+        Assert.Equal(
+            [nameof(ItemSkill.GameVersion), nameof(ItemSkill.ItemId), nameof(ItemSkill.SkillId), nameof(ItemSkill.SkillLevel)],
+            skill.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("item_skill_type_name", skill.FindProperty(nameof(ItemSkill.ItemSkillTypeName))!.GetColumnName());
+        Assert.True(skill.FindProperty(nameof(ItemSkill.ItemSkillTypeName))!.IsNullable);
+        Assert.Equal("chance", skill.FindProperty(nameof(ItemSkill.Chance))!.GetColumnName());
+        Assert.True(skill.FindProperty(nameof(ItemSkill.Chance))!.IsNullable);
+        Assert.Contains(skill.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.Contains(skill.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemSkillType) && key.DeleteBehavior == DeleteBehavior.Restrict);
+        Assert.DoesNotContain(skill.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Skill));
     }
 
     [Fact]

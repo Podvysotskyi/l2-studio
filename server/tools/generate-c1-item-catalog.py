@@ -11,12 +11,12 @@ FIELDS = {
     "material": ("MaterialName", "string"), "crystal_type": ("CrystalTypeName", "string"),
     "icon": ("Icon", "string"), "weapon_type": ("WeaponType", "string"),
     "armor_type": ("ArmorType", "string"), "etcitem_type": ("EtcItemType", "string"),
-    "damage_range": ("DamageRange", "string"), "displayId": ("DisplayId", "int"),
+    "displayId": ("DisplayId", "int"),
     "crystal_count": ("CrystalCount", "int"), "weight": ("Weight", "int"),
     "price": ("Price", "long"), "soulshots": ("Soulshots", "int"), "spiritshots": ("Spiritshots", "int"),
     "mp_consume": ("MpConsume", "int"), "reduced_mp_consume": ("ReducedMpConsume", "string"),
     "reuse_delay": ("ReuseDelay", "int"), "recipe_id": ("RecipeId", "int"),
-    "handler": ("Handler", "string"), "item_skill": ("ItemSkill", "string"), "use_condition": ("UseCondition", "string"),
+    "handler": ("HandlerName", "string"), "item_skill": ("ItemSkill", "string"), "use_condition": ("UseCondition", "string"),
     "element_enabled": ("ElementEnabled", "bool"), "enchant_enabled": ("EnchantEnabled", "bool"),
     "for_npc": ("ForNpc", "bool"), "immediate_effect": ("ImmediateEffect", "bool"),
     "isAttackWeapon": ("IsAttackWeapon", "bool"), "isForceEquip": ("IsForceEquip", "bool"),
@@ -34,7 +34,7 @@ STATS = [
     ("randomDamage", "RandomDamage"), ("sDef", "ShieldDefence"),
 ]
 BODY_PART_NAMES = {
-    "lrhand": "hand",
+    "lrhand": "hands",
     "rear;lear": "ear",
     "rfinger;lfinger": "finger",
 }
@@ -60,6 +60,40 @@ def decimal(value: str | None) -> str:
     return "null" if value is None else f"{value}m"
 
 
+def attack_geometry(item: ElementTree.Element) -> str:
+    damage_range = item.find("set[@name='damage_range']")
+    if damage_range is None:
+        return "null"
+    values = damage_range.attrib["val"].split(";")
+    if len(values) != 4:
+        raise ValueError(f"Item {item.attrib['id']} has an invalid damage_range: {damage_range.attrib['val']}")
+    try:
+        offset_x, offset_y, radius, length = (int(value) for value in values)
+    except ValueError as error:
+        raise ValueError(f"Item {item.attrib['id']} has an invalid damage_range: {damage_range.attrib['val']}") from error
+    return f"new({offset_x}, {offset_y}, {radius}, {length})"
+
+
+def skills(item: ElementTree.Element) -> str:
+    values: list[str] = []
+    keys: set[tuple[int, int]] = set()
+    for skill in item.findall("./skills/skill"):
+        try:
+            skill_id = int(skill.attrib["id"])
+            skill_level = int(skill.attrib["level"])
+            chance = int(skill.attrib["type_chance"]) if "type_chance" in skill.attrib else None
+        except ValueError as error:
+            raise ValueError(f"Item {item.attrib['id']} has an invalid skill definition") from error
+        if not -(2 ** 15) <= skill_level < 2 ** 15:
+            raise ValueError(f"Item {item.attrib['id']} has an out-of-range skill level: {skill_level}")
+        if (skill_id, skill_level) in keys:
+            raise ValueError(f"Item {item.attrib['id']} defines duplicate skill {skill_id}-{skill_level}")
+        keys.add((skill_id, skill_level))
+        chance_value = "null" if chance is None else str(chance)
+        values.append(f"new({skill_id}, {skill_level}, {csharp_string(skill.attrib.get('type'))}, {chance_value})")
+    return "[" + ", ".join(values) + "]"
+
+
 def expression(item: ElementTree.Element) -> str:
     sets = {node.attrib["name"]: node.attrib["val"] for node in item.findall("set")}
     if "bodypart" in sets:
@@ -67,6 +101,8 @@ def expression(item: ElementTree.Element) -> str:
     values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item.attrib['type'])}"]
     for source, (target, kind) in FIELDS.items():
         values.append(f"{target} = {csharp(sets.get(source), kind)}")
+    values.append(f"AttackGeometry = {attack_geometry(item)}")
+    values.append(f"Skills = {skills(item)}")
     stat_values = {node.attrib["type"]: (node.text or "").strip() for node in item.findall("./stats/stat")}
     if stat_values:
         values.append("Stats = new(" + ", ".join(decimal(stat_values.get(source)) for source, _ in STATS) + ")")
@@ -87,6 +123,8 @@ def lookup_lines(items: dict[int, ElementTree.Element]) -> list[str]:
         ("BodyPartNames", {BODY_PART_NAMES.get(item.find("set[@name='bodypart']").attrib["val"], item.find("set[@name='bodypart']").attrib["val"]) for item in definitions if item.find("set[@name='bodypart']") is not None}),
         ("MaterialNames", {item.find("set[@name='material']").attrib["val"] for item in definitions if item.find("set[@name='material']") is not None}),
         ("CrystalTypeNames", {item.find("set[@name='crystal_type']").attrib["val"] for item in definitions if item.find("set[@name='crystal_type']") is not None}),
+        ("HandlerNames", {item.find("set[@name='handler']").attrib["val"] for item in definitions if item.find("set[@name='handler']") is not None}),
+        ("SkillTypeNames", {skill.attrib["type"] for item in definitions for skill in item.findall("./skills/skill") if "type" in skill.attrib}),
     ]
     lines = ["namespace L2.Studio.Worker;", "", "public sealed partial class C1ItemCatalog", "{"]
     for field, names in lookups:

@@ -14,6 +14,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
   const itemBodyPartName = ref<string>()
   const itemMaterialName = ref<string>()
   const itemCrystalTypeName = ref<string>()
+  const handlerName = ref<string>()
   const loading = ref(true)
   const error = ref<string>()
   let requestVersion = 0
@@ -30,7 +31,8 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
         itemActionName: itemActionName.value,
         itemBodyPartName: itemBodyPartName.value,
         itemMaterialName: itemMaterialName.value,
-        itemCrystalTypeName: itemCrystalTypeName.value
+        itemCrystalTypeName: itemCrystalTypeName.value,
+        handlerName: handlerName.value
       })
       if (version !== requestVersion) return
       items.value = response.items
@@ -52,6 +54,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     itemBodyPartName,
     itemMaterialName,
     itemCrystalTypeName,
+    handlerName,
     loading,
     error,
     load

@@ -9,6 +9,7 @@ export interface ItemDirectoryRouteState {
   itemBodyPartName?: string
   itemMaterialName?: string
   itemCrystalTypeName?: string
+  handlerName?: string
 }
 
 export function itemDirectoryRouteState(query: Record<string, unknown>): ItemDirectoryRouteState {
@@ -18,7 +19,8 @@ export function itemDirectoryRouteState(query: Record<string, unknown>): ItemDir
     itemActionName: queryValue(query.itemActionName),
     itemBodyPartName: queryValue(query.itemBodyPartName),
     itemMaterialName: queryValue(query.itemMaterialName),
-    itemCrystalTypeName: queryValue(query.itemCrystalTypeName)
+    itemCrystalTypeName: queryValue(query.itemCrystalTypeName),
+    handlerName: queryValue(query.handlerName)
   }
 }
 
@@ -29,7 +31,8 @@ export function itemDirectoryRouteQuery(state: ItemDirectoryRouteState) {
     ...(state.itemActionName ? { itemActionName: state.itemActionName } : {}),
     ...(state.itemBodyPartName ? { itemBodyPartName: state.itemBodyPartName } : {}),
     ...(state.itemMaterialName ? { itemMaterialName: state.itemMaterialName } : {}),
-    ...(state.itemCrystalTypeName ? { itemCrystalTypeName: state.itemCrystalTypeName } : {})
+    ...(state.itemCrystalTypeName ? { itemCrystalTypeName: state.itemCrystalTypeName } : {}),
+    ...(state.handlerName ? { handlerName: state.handlerName } : {})
   }
 }
 

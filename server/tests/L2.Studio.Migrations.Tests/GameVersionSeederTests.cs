@@ -25,6 +25,10 @@ public sealed class GameVersionSeederTests
         Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsAttack)));
         Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsDefence)));
         Assert.NotNull(snapshot.Model.FindEntityType(typeof(NpcStatsSpeed)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(ItemAttackGeometry)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(ItemHandler)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(ItemSkillType)));
+        Assert.NotNull(snapshot.Model.FindEntityType(typeof(ItemSkill)));
     }
 
     [Fact]

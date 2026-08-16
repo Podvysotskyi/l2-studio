@@ -119,7 +119,8 @@ export function updateItemDefinition(id: number, request: {
   name: string; itemTypeName: string; itemActionName?: string | null; itemBodyPartName?: string | null
   itemMaterialName?: string | null; itemCrystalTypeName?: string | null; icon?: string | null
   weight?: number | null; price?: number | null; weaponType?: string | null; armorType?: string | null
-  etcItemType?: string | null; damageRange?: string | null
+  etcItemType?: string | null; handlerName?: string | null
+  attackGeometry?: { offsetX: number; offsetY: number; radius: number; length: number } | null
 }): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`), { method: 'PATCH', body: request }) }
 export function deleteItemDefinition(id: number): Promise<void> {
   return $fetch<void>(versionPath(`/content/items/${id}`), { method: 'DELETE' })
@@ -611,13 +612,15 @@ function itemDirectoryQuery(request: ItemDirectoryRequest) {
   const itemBodyPartName = request.itemBodyPartName?.trim()
   const itemMaterialName = request.itemMaterialName?.trim()
   const itemCrystalTypeName = request.itemCrystalTypeName?.trim()
+  const handlerName = request.handlerName?.trim()
   return {
     ...directoryQuery(request),
     ...(itemTypeName ? { itemTypeName } : {}),
     ...(itemActionName ? { itemActionName } : {}),
     ...(itemBodyPartName ? { itemBodyPartName } : {}),
     ...(itemMaterialName ? { itemMaterialName } : {}),
-    ...(itemCrystalTypeName ? { itemCrystalTypeName } : {})
+    ...(itemCrystalTypeName ? { itemCrystalTypeName } : {}),
+    ...(handlerName ? { handlerName } : {})
   }
 }
 

@@ -7,6 +7,8 @@ public static class ItemLookupImportJobValues
     public const string ItemBodyParts = "item-body-parts";
     public const string ItemMaterials = "item-materials";
     public const string ItemCrystalTypes = "item-crystal-types";
+    public const string ItemHandlers = "item-handlers";
+    public const string ItemSkillTypes = "item-skill-types";
     public const string AddMissing = "add_missing";
     public const string RestoreDefaults = "restore_defaults";
     public const string Queued = "queued";
@@ -16,7 +18,7 @@ public static class ItemLookupImportJobValues
 
     public static readonly IReadOnlySet<string> SupportedKinds = new HashSet<string>(StringComparer.Ordinal)
     {
-        ItemTypes, ItemActions, ItemBodyParts, ItemMaterials, ItemCrystalTypes
+        ItemTypes, ItemActions, ItemBodyParts, ItemMaterials, ItemCrystalTypes, ItemHandlers, ItemSkillTypes
     };
     public static readonly IReadOnlySet<string> SupportedModes = new HashSet<string>(StringComparer.Ordinal)
     {

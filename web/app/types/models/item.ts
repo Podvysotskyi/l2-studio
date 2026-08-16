@@ -1,4 +1,4 @@
-export type ItemLookupKind = 'item-types' | 'item-actions' | 'item-body-parts' | 'item-materials' | 'item-crystal-types'
+export type ItemLookupKind = 'item-types' | 'item-actions' | 'item-body-parts' | 'item-materials' | 'item-crystal-types' | 'item-handlers' | 'item-skill-types'
 
 export interface ItemLookupRecord { name: string; displayName: string }
 export interface ItemStatsRecord {
@@ -7,6 +7,13 @@ export interface ItemStatsRecord {
   physicalAttackRange: number | null; physicalAttackSpeed: number | null; physicalDefence: number | null
   evasion: number | null; shieldRate: number | null; randomDamage: number | null; shieldDefence: number | null
 }
+export interface ItemAttackGeometryRecord {
+  offsetX: number; offsetY: number; radius: number; length: number
+}
+export interface ItemSkillRecord {
+  skillId: number; skillLevel: number; skillName: string | null
+  itemSkillTypeName: string | null; itemSkillTypeDisplayName: string | null; chance: number | null
+}
 export interface ItemRecord {
   id: number; name: string; itemTypeName: string; itemTypeDisplayName: string
   itemActionName: string | null; itemActionDisplayName: string | null
@@ -14,7 +21,8 @@ export interface ItemRecord {
   itemMaterialName: string | null; itemMaterialDisplayName: string | null
   itemCrystalTypeName: string | null; itemCrystalTypeDisplayName: string | null
   icon: string | null; weight: number | null; price: number | null; weaponType: string | null
-  armorType: string | null; etcItemType: string | null; damageRange: string | null
+  armorType: string | null; etcItemType: string | null; handlerName: string | null; handlerDisplayName: string | null
+  skills: ItemSkillRecord[]; attackGeometry: ItemAttackGeometryRecord | null
   stats: ItemStatsRecord | null
 }
 export interface ItemPage { items: ItemRecord[]; total: number; page: number; pageSize: number }

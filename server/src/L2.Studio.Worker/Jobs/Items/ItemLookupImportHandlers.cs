@@ -64,6 +64,26 @@ public sealed class ItemLookupImportHandlers(
                 GameVersion = version, Name = definition.Name, DisplayName = definition.DisplayName
             }, token);
 
+    public Task Handle(ImportC1ItemHandlers message, CancellationToken token) =>
+        ImportAsync(message.RunId, ItemLookupImportJobValues.ItemHandlers, Catalog.Handlers,
+            context => context.ItemHandlers, context => context.ItemHandlers,
+            item => item.Name, item => item.DisplayName,
+            (item, definition) => item.DisplayName = definition.DisplayName,
+            (version, definition) => new ItemHandler
+            {
+                GameVersion = version, Name = definition.Name, DisplayName = definition.DisplayName
+            }, token);
+
+    public Task Handle(ImportC1ItemSkillTypes message, CancellationToken token) =>
+        ImportAsync(message.RunId, ItemLookupImportJobValues.ItemSkillTypes, Catalog.SkillTypes,
+            context => context.ItemSkillTypes, context => context.ItemSkillTypes,
+            item => item.Name, item => item.DisplayName,
+            (item, definition) => item.DisplayName = definition.DisplayName,
+            (version, definition) => new ItemSkillType
+            {
+                GameVersion = version, Name = definition.Name, DisplayName = definition.DisplayName
+            }, token);
+
     private async Task ImportAsync<TEntity>(
         Guid runId,
         string kind,

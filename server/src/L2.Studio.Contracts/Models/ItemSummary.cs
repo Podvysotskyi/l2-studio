@@ -5,4 +5,5 @@ public sealed record ItemSummary(
     string? ItemActionDisplayName, string? ItemBodyPartName, string? ItemBodyPartDisplayName,
     string? ItemMaterialName, string? ItemMaterialDisplayName, string? ItemCrystalTypeName,
     string? ItemCrystalTypeDisplayName, string? Icon, int? Weight, long? Price, string? WeaponType,
-    string? ArmorType, string? EtcItemType, string? DamageRange, ItemStatsSummary? Stats);
+    string? ArmorType, string? EtcItemType, string? HandlerName, string? HandlerDisplayName,
+    IReadOnlyList<ItemSkillSummary> Skills, ItemAttackGeometrySummary? AttackGeometry, ItemStatsSummary? Stats);

@@ -11,7 +11,10 @@ import {
   getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
+  getItemDirectory,
   getNpcDefinition,
+  getItemDefinition,
+  getItemLookups,
   getNpcAppearanceManifest,
   getNpcLookupDirectory,
   getSkillLookupDirectory,
@@ -23,6 +26,7 @@ import {
   updateNpcLookupDisplayName,
   updateSkillLookupDisplayName,
   updateNpcDefinition,
+  updateItemDefinition,
   rebuildStaleAssetSources,
   verifyAssetArtifact
 } from '../../app/services/studio-api'
@@ -79,6 +83,34 @@ describe('Studio API service', () => {
     await updateNpcDefinition(100, request)
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npcs/100', {
       method: 'PATCH', body: request
+    })
+  })
+
+  it('loads and updates structured item attack geometry through the content API', async () => {
+    fetchMock.mockResolvedValue({})
+    await getItemDefinition(3028)
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/items/3028')
+
+    const request = {
+      name: 'Crescent Moon Bow', itemTypeName: 'Weapon', attackGeometry: { offsetX: 0, offsetY: 0, radius: 10, length: 0 }
+    }
+    await updateItemDefinition(3028, request)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028', {
+      method: 'PATCH', body: request
+    })
+  })
+
+  it('filters item definitions and loads item-handler lookups through the content API', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
+
+    await getItemDirectory({ handlerName: ' ItemSkills ' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items', {
+      query: { page: 1, pageSize: 25, handlerName: 'ItemSkills' }
+    })
+
+    await getItemLookups('item-skill-types', { query: ' critical ' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-skill-types', {
+      query: { query: 'critical', page: 1, pageSize: 25 }
     })
   })
 

@@ -18,6 +18,7 @@ export interface ItemDirectoryRequest extends DirectoryRequest {
   itemBodyPartName?: string
   itemMaterialName?: string
   itemCrystalTypeName?: string
+  handlerName?: string
 }
 
 export interface PlayerAppearanceDirectoryRequest extends DirectoryRequest {

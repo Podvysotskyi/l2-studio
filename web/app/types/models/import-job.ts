@@ -14,6 +14,8 @@ export type ContentImportTarget =
   | 'item-body-parts'
   | 'item-materials'
   | 'item-crystal-types'
+  | 'item-handlers'
+  | 'item-skill-types'
   | 'npcs'
   | 'npc-types'
   | 'npc-races'

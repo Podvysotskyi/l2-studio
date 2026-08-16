@@ -33,7 +33,9 @@ describe('Studio navigation', () => {
       'Actions',
       'Body parts',
       'Materials',
-      'Crystal types'
+      'Crystal types',
+      'Handlers',
+      'Skill types'
     ])
     expect(group('Asset library').children?.map(item => item.label)).toEqual([
       'Textures',
@@ -62,6 +64,8 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/players/hair-styles')
     expect(routes).toContain('/authoring/npcs')
     expect(routes).toContain('/authoring/items')
+    expect(routes).toContain('/authoring/items/handlers')
+    expect(routes).toContain('/authoring/items/skill-types')
     expect(routes).toContain('/authoring/skills/target-types')
     expect(routes).toContain('/library/static-meshes')
     expect(routes).toContain('/library/animations')
@@ -120,6 +124,8 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
     expect(studioRouteTitle('/authoring/items/1')).toBe('Item definition')
+    expect(studioRouteTitle('/authoring/items/handlers')).toBe('Item handlers')
+    expect(studioRouteTitle('/authoring/items/skill-types')).toBe('Item skill types')
     expect(studioRouteTitle('/authoring/skills/operate-types'))
       .toBe('Skill operate types')
     expect(studioRouteTitle('/authoring/players/hair-colors')).toBe('Player hair colors')

@@ -13,6 +13,7 @@ const itemActionName = defineModel<string | undefined>('itemActionName', { requi
 const itemBodyPartName = defineModel<string | undefined>('itemBodyPartName', { required: true })
 const itemMaterialName = defineModel<string | undefined>('itemMaterialName', { required: true })
 const itemCrystalTypeName = defineModel<string | undefined>('itemCrystalTypeName', { required: true })
+const handlerName = defineModel<string | undefined>('handlerName', { required: true })
 const emit = defineEmits<{ refresh: [] }>()
 const dialogs = useStudioDialogs()
 const notifications = useStudioToasts()
@@ -30,18 +31,24 @@ const editForm = reactive({
   itemBodyPartName: null as string | null,
   itemMaterialName: null as string | null,
   itemCrystalTypeName: null as string | null,
+  handlerName: null as string | null,
   icon: '',
   weight: null as number | null,
   price: null as number | null,
   weaponType: '',
   armorType: '',
   etcItemType: '',
-  damageRange: ''
+  hasAttackGeometry: false,
+  attackGeometryOffsetX: 0,
+  attackGeometryOffsetY: 0,
+  attackGeometryRadius: 0,
+  attackGeometryLength: 0
 })
 const columns: TableColumn<ItemRecord>[] = [
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'name', header: 'Name' },
   { accessorKey: 'itemTypeDisplayName', header: 'Type' },
+  { accessorKey: 'handlerDisplayName', header: 'Handler' },
   { accessorKey: 'itemBodyPartDisplayName', header: 'Body part' },
   { accessorKey: 'itemMaterialDisplayName', header: 'Material' },
   { accessorKey: 'itemCrystalTypeDisplayName', header: 'Crystal type' },
@@ -55,7 +62,8 @@ const filterValues = computed({
     itemActionName: itemActionName.value,
     itemBodyPartName: itemBodyPartName.value,
     itemMaterialName: itemMaterialName.value,
-    itemCrystalTypeName: itemCrystalTypeName.value
+    itemCrystalTypeName: itemCrystalTypeName.value,
+    handlerName: handlerName.value
   }),
   set: (value: Record<string, string | number | boolean | undefined>) => {
     itemTypeName.value = stringValue(value.itemTypeName)
@@ -63,6 +71,7 @@ const filterValues = computed({
     itemBodyPartName.value = stringValue(value.itemBodyPartName)
     itemMaterialName.value = stringValue(value.itemMaterialName)
     itemCrystalTypeName.value = stringValue(value.itemCrystalTypeName)
+    handlerName.value = stringValue(value.handlerName)
   }
 })
 const filters = computed(() => [
@@ -70,18 +79,20 @@ const filters = computed(() => [
   lookupFilter('itemActionName', 'All actions', 'item-actions'),
   lookupFilter('itemBodyPartName', 'All body parts', 'item-body-parts'),
   lookupFilter('itemMaterialName', 'All materials', 'item-materials'),
-  lookupFilter('itemCrystalTypeName', 'All crystal types', 'item-crystal-types')
+  lookupFilter('itemCrystalTypeName', 'All crystal types', 'item-crystal-types'),
+  lookupFilter('handlerName', 'All handlers', 'item-handlers')
 ])
 const itemTypeOptions = computed(() => lookupSelectOptions('item-types'))
 const itemActionOptions = computed(() => optionalLookupSelectOptions('item-actions'))
 const itemBodyPartOptions = computed(() => optionalLookupSelectOptions('item-body-parts'))
 const itemMaterialOptions = computed(() => optionalLookupSelectOptions('item-materials'))
 const itemCrystalTypeOptions = computed(() => optionalLookupSelectOptions('item-crystal-types'))
+const handlerOptions = computed(() => optionalLookupSelectOptions('item-handlers'))
 
 async function loadFilters() {
   filtersLoading.value = true
   try {
-    const kinds: ItemLookupKind[] = ['item-types', 'item-actions', 'item-body-parts', 'item-materials', 'item-crystal-types']
+    const kinds: ItemLookupKind[] = ['item-types', 'item-actions', 'item-body-parts', 'item-materials', 'item-crystal-types', 'item-handlers']
     const values = await Promise.all(kinds.map(async kind => [
       kind,
       await loadDirectoryOptions((nextPage, nextPageSize) => getItemLookups(kind, { page: nextPage, pageSize: nextPageSize }))
@@ -129,13 +140,18 @@ async function edit(item: ItemRecord) {
     itemBodyPartName: item.itemBodyPartName,
     itemMaterialName: item.itemMaterialName,
     itemCrystalTypeName: item.itemCrystalTypeName,
+    handlerName: item.handlerName,
     icon: item.icon ?? '',
     weight: item.weight,
     price: item.price,
     weaponType: item.weaponType ?? '',
     armorType: item.armorType ?? '',
     etcItemType: item.etcItemType ?? '',
-    damageRange: item.damageRange ?? ''
+    hasAttackGeometry: item.attackGeometry !== null,
+    attackGeometryOffsetX: item.attackGeometry?.offsetX ?? 0,
+    attackGeometryOffsetY: item.attackGeometry?.offsetY ?? 0,
+    attackGeometryRadius: item.attackGeometry?.radius ?? 0,
+    attackGeometryLength: item.attackGeometry?.length ?? 0
   })
   editError.value = undefined
   editOpen.value = true
@@ -153,7 +169,14 @@ async function save() {
   saving.value = true
   editError.value = undefined
   try {
-    await updateItemDefinition(item.id, { ...editForm, name })
+    const { hasAttackGeometry, attackGeometryOffsetX, attackGeometryOffsetY, attackGeometryRadius, attackGeometryLength, ...definition } = editForm
+    await updateItemDefinition(item.id, {
+      ...definition,
+      name,
+      attackGeometry: hasAttackGeometry
+        ? { offsetX: attackGeometryOffsetX, offsetY: attackGeometryOffsetY, radius: attackGeometryRadius, length: attackGeometryLength }
+        : null
+    })
     editOpen.value = false
     notifications.success({ title: 'Item definition saved' })
     emit('refresh')
@@ -242,6 +265,9 @@ onMounted(() => void loadFilters())
         <template #itemBodyPartDisplayName-cell="{ row }">
           {{ row.original.itemBodyPartDisplayName ?? '—' }}
         </template>
+        <template #handlerDisplayName-cell="{ row }">
+          {{ row.original.handlerDisplayName ?? '—' }}
+        </template>
         <template #itemMaterialDisplayName-cell="{ row }">
           {{ row.original.itemMaterialDisplayName ?? '—' }}
         </template>
@@ -262,13 +288,22 @@ onMounted(() => void loadFilters())
             <UFormField label="Body part"><USelect v-model="editForm.itemBodyPartName" :items="itemBodyPartOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField label="Material"><USelect v-model="editForm.itemMaterialName" :items="itemMaterialOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField label="Crystal type"><USelect v-model="editForm.itemCrystalTypeName" :items="itemCrystalTypeOptions" :loading="filtersLoading" class="w-full" /></UFormField>
+            <UFormField label="Handler"><USelect v-model="editForm.handlerName" :items="handlerOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField label="Icon"><UInput v-model="editForm.icon" class="w-full" /></UFormField>
             <UFormField label="Weight"><UInput v-model.number="editForm.weight" type="number" class="w-full" /></UFormField>
             <UFormField label="Price"><UInput v-model.number="editForm.price" type="number" class="w-full" /></UFormField>
             <UFormField label="Weapon type"><UInput v-model="editForm.weaponType" class="w-full" /></UFormField>
             <UFormField label="Armor type"><UInput v-model="editForm.armorType" class="w-full" /></UFormField>
             <UFormField label="Etc item type"><UInput v-model="editForm.etcItemType" class="w-full" /></UFormField>
-            <UFormField label="Damage range"><UInput v-model="editForm.damageRange" class="w-full" /></UFormField>
+            <div class="col-span-full space-y-3 rounded-md border border-default p-3">
+              <UCheckbox v-model="editForm.hasAttackGeometry" label="Client attack geometry" />
+              <div v-if="editForm.hasAttackGeometry" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <UFormField label="Start offset X"><UInput v-model.number="editForm.attackGeometryOffsetX" type="number" class="w-full" /></UFormField>
+                <UFormField label="Start offset Y"><UInput v-model.number="editForm.attackGeometryOffsetY" type="number" class="w-full" /></UFormField>
+                <UFormField label="Sweep radius"><UInput v-model.number="editForm.attackGeometryRadius" type="number" min="0" class="w-full" /></UFormField>
+                <UFormField label="Forward length"><UInput v-model.number="editForm.attackGeometryLength" type="number" min="0" class="w-full" /></UFormField>
+              </div>
+            </div>
           </div>
           <div class="flex justify-end gap-3 pt-2"><UButton label="Cancel" color="neutral" variant="outline" @click="editOpen = false" /><UButton type="submit" label="Save changes" icon="i-lucide-save" :loading="saving" :disabled="filtersLoading" /></div>
         </form>

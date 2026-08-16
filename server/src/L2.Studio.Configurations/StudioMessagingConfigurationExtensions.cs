@@ -87,6 +87,8 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<ImportC1ItemBodyParts>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1ItemMaterials>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1ItemCrystalTypes>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemHandlers>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemSkillTypes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Skills>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Players>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1NpcTypes>().ToPostgresqlQueue(ControlQueue);

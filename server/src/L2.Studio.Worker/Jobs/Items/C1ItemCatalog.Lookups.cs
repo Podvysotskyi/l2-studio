@@ -27,7 +27,7 @@ public sealed partial class C1ItemCatalog
         "feet",
         "finger",
         "gloves",
-        "hand",
+        "hands",
         "head",
         "legs",
         "lhand",
@@ -71,6 +71,26 @@ public sealed partial class C1ItemCatalog
         "C",
         "D",
         "S",
+    ];
+
+    private static readonly string[] HandlerNames =
+    [
+        "BlessedSpiritShot",
+        "EnchantScrolls",
+        "ItemSkills",
+        "Maps",
+        "MercTicket",
+        "PetFood",
+        "Recipes",
+        "SoulShots",
+        "SpiritShot",
+        "SummonItems",
+    ];
+
+    private static readonly string[] SkillTypeNames =
+    [
+        "ON_CRITICAL_SKILL",
+        "ON_ENCHANT_4",
     ];
 
 }

@@ -8,4 +8,5 @@ public sealed record ItemDirectoryRequest(
     string? ItemActionName = null,
     string? ItemBodyPartName = null,
     string? ItemMaterialName = null,
-    string? ItemCrystalTypeName = null) : DirectoryRequest(Query, Page, PageSize);
+    string? ItemCrystalTypeName = null,
+    string? HandlerName = null) : DirectoryRequest(Query, Page, PageSize);

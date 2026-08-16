@@ -21,12 +21,16 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
     public DbSet<NpcSex> NpcSexes => Set<NpcSex>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<ItemAttackGeometry> ItemAttackGeometries => Set<ItemAttackGeometry>();
+    public DbSet<ItemSkill> ItemSkills => Set<ItemSkill>();
     public DbSet<ItemStats> ItemStats => Set<ItemStats>();
     public DbSet<ItemType> ItemTypes => Set<ItemType>();
     public DbSet<ItemAction> ItemActions => Set<ItemAction>();
     public DbSet<ItemBodyPart> ItemBodyParts => Set<ItemBodyPart>();
     public DbSet<ItemMaterial> ItemMaterials => Set<ItemMaterial>();
     public DbSet<ItemCrystalType> ItemCrystalTypes => Set<ItemCrystalType>();
+    public DbSet<ItemHandler> ItemHandlers => Set<ItemHandler>();
+    public DbSet<ItemSkillType> ItemSkillTypes => Set<ItemSkillType>();
     public DbSet<Skill> Skills => Set<Skill>();
     public DbSet<SkillIcon> SkillIcons => Set<SkillIcon>();
     public DbSet<SkillOperateType> SkillOperateTypes => Set<SkillOperateType>();
@@ -316,6 +320,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         var itemBodyPart = modelBuilder.Entity<ItemBodyPart>();
         var itemMaterial = modelBuilder.Entity<ItemMaterial>();
         var itemCrystalType = modelBuilder.Entity<ItemCrystalType>();
+        var itemHandler = modelBuilder.Entity<ItemHandler>();
+        var itemSkillType = modelBuilder.Entity<ItemSkillType>();
 
         var item = modelBuilder.Entity<Item>();
         item.HasIndex(entity => new { entity.GameVersion, entity.Name }).HasDatabaseName("ix_items_name");
@@ -325,6 +331,14 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         item.HasOne(entity => entity.ItemBodyPart).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemBodyPartName }).OnDelete(DeleteBehavior.Restrict);
         item.HasOne(entity => entity.ItemMaterial).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemMaterialName }).OnDelete(DeleteBehavior.Restrict);
         item.HasOne(entity => entity.ItemCrystalType).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemCrystalTypeName }).OnDelete(DeleteBehavior.Restrict);
+        item.HasIndex(entity => new { entity.GameVersion, entity.HandlerName }).HasDatabaseName("ix_items_handler_name");
+        item.HasOne(entity => entity.ItemHandler).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.HandlerName }).OnDelete(DeleteBehavior.Restrict);
+        var itemAttackGeometry = modelBuilder.Entity<ItemAttackGeometry>();
+        itemAttackGeometry.HasOne(entity => entity.Item).WithOne(entity => entity.AttackGeometry).HasForeignKey<ItemAttackGeometry>(entity => new { entity.GameVersion, entity.ItemId }).OnDelete(DeleteBehavior.Cascade);
+        var itemSkill = modelBuilder.Entity<ItemSkill>();
+        itemSkill.HasIndex(entity => new { entity.GameVersion, entity.ItemSkillTypeName }).HasDatabaseName("ix_item_skills_type_name");
+        itemSkill.HasOne(entity => entity.Item).WithMany(entity => entity.Skills).HasForeignKey(entity => new { entity.GameVersion, entity.ItemId }).OnDelete(DeleteBehavior.Cascade);
+        itemSkill.HasOne(entity => entity.ItemSkillType).WithMany(entity => entity.ItemSkills).HasForeignKey(entity => new { entity.GameVersion, entity.ItemSkillTypeName }).OnDelete(DeleteBehavior.Restrict);
         var itemStats = modelBuilder.Entity<ItemStats>();
         itemStats.HasOne(entity => entity.Item).WithOne(entity => entity.Stats).HasForeignKey<ItemStats>(entity => new { entity.GameVersion, entity.ItemId }).OnDelete(DeleteBehavior.Cascade);
         var skillIcon = modelBuilder.Entity<SkillIcon>();
@@ -376,7 +390,10 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         itemBodyPart.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemMaterial.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemCrystalType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemHandler.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSkillType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         item.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSkill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillTargetType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -392,7 +409,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             typeof(NpcSex), typeof(Npc), typeof(NpcStatus), typeof(NpcStats), typeof(NpcStatsVitals),
             typeof(NpcStatsAttack), typeof(NpcStatsDefence), typeof(NpcStatsSpeed),
             typeof(ItemType), typeof(ItemAction), typeof(ItemBodyPart), typeof(ItemMaterial), typeof(ItemCrystalType),
-            typeof(Item), typeof(ItemStats), typeof(ContentImportRun),
+            typeof(ItemHandler), typeof(ItemSkillType), typeof(Item), typeof(ItemAttackGeometry), typeof(ItemSkill), typeof(ItemStats), typeof(ContentImportRun),
             typeof(SkillOperateType), typeof(SkillTargetType),
             typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),
             typeof(AssetCatalog)

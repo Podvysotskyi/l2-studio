@@ -16,7 +16,8 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
         {
             Query = request.Query?.Trim(), ItemTypeName = TrimOptional(request.ItemTypeName),
             ItemActionName = TrimOptional(request.ItemActionName), ItemBodyPartName = TrimOptional(request.ItemBodyPartName),
-            ItemMaterialName = TrimOptional(request.ItemMaterialName), ItemCrystalTypeName = TrimOptional(request.ItemCrystalTypeName)
+            ItemMaterialName = TrimOptional(request.ItemMaterialName), ItemCrystalTypeName = TrimOptional(request.ItemCrystalTypeName),
+            HandlerName = TrimOptional(request.HandlerName)
         }, token);
 
     [HttpGet("items/{id:int}")]
@@ -35,11 +36,22 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
             {
                 ["definition"] = ["Item name and type are required and must not exceed their maximum length."]
             }));
+        if (request.AttackGeometry is { Radius: < 0 } || request.AttackGeometry is { Length: < 0 })
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["attackGeometry"] = ["Attack geometry radius and length must not be negative."]
+            }));
         try
         {
             var item = await repository.UpdateItemAsync(gameVersion, id, request with
             {
-                Name = request.Name.Trim(), ItemTypeName = request.ItemTypeName.Trim()
+                Name = request.Name.Trim(),
+                ItemTypeName = request.ItemTypeName.Trim(),
+                ItemActionName = TrimOptional(request.ItemActionName),
+                ItemBodyPartName = TrimOptional(request.ItemBodyPartName),
+                ItemMaterialName = TrimOptional(request.ItemMaterialName),
+                ItemCrystalTypeName = TrimOptional(request.ItemCrystalTypeName),
+                HandlerName = TrimOptional(request.HandlerName)
             }, token);
             return item is null ? NotFound() : Ok(item);
         }
@@ -87,6 +99,20 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
     public Task<ActionResult<L2.Studio.Contracts.ItemLookupSummary>> UpdateItemCrystalType(string gameVersion, string name, UpdateNpcLookupRequest request, CancellationToken token) => UpdateItemLookup(gameVersion, "item-crystal-types", name, request, token);
     [HttpDelete("item-crystal-types/{name}")]
     public Task<IActionResult> DeleteItemCrystalType(string gameVersion, string name, CancellationToken token) => Delete(() => repository.DeleteItemLookupAsync(gameVersion, "item-crystal-types", name, token));
+    [HttpGet("item-handlers"), ValidateDirectoryRequest]
+    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemLookupSummary>> GetItemHandlers(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
+        repository.SearchItemLookupsAsync(gameVersion, "item-handlers", Normalized(request), token);
+    [HttpPatch("item-handlers/{name}")]
+    public Task<ActionResult<L2.Studio.Contracts.ItemLookupSummary>> UpdateItemHandler(string gameVersion, string name, UpdateNpcLookupRequest request, CancellationToken token) => UpdateItemLookup(gameVersion, "item-handlers", name, request, token);
+    [HttpDelete("item-handlers/{name}")]
+    public Task<IActionResult> DeleteItemHandler(string gameVersion, string name, CancellationToken token) => Delete(() => repository.DeleteItemLookupAsync(gameVersion, "item-handlers", name, token));
+    [HttpGet("item-skill-types"), ValidateDirectoryRequest]
+    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemLookupSummary>> GetItemSkillTypes(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
+        repository.SearchItemLookupsAsync(gameVersion, "item-skill-types", Normalized(request), token);
+    [HttpPatch("item-skill-types/{name}")]
+    public Task<ActionResult<L2.Studio.Contracts.ItemLookupSummary>> UpdateItemSkillType(string gameVersion, string name, UpdateNpcLookupRequest request, CancellationToken token) => UpdateItemLookup(gameVersion, "item-skill-types", name, request, token);
+    [HttpDelete("item-skill-types/{name}")]
+    public Task<IActionResult> DeleteItemSkillType(string gameVersion, string name, CancellationToken token) => Delete(() => repository.DeleteItemLookupAsync(gameVersion, "item-skill-types", name, token));
     [HttpGet("npcs"), ValidateDirectoryRequest]
     public Task<L2.Studio.Contracts.NpcDirectoryPage> SearchNpcs(string gameVersion, [FromQuery] NpcDirectoryRequest request, CancellationToken token) =>
         repository.SearchNpcsAsync(gameVersion, request with

@@ -152,6 +152,43 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task DelegatesStructuredItemAttackGeometryAndRejectsNegativeDimensions()
+    {
+        var repository = new StubContentDirectoryRepository();
+        var controller = new ContentDirectoryController(repository);
+        var request = new UpdateItemRequest(
+            "Crescent Moon Bow", "Weapon", null, null, null, null, null, null, null, "BOW", null, null,
+            null, new UpdateItemAttackGeometryRequest(0, 0, 10, 0));
+
+        var result = await controller.UpdateItem("c1", 3028, request, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.Equal(request.AttackGeometry, repository.UpdatedItemRequest?.AttackGeometry);
+
+        var invalid = await controller.UpdateItem("c1", 3028, request with
+        {
+            AttackGeometry = new UpdateItemAttackGeometryRequest(0, 0, -1, 0)
+        }, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(invalid.Result);
+    }
+
+    [Fact]
+    public async Task NormalizesItemHandlerBeforeUpdatingItem()
+    {
+        var repository = new StubContentDirectoryRepository();
+        var controller = new ContentDirectoryController(repository);
+
+        await controller.UpdateItem(
+            "c1", 1660,
+            new UpdateItemRequest("Cursed Bone", "EtcItem", "  none  ", null, null, null, null, null, null,
+                null, null, null, "  ItemSkills  ", null),
+            CancellationToken.None);
+
+        Assert.Equal("none", repository.UpdatedItemRequest?.ItemActionName);
+        Assert.Equal("ItemSkills", repository.UpdatedItemRequest?.HandlerName);
+    }
+
+    [Fact]
     public async Task DeletesDefinitionsAndReportsDependencyConflicts()
     {
         var deleted = await new ContentDirectoryController(new StubContentDirectoryRepository { NpcDeleted = true })
@@ -173,7 +210,11 @@ public sealed class ContentDirectoryControllerTests
     {
         public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, ItemDirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new ItemDirectoryPage([], 0, request.Page, request.PageSize));
         public Task<ItemSummary?> GetItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult<ItemSummary?>(null);
-        public Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemSummary?>(null);
+        public Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken)
+        {
+            UpdatedItemRequest = request;
+            return Task.FromResult<ItemSummary?>(null);
+        }
         public Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemLookupSummary>([], 0, request.Page, request.PageSize));
         public Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken) => Task.FromResult<ItemLookupSummary?>(new(name, displayName));
@@ -201,6 +242,7 @@ public sealed class ContentDirectoryControllerTests
         public string? UpdatedNpcTypeName { get; private set; }
         public string? UpdatedNpcRaceName { get; private set; }
         public string? UpdatedNpcSexName { get; private set; }
+        public UpdateItemRequest? UpdatedItemRequest { get; private set; }
 
         public Task<NpcDirectoryPage> SearchNpcsAsync(string gameVersion, NpcDirectoryRequest request, CancellationToken cancellationToken)
         {

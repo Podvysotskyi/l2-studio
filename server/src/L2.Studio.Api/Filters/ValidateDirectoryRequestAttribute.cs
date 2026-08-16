@@ -32,6 +32,7 @@ public sealed class ValidateDirectoryRequestAttribute : ActionFilterAttribute
             ValidateLookupFilter(itemRequest.ItemBodyPartName, "itemBodyPartName", "Item body part", errors);
             ValidateLookupFilter(itemRequest.ItemMaterialName, "itemMaterialName", "Item material", errors);
             ValidateLookupFilter(itemRequest.ItemCrystalTypeName, "itemCrystalTypeName", "Item crystal type", errors);
+            ValidateLookupFilter(itemRequest.HandlerName, "handlerName", "Item handler", errors);
         }
         if (request is PlayerAppearanceDirectoryRequest appearanceRequest)
         {
