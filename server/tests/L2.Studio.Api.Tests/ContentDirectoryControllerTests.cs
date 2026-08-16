@@ -46,6 +46,22 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task DelegatesItemSearchToTheRequestedFamily()
+    {
+        var repository = new StubContentDirectoryRepository();
+        var controller = new ContentDirectoryController(repository);
+
+        await controller.SearchItems(
+            "c1",
+            "weapon",
+            new ItemDirectoryRequest(Query: "  blade  "),
+            CancellationToken.None);
+
+        Assert.Equal("weapon", repository.ItemFamily);
+        Assert.Equal("blade", repository.ItemRequest?.Query);
+    }
+
+    [Fact]
     public async Task DelegatesLookupRequestsToTheMatchingRepositoryMethod()
     {
         var expected = new DirectoryPage<NpcLookupSummary>([new("Humanoid", "Humanoid")], 1, 2, 50);
@@ -157,15 +173,15 @@ public sealed class ContentDirectoryControllerTests
         var repository = new StubContentDirectoryRepository();
         var controller = new ContentDirectoryController(repository);
         var request = new UpdateItemRequest(
-            "Crescent Moon Bow", "BOW", null, null, null, null, null, null, null,
+            "Crescent Moon Bow", null, null, null, null, null, null, null,
             null, new UpdateItemAttackGeometryRequest(0, 0, 10, 0));
 
-        var result = await controller.UpdateItem("c1", 3028, request, CancellationToken.None);
+        var result = await controller.UpdateItem("c1", "weapon", 3028, request, CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result.Result);
         Assert.Equal(request.AttackGeometry, repository.UpdatedItemRequest?.AttackGeometry);
 
-        var invalid = await controller.UpdateItem("c1", 3028, request with
+        var invalid = await controller.UpdateItem("c1", "weapon", 3028, request with
         {
             AttackGeometry = new UpdateItemAttackGeometryRequest(0, 0, -1, 0)
         }, CancellationToken.None);
@@ -179,8 +195,8 @@ public sealed class ContentDirectoryControllerTests
         var controller = new ContentDirectoryController(repository);
 
         await controller.UpdateItem(
-            "c1", 1660,
-            new UpdateItemRequest("Cursed Bone", "EtcItem", "  none  ", null, null, null, null, null, null,
+            "c1", "etc", 1660,
+            new UpdateItemRequest("Cursed Bone", "  none  ", null, null, null, null, null, null,
                 "  ItemSkills  ", null),
             CancellationToken.None);
 
@@ -196,18 +212,18 @@ public sealed class ContentDirectoryControllerTests
         var controller = new ContentDirectoryController(repository);
 
         var created = await controller.CreateItemSkill(
-            "c1", 3028, new CreateItemSkillRequest(3005, 1, "  ON_CRITICAL_SKILL  ", 50), CancellationToken.None);
+            "c1", "weapon", 3028, new CreateItemSkillRequest(3005, 1, "  ON_CRITICAL_SKILL  ", 50), CancellationToken.None);
 
         var response = Assert.IsType<CreatedAtActionResult>(created.Result);
         Assert.Equal(expected, response.Value);
         Assert.Equal("ON_CRITICAL_SKILL", repository.CreatedItemSkillRequest?.ItemSkillTypeName);
 
         var invalid = await controller.CreateItemSkill(
-            "c1", 3028, new CreateItemSkillRequest(3005, 1, null, 101), CancellationToken.None);
+            "c1", "weapon", 3028, new CreateItemSkillRequest(3005, 1, null, 101), CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(invalid.Result);
 
         var invalidPrimary = await controller.SetItemPrimarySkill(
-            "c1", 3028, new SetItemPrimarySkillRequest(0, 1), CancellationToken.None);
+            "c1", "etc", 3028, new SetItemPrimarySkillRequest(0, 1), CancellationToken.None);
         Assert.IsType<BadRequestObjectResult>(invalidPrimary.Result);
     }
 
@@ -231,23 +247,30 @@ public sealed class ContentDirectoryControllerTests
 
     private sealed class StubContentDirectoryRepository : IContentDirectoryRepository
     {
-        public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, ItemDirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new ItemDirectoryPage([], 0, request.Page, request.PageSize));
-        public Task<ItemDetailSummary?> GetItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult<ItemDetailSummary?>(null);
-        public Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken)
+        public ItemDirectoryRequest? ItemRequest { get; private set; }
+        public string? ItemFamily { get; private set; }
+        public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken)
+        {
+            ItemFamily = family;
+            ItemRequest = request;
+            return Task.FromResult(new ItemDirectoryPage([], 0, request.Page, request.PageSize));
+        }
+        public Task<ItemDetailSummary?> GetItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken) => Task.FromResult<ItemDetailSummary?>(null);
+        public Task<ItemSummary?> UpdateItemAsync(string gameVersion, string family, int id, UpdateItemRequest request, CancellationToken cancellationToken)
         {
             UpdatedItemRequest = request;
             return Task.FromResult<ItemSummary?>(null);
         }
-        public Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);
-        public Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemPrimarySkillSummary?>(null);
-        public Task<bool> ClearItemPrimarySkillAsync(string gameVersion, int itemId, CancellationToken cancellationToken) => Task.FromResult(false);
-        public Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken)
+        public Task<bool> DeleteItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, string family, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemPrimarySkillSummary?>(null);
+        public Task<bool> ClearItemPrimarySkillAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, string family, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken)
         {
             CreatedItemSkillRequest = request;
             return Task.FromResult(CreatedItemSkill);
         }
-        public Task<ItemSkillSummary?> UpdateItemSkillAsync(string gameVersion, int itemId, int skillId, short skillLevel, UpdateItemSkillRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemSkillSummary?>(null);
-        public Task<bool> DeleteItemSkillAsync(string gameVersion, int itemId, int skillId, short skillLevel, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<ItemSkillSummary?> UpdateItemSkillAsync(string gameVersion, string family, int itemId, int skillId, short skillLevel, UpdateItemSkillRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemSkillSummary?>(null);
+        public Task<bool> DeleteItemSkillAsync(string gameVersion, string family, int itemId, int skillId, short skillLevel, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemTypeSummary>([], 0, request.Page, request.PageSize));
         public Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken) => Task.FromResult(new DirectoryPage<ItemLookupSummary>([], 0, request.Page, request.PageSize));
         public Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken) => Task.FromResult<ItemLookupSummary?>(new(name, displayName));

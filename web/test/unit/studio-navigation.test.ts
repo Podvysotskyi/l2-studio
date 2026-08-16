@@ -29,13 +29,14 @@ describe('Studio navigation', () => {
     ])
     expect(group('Items').children?.map(item => item.label)).toEqual([
       'Definitions',
-      'Types',
-      'Actions',
-      'Body parts',
-      'Materials',
-      'Crystal types',
-      'Handlers',
-      'Skill types'
+      'Lookups'
+    ])
+    expect(child(group('Items'), 'Definitions').children?.map(item => item.label)).toEqual([
+      'Armor', 'Weapons', 'Arrows', 'Materials', 'Potions', 'Recipes',
+      'Enchants', 'Scrolls', 'Pet collars', 'Etc items'
+    ])
+    expect(child(group('Items'), 'Lookups').children?.map(item => item.label)).toEqual([
+      'Types', 'Actions', 'Body parts', 'Materials', 'Crystal types', 'Handlers', 'Skill types'
     ])
     expect(group('Asset library').children?.map(item => item.label)).toEqual([
       'Textures',
@@ -63,9 +64,12 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/players/classes')
     expect(routes).toContain('/authoring/players/hair-styles')
     expect(routes).toContain('/authoring/npcs')
-    expect(routes).toContain('/authoring/items')
-    expect(routes).toContain('/authoring/items/handlers')
-    expect(routes).toContain('/authoring/items/skill-types')
+    expect(routes).toContain('/authoring/items/weapon')
+    expect(routes).toContain('/authoring/items/armor')
+    expect(routes).toContain('/authoring/items/pet-collar')
+    expect(routes).toContain('/authoring/items/etc')
+    expect(routes).toContain('/authoring/items/lookups/handlers')
+    expect(routes).toContain('/authoring/items/lookups/skill-types')
     expect(routes).toContain('/authoring/skills/target-types')
     expect(routes).toContain('/library/static-meshes')
     expect(routes).toContain('/library/animations')
@@ -76,6 +80,8 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/storage/generated-assets')
     expect(routes).toContain('/storage/artifact-registry')
     expect(routes).not.toContain('/content/npcs')
+    expect(routes).not.toContain('/authoring/items/body-parts')
+    expect(routes).not.toContain('/authoring/equipment/weapons')
     expect(routes).not.toContain('/assets/maps')
     expect(routes).not.toContain('/storage')
     expect(routes).not.toContain('/releases')
@@ -90,7 +96,9 @@ describe('Studio navigation', () => {
       .toBe(studioNavigationGroups.players)
     expect(studioRouteGroup('/authoring/npcs/races'))
       .toBe(studioNavigationGroups.npcs)
-    expect(studioRouteGroup('/authoring/items/materials'))
+    expect(studioRouteGroup('/authoring/items/weapon/1'))
+      .toBe(studioNavigationGroups.items)
+    expect(studioRouteGroup('/authoring/items/lookups/materials'))
       .toBe(studioNavigationGroups.items)
     expect(studioRouteGroup('/authoring/skills'))
       .toBe(studioNavigationGroups.skills)
@@ -123,10 +131,19 @@ describe('Studio navigation', () => {
   it('provides titles for canonical list and detail routes', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
-    expect(studioRouteTitle('/authoring/items/1')).toBe('Item definition')
-    expect(studioRouteTitle('/authoring/items/1/skills')).toBe('Item skills')
-    expect(studioRouteTitle('/authoring/items/handlers')).toBe('Item handlers')
-    expect(studioRouteTitle('/authoring/items/skill-types')).toBe('Item skill types')
+    expect(studioRouteTitle('/authoring/items')).toBe('Item definitions')
+    expect(studioRouteTitle('/authoring/items/etc')).toBe('Etc Item definitions')
+    expect(studioRouteTitle('/authoring/items/etc/1')).toBe('Etc Item definition')
+    expect(studioRouteTitle('/authoring/items/etc/1/skills')).toBe('Etc Item skills')
+    expect(studioRouteTitle('/authoring/items/weapon')).toBe('Weapon definitions')
+    expect(studioRouteTitle('/authoring/items/weapon/1')).toBe('Weapon definition')
+    expect(studioRouteTitle('/authoring/items/weapon/1/skills')).toBe('Weapon skills')
+    expect(studioRouteTitle('/authoring/items/armor/1')).toBe('Armor definition')
+    expect(studioRouteTitle('/authoring/items/pet-collar/1')).toBe('Pet Collar definition')
+    expect(studioRouteTitle('/authoring/items/lookups/body-parts')).toBe('Item body parts')
+    expect(studioRouteTitle('/authoring/items/lookups/crystal-types')).toBe('Item crystal types')
+    expect(studioRouteTitle('/authoring/items/lookups/handlers')).toBe('Item handlers')
+    expect(studioRouteTitle('/authoring/items/lookups/skill-types')).toBe('Item skill types')
     expect(studioRouteTitle('/authoring/skills/operate-types'))
       .toBe('Skill operate types')
     expect(studioRouteTitle('/authoring/players/hair-colors')).toBe('Player hair colors')
@@ -151,6 +168,12 @@ function group(label: string) {
   const item = studioNavigation.find(candidate => candidate.label === label)
   if (!item) throw new Error(`Missing navigation group: ${label}`)
   return item
+}
+
+function child(item: NavigationMenuItem, label: string) {
+  const child = item.children?.find(candidate => candidate.label === label)
+  if (!child) throw new Error(`Missing ${label} child`)
+  return child
 }
 
 function navigationRoutes(items: NavigationMenuItem[]): string[] {

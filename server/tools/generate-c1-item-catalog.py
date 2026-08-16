@@ -99,6 +99,36 @@ TYPE_SUBTYPE_FIELDS = {
     "EtcItem": "etcitem_type",
 }
 
+COMMON_FIELDS = {"material", "icon", "weight", "price"}
+FAMILY_FIELDS = {
+    "Armor": {"default_action", "bodypart", "crystal_type", "crystal_count", "enchant_enabled", "for_npc", "immediate_effect", "is_depositable", "is_destroyable", "is_dropable", "is_sellable", "is_tradable"},
+    "Weapon": {"default_action", "bodypart", "crystal_type", "displayId", "crystal_count", "soulshots", "spiritshots", "mp_consume", "reduced_mp_consume", "reuse_delay", "element_enabled", "enchant_enabled", "for_npc", "immediate_effect", "isAttackWeapon", "isForceEquip", "is_depositable", "is_destroyable", "is_dropable", "is_magic_weapon", "is_sellable", "is_tradable", "useWeaponSkillsOnly"},
+    "Arrow": {"default_action", "bodypart", "crystal_type", "immediate_effect", "is_stackable"},
+    "Material": {"immediate_effect", "is_stackable"},
+    "Potion": {"default_action", "reuse_delay", "handler", "for_npc", "immediate_effect", "is_oly_restricted", "is_stackable"},
+    "Recipe": {"default_action", "recipe_id", "handler", "immediate_effect", "is_depositable", "is_destroyable", "is_dropable", "is_sellable", "is_stackable", "is_tradable"},
+    "Enchant": {"default_action", "handler", "immediate_effect", "is_oly_restricted", "is_stackable"},
+    "Scroll": {"default_action", "handler", "for_npc", "is_oly_restricted", "is_stackable"},
+    "PetCollar": {"default_action", "handler", "use_condition", "is_oly_restricted"},
+    "Etc": {"default_action", "bodypart", "crystal_type", "displayId", "reuse_delay", "handler", "item_skill", "use_condition", "for_npc", "immediate_effect", "is_depositable", "is_destroyable", "is_dropable", "is_oly_restricted", "is_questitem", "is_sellable", "is_stackable", "is_tradable"},
+}
+SKILL_FAMILIES = {"Weapon", "Potion", "Enchant", "Scroll", "PetCollar", "Etc"}
+STATS_FAMILIES = {"Armor", "Weapon", "Etc"}
+
+
+def item_family(item: ElementTree.Element, sets: dict[str, str]) -> str:
+    parent = item.attrib["type"]
+    subtype = item_type(item, sets)
+    if parent == "Armor":
+        return "Armor"
+    if parent == "Weapon":
+        return "Weapon"
+    return {
+        "ARROW": "Arrow", "MATERIAL": "Material", "POTION": "Potion", "RECIPE": "Recipe",
+        "SCRL_ENCHANT_AM": "Enchant", "SCRL_ENCHANT_WP": "Enchant", "SCROLL": "Scroll",
+        "PET_COLLAR": "PetCollar",
+    }.get(subtype, "Etc")
+
 
 def item_type(item: ElementTree.Element, sets: dict[str, str]) -> str:
     parent = item.attrib["type"]
@@ -109,25 +139,39 @@ def expression(item: ElementTree.Element) -> str:
     sets = {node.attrib["name"]: node.attrib["val"] for node in item.findall("set")}
     if "bodypart" in sets:
         sets["bodypart"] = BODY_PART_NAMES.get(sets["bodypart"], sets["bodypart"])
+    family = item_family(item, sets)
     values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item_type(item, sets))}"]
     for source, (target, kind) in FIELDS.items():
-        values.append(f"{target} = {csharp(sets.get(source), kind)}")
-    values.append(f"AttackGeometry = {attack_geometry(item)}")
-    values.append(f"Skills = {skills(item)}")
+        if source in COMMON_FIELDS or source in FAMILY_FIELDS[family]:
+            values.append(f"{target} = {csharp(sets.get(source), kind)}")
+    if family == "Weapon":
+        values.append(f"AttackGeometry = {attack_geometry(item)}")
+    if family in SKILL_FAMILIES:
+        values.append(f"Skills = {skills(item)}")
     stat_values = {node.attrib["type"]: (node.text or "").strip() for node in item.findall("./stats/stat")}
-    if stat_values:
-        values.append("Stats = new(" + ", ".join(decimal(stat_values.get(source)) for source, _ in STATS) + ")")
-    else:
-        values.append("Stats = null")
-    return "        new() { " + ", ".join(values) + " },"
+    if family in STATS_FAMILIES:
+        if stat_values:
+            values.append("Stats = new(" + ", ".join(decimal(stat_values.get(source)) for source, _ in STATS) + ")")
+        else:
+            values.append("Stats = null")
+    return f"        new Item_{family}Definition() {{ " + ", ".join(values) + " },"
 
 
 def lookup_expression(name: str) -> str:
     return f"        {csharp_string(name)},"
 
 
+def display_name(name: str) -> str:
+    if name == "EtcItem":
+        return "Etc Item"
+    return name.replace("_", " ").title()
+
+
 def type_definition_expression(name: str, parent: str | None) -> str:
-    return f"        new({csharp_string(name)}, {csharp_string(name)}, {csharp_string(parent)}),"
+    arguments = f"{csharp_string(name)}, {csharp_string(display_name(name))}"
+    if parent is not None:
+        arguments += f", {csharp_string(parent)}"
+    return f"        new({arguments}),"
 
 
 def lookup_lines(items: dict[int, ElementTree.Element]) -> list[str]:

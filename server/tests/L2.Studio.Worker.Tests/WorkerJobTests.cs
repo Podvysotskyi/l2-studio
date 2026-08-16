@@ -108,7 +108,7 @@ public sealed class WorkerJobTests
         Assert.Equal(5, catalog.CrystalTypes.Count);
         Assert.Equal(10, catalog.Handlers.Count);
         Assert.Equal(2, catalog.SkillTypes.Count);
-        Assert.Equal(158, ((C1ItemCatalog)catalog).Items.Sum(item => item.Skills.Count));
+        Assert.Equal(158, ((C1ItemCatalog)catalog).Items.OfType<IItemSkillsDefinition>().Sum(item => item.Skills.Count));
         Assert.Contains(catalog.Types, definition => definition is { Name: "Weapon", DisplayName: "Weapon" });
         Assert.Contains(catalog.Types, definition => definition is
             { Name: "SWORD", DisplayName: "Sword", ParentTypeName: "Weapon" });
@@ -126,17 +126,17 @@ public sealed class WorkerJobTests
         Assert.Contains(catalog.Handlers, definition => definition is { Name: "ItemSkills", DisplayName: "Item Skills" });
         Assert.Contains(catalog.SkillTypes, definition => definition is { Name: "ON_CRITICAL_SKILL", DisplayName: "On Critical Skill" });
         Assert.DoesNotContain(catalog.BodyParts, definition => definition.Name is "lrhand" or "hand" or "rear;lear" or "rfinger;lfinger");
-        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is Item_WeaponDefinition
         {
             Id: 3028,
             AttackGeometry: { OffsetX: 0, OffsetY: 0, Radius: 10, Length: 0 }
         });
-        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is Item_WeaponDefinition
         {
             Id: 3027,
             AttackGeometry: { OffsetX: 0, OffsetY: 0, Radius: 44, Length: 120 }
         });
-        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is Item_WeaponDefinition
         {
             Id: 1660,
             Skills: [{ SkillId: 3005, SkillLevel: 1, TypeName: "ON_CRITICAL_SKILL", Chance: 50 }]
@@ -145,12 +145,16 @@ public sealed class WorkerJobTests
         Assert.All(((C1ItemCatalog)catalog).Items, item =>
         {
             Assert.Contains(catalog.Types, definition => definition.Name == item.TypeName);
-            if (item.ActionName is not null) Assert.Contains(catalog.Actions, definition => definition.Name == item.ActionName);
-            if (item.BodyPartName is not null) Assert.Contains(catalog.BodyParts, definition => definition.Name == item.BodyPartName);
+            var actionName = item switch { Item_ArmorDefinition v => v.ActionName, Item_WeaponDefinition v => v.ActionName, Item_ArrowDefinition v => v.ActionName, Item_PotionDefinition v => v.ActionName, Item_RecipeDefinition v => v.ActionName, Item_EnchantDefinition v => v.ActionName, Item_ScrollDefinition v => v.ActionName, Item_PetCollarDefinition v => v.ActionName, Item_EtcDefinition v => v.ActionName, _ => null };
+            var bodyPartName = item switch { Item_ArmorDefinition v => v.BodyPartName, Item_WeaponDefinition v => v.BodyPartName, Item_ArrowDefinition v => v.BodyPartName, Item_EtcDefinition v => v.BodyPartName, _ => null };
+            var crystalTypeName = item switch { Item_ArmorDefinition v => v.CrystalTypeName, Item_WeaponDefinition v => v.CrystalTypeName, Item_ArrowDefinition v => v.CrystalTypeName, Item_EtcDefinition v => v.CrystalTypeName, _ => null };
+            var handlerName = item switch { Item_PotionDefinition v => v.HandlerName, Item_RecipeDefinition v => v.HandlerName, Item_EnchantDefinition v => v.HandlerName, Item_ScrollDefinition v => v.HandlerName, Item_PetCollarDefinition v => v.HandlerName, Item_EtcDefinition v => v.HandlerName, _ => null };
+            if (actionName is not null) Assert.Contains(catalog.Actions, definition => definition.Name == actionName);
+            if (bodyPartName is not null) Assert.Contains(catalog.BodyParts, definition => definition.Name == bodyPartName);
             if (item.MaterialName is not null) Assert.Contains(catalog.Materials, definition => definition.Name == item.MaterialName);
-            if (item.CrystalTypeName is not null) Assert.Contains(catalog.CrystalTypes, definition => definition.Name == item.CrystalTypeName);
-            if (item.HandlerName is not null) Assert.Contains(catalog.Handlers, definition => definition.Name == item.HandlerName);
-            Assert.All(item.Skills, skill =>
+            if (crystalTypeName is not null) Assert.Contains(catalog.CrystalTypes, definition => definition.Name == crystalTypeName);
+            if (handlerName is not null) Assert.Contains(catalog.Handlers, definition => definition.Name == handlerName);
+            Assert.All((item as IItemSkillsDefinition)?.Skills ?? [], skill =>
             {
                 if (skill.TypeName is not null) Assert.Contains(catalog.SkillTypes, definition => definition.Name == skill.TypeName);
             });
@@ -158,6 +162,13 @@ public sealed class WorkerJobTests
         Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1, TypeName: "SWORD" });
         Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1119, TypeName: "Armor" });
         Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is { Id: 1118, TypeName: "EtcItem" });
+        Assert.Equal(4, ((C1ItemCatalog)catalog).Items.OfType<Item_PetCollarDefinition>().Count());
+        Assert.All(((C1ItemCatalog)catalog).Items.OfType<Item_PetCollarDefinition>(), item =>
+        {
+            Assert.Equal("SummonItems", item.HandlerName);
+            Assert.True(item.IsOlyRestricted);
+            Assert.Contains(item.Skills, skill => skill is { SkillId: 2046, SkillLevel: 1 });
+        });
     }
 
     [Fact]

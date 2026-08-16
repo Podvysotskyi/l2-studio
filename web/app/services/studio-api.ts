@@ -35,6 +35,7 @@ import type {
 } from '../types/requests/directory-request'
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
 import type { ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
+import type { ItemFamily } from '../types/requests/directory-request'
 import type {
   NpcPage,
   SkillPage,
@@ -110,38 +111,38 @@ export function getNpcDirectory(
   })
 }
 
-export function getItemDirectory(request: ItemDirectoryRequest = {}): Promise<ItemPage> {
-  return $fetch<ItemPage>(versionPath('/content/items'), { query: itemDirectoryQuery(request) })
+export function getItemDirectory(family: ItemFamily, request: ItemDirectoryRequest = {}): Promise<ItemPage> {
+  return $fetch<ItemPage>(versionPath(`/content/items/${family}`), { query: itemDirectoryQuery(request) })
 }
 
-export function getItemDefinition(id: number): Promise<ItemDetailRecord> { return $fetch<ItemDetailRecord>(versionPath(`/content/items/${id}`)) }
-export function updateItemDefinition(id: number, request: {
-  name: string; itemTypeName: string; itemActionName?: string | null; itemBodyPartName?: string | null
+export function getItemDefinition(family: ItemFamily, id: number): Promise<ItemDetailRecord> { return $fetch<ItemDetailRecord>(versionPath(`/content/items/${family}/${id}`)) }
+export function updateItemDefinition(family: ItemFamily, id: number, request: {
+  name: string; itemActionName?: string | null; itemBodyPartName?: string | null
   itemMaterialName?: string | null; itemCrystalTypeName?: string | null; icon?: string | null
   weight?: number | null; price?: number | null; handlerName?: string | null
   attackGeometry?: { offsetX: number; offsetY: number; radius: number; length: number } | null
-}): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${id}`), { method: 'PATCH', body: request }) }
-export function deleteItemDefinition(id: number): Promise<void> {
-  return $fetch<void>(versionPath(`/content/items/${id}`), { method: 'DELETE' })
+}): Promise<ItemRecord> { return $fetch<ItemRecord>(versionPath(`/content/items/${family}/${id}`), { method: 'PATCH', body: request }) }
+export function deleteItemDefinition(family: ItemFamily, id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/items/${family}/${id}`), { method: 'DELETE' })
 }
-export function setItemPrimarySkill(id: number, request: { skillId: number; skillLevel: number }): Promise<ItemPrimarySkillRecord> {
-  return $fetch<ItemPrimarySkillRecord>(versionPath(`/content/items/${id}/primary-skill`), { method: 'PUT', body: request })
+export function setItemPrimarySkill(family: ItemFamily, id: number, request: { skillId: number; skillLevel: number }): Promise<ItemPrimarySkillRecord> {
+  return $fetch<ItemPrimarySkillRecord>(versionPath(`/content/items/${family}/${id}/primary-skill`), { method: 'PUT', body: request })
 }
-export function clearItemPrimarySkill(id: number): Promise<void> {
-  return $fetch<void>(versionPath(`/content/items/${id}/primary-skill`), { method: 'DELETE' })
+export function clearItemPrimarySkill(family: ItemFamily, id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/items/${family}/${id}/primary-skill`), { method: 'DELETE' })
 }
-export function createItemSkill(id: number, request: {
+export function createItemSkill(family: ItemFamily, id: number, request: {
   skillId: number; skillLevel: number; itemSkillTypeName?: string | null; chance?: number | null
 }): Promise<ItemSkillRecord> {
-  return $fetch<ItemSkillRecord>(versionPath(`/content/items/${id}/skills`), { method: 'POST', body: request })
+  return $fetch<ItemSkillRecord>(versionPath(`/content/items/${family}/${id}/skills`), { method: 'POST', body: request })
 }
-export function updateItemSkill(id: number, skillId: number, skillLevel: number, request: {
+export function updateItemSkill(family: ItemFamily, id: number, skillId: number, skillLevel: number, request: {
   itemSkillTypeName?: string | null; chance?: number | null
 }): Promise<ItemSkillRecord> {
-  return $fetch<ItemSkillRecord>(versionPath(`/content/items/${id}/skills/${skillId}/${skillLevel}`), { method: 'PATCH', body: request })
+  return $fetch<ItemSkillRecord>(versionPath(`/content/items/${family}/${id}/skills/${skillId}/${skillLevel}`), { method: 'PATCH', body: request })
 }
-export function deleteItemSkill(id: number, skillId: number, skillLevel: number): Promise<void> {
-  return $fetch<void>(versionPath(`/content/items/${id}/skills/${skillId}/${skillLevel}`), { method: 'DELETE' })
+export function deleteItemSkill(family: ItemFamily, id: number, skillId: number, skillLevel: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/items/${family}/${id}/skills/${skillId}/${skillLevel}`), { method: 'DELETE' })
 }
 export function getItemLookups(
   kind: ItemLookupKind,

@@ -28,7 +28,12 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             run.StartedAt ??= timeProvider.GetUtcNow();
             run.LastHeartbeatAt = timeProvider.GetUtcNow();
             await EnsureC1LookupsAsync(context, run.GameVersion, token);
-            var existing = await context.Items.Include(item => item.AttackGeometry).Include(item => item.Skills).Include(item => item.Stats)
+            var existing = await context.Items
+                .Include(item => item.Armor).Include(item => item.Weapon).Include(item => item.Arrow)
+                .Include(item => item.Material).Include(item => item.Potion).Include(item => item.Recipe)
+                .Include(item => item.Enchant).Include(item => item.Scroll).Include(item => item.PetCollar).Include(item => item.Etc)
+                .Include(item => item.BehaviorAvailability)
+                .Include(item => item.AttackGeometry).Include(item => item.Skills).Include(item => item.Stats)
                 .Where(item => item.GameVersion == run.GameVersion).ToDictionaryAsync(item => item.Id, token);
             var missing = Catalog.Items.Where(definition => !existing.ContainsKey(definition.Id)).ToArray();
             context.Items.AddRange(missing.Select(definition => ToEntity(run.GameVersion, definition)));
@@ -41,7 +46,10 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             else
             {
                 foreach (var definition in Catalog.Items.Where(definition => existing.ContainsKey(definition.Id)))
+                {
+                    AddMissingBehaviorAvailability(context, existing[definition.Id], definition);
                     AddMissingSkills(existing[definition.Id], definition);
+                }
             }
             run.TotalCount = Catalog.Items.Count;
             run.InsertedCount = missing.Length;
@@ -155,11 +163,17 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
 
     private static void Apply(GameContentDbContext? context, Item item, ItemDefinition definition)
     {
-        item.Name = definition.Name; item.ItemTypeName = definition.TypeName; item.ItemActionName = definition.ActionName; item.ItemBodyPartName = definition.BodyPartName; item.ItemMaterialName = definition.MaterialName; item.ItemCrystalTypeName = definition.CrystalTypeName;
-        item.Icon = definition.Icon; item.DisplayId = definition.DisplayId; item.CrystalCount = definition.CrystalCount; item.Weight = definition.Weight; item.Price = definition.Price; item.Soulshots = definition.Soulshots; item.Spiritshots = definition.Spiritshots; item.MpConsume = definition.MpConsume; item.ReducedMpConsume = definition.ReducedMpConsume; item.ReuseDelay = definition.ReuseDelay; item.RecipeId = definition.RecipeId; item.HandlerName = definition.HandlerName; item.ItemSkill = definition.ItemSkill; item.UseCondition = definition.UseCondition;
-        item.ElementEnabled = definition.ElementEnabled; item.EnchantEnabled = definition.EnchantEnabled; item.ForNpc = definition.ForNpc; item.ImmediateEffect = definition.ImmediateEffect; item.IsAttackWeapon = definition.IsAttackWeapon; item.IsForceEquip = definition.IsForceEquip; item.IsDepositable = definition.IsDepositable; item.IsDestroyable = definition.IsDestroyable; item.IsDropable = definition.IsDropable; item.IsMagicWeapon = definition.IsMagicWeapon; item.IsOlyRestricted = definition.IsOlyRestricted; item.IsQuestItem = definition.IsQuestItem; item.IsSellable = definition.IsSellable; item.IsStackable = definition.IsStackable; item.IsTradable = definition.IsTradable; item.UseWeaponSkillsOnly = definition.UseWeaponSkillsOnly;
+        item.Name = definition.Name;
+        item.ItemTypeName = definition.TypeName;
+        item.ItemMaterialName = definition.MaterialName;
+        item.Icon = definition.Icon;
+        item.Weight = definition.Weight;
+        item.Price = definition.Price;
+        ApplyFamily(context, item, definition);
+        ApplyBehaviorAvailability(context, item, definition);
         RestoreSkills(context, item, definition);
-        if (definition.AttackGeometry is null)
+        var attackGeometry = (definition as Item_WeaponDefinition)?.AttackGeometry;
+        if (attackGeometry is null)
         {
             if (item.AttackGeometry is not null && context is not null) context.ItemAttackGeometries.Remove(item.AttackGeometry);
             item.AttackGeometry = null;
@@ -170,21 +184,22 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             {
                 GameVersion = item.GameVersion,
                 ItemId = item.Id,
-                OffsetX = definition.AttackGeometry.OffsetX,
-                OffsetY = definition.AttackGeometry.OffsetY,
-                Radius = definition.AttackGeometry.Radius,
-                Length = definition.AttackGeometry.Length
+                OffsetX = attackGeometry.OffsetX,
+                OffsetY = attackGeometry.OffsetY,
+                Radius = attackGeometry.Radius,
+                Length = attackGeometry.Length
             };
             if (context is not null) context.ItemAttackGeometries.Add(item.AttackGeometry);
         }
         else
         {
-            item.AttackGeometry.OffsetX = definition.AttackGeometry.OffsetX;
-            item.AttackGeometry.OffsetY = definition.AttackGeometry.OffsetY;
-            item.AttackGeometry.Radius = definition.AttackGeometry.Radius;
-            item.AttackGeometry.Length = definition.AttackGeometry.Length;
+            item.AttackGeometry.OffsetX = attackGeometry.OffsetX;
+            item.AttackGeometry.OffsetY = attackGeometry.OffsetY;
+            item.AttackGeometry.Radius = attackGeometry.Radius;
+            item.AttackGeometry.Length = attackGeometry.Length;
         }
-        if (definition.Stats is null)
+        var stats = (definition as IItemStatsDefinition)?.Stats;
+        if (stats is null)
         {
             if (item.Stats is not null && context is not null) context.ItemStats.Remove(item.Stats);
             item.Stats = null;
@@ -192,10 +207,183 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
         }
         if (item.Stats is null)
         {
-            item.Stats = ToEntity(item.GameVersion, item.Id, definition.Stats);
+            item.Stats = ToEntity(item.GameVersion, item.Id, stats);
             if (context is not null) context.ItemStats.Add(item.Stats);
         }
-        Apply(item.Stats, definition.Stats);
+        Apply(item.Stats, stats);
+    }
+
+    private static void ApplyFamily(GameContentDbContext? context, Item item, ItemDefinition definition)
+    {
+        EnsureNoOtherFamily(item, definition);
+        switch (definition)
+        {
+            case Item_ArmorDefinition value:
+                item.Armor ??= Add(context, new Item_Armor { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Armor, value);
+                break;
+            case Item_WeaponDefinition value:
+                item.Weapon ??= Add(context, new Item_Weapon { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Weapon, value);
+                break;
+            case Item_ArrowDefinition value:
+                item.Arrow ??= Add(context, new Item_Arrow { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Arrow, value);
+                break;
+            case Item_MaterialDefinition value:
+                item.Material ??= Add(context, new Item_Material { GameVersion = item.GameVersion, ItemId = item.Id });
+                break;
+            case Item_PotionDefinition value:
+                item.Potion ??= Add(context, new Item_Potion { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Potion, value);
+                break;
+            case Item_RecipeDefinition value:
+                item.Recipe ??= Add(context, new Item_Recipe { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Recipe, value);
+                break;
+            case Item_EnchantDefinition value:
+                item.Enchant ??= Add(context, new Item_Enchant { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Enchant, value);
+                break;
+            case Item_ScrollDefinition value:
+                item.Scroll ??= Add(context, new Item_Scroll { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Scroll, value);
+                break;
+            case Item_PetCollarDefinition value:
+                item.PetCollar ??= Add(context, new Item_PetCollar { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.PetCollar, value);
+                break;
+            case Item_EtcDefinition value:
+                item.Etc ??= Add(context, new Item_Etc { GameVersion = item.GameVersion, ItemId = item.Id });
+                Apply(item.Etc, value);
+                break;
+        }
+    }
+
+    private static T Add<T>(GameContentDbContext? context, T entity) where T : class
+    {
+        if (context is not null) context.Set<T>().Add(entity);
+        return entity;
+    }
+
+    private static void AddMissingBehaviorAvailability(
+        GameContentDbContext context,
+        Item item,
+        ItemDefinition definition)
+    {
+        if (item.BehaviorAvailability is null) ApplyBehaviorAvailability(context, item, definition);
+    }
+
+    private static void ApplyBehaviorAvailability(
+        GameContentDbContext? context,
+        Item item,
+        ItemDefinition definition)
+    {
+        item.BehaviorAvailability ??= Add(context, new ItemBehaviorAvailability
+        {
+            GameVersion = item.GameVersion,
+            ItemId = item.Id
+        });
+        var behavior = item.BehaviorAvailability;
+        switch (definition)
+        {
+            case Item_ArmorDefinition value:
+                behavior.EnchantEnabled = value.EnchantEnabled; behavior.ForNpc = value.ForNpc; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = value.IsDepositable; behavior.IsDestroyable = value.IsDestroyable; behavior.IsDropable = value.IsDropable; behavior.IsOlyRestricted = null; behavior.IsSellable = value.IsSellable; behavior.IsStackable = null; behavior.IsTradable = value.IsTradable;
+                break;
+            case Item_WeaponDefinition value:
+                behavior.EnchantEnabled = value.EnchantEnabled; behavior.ForNpc = value.ForNpc; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = value.IsDepositable; behavior.IsDestroyable = value.IsDestroyable; behavior.IsDropable = value.IsDropable; behavior.IsOlyRestricted = null; behavior.IsSellable = value.IsSellable; behavior.IsStackable = null; behavior.IsTradable = value.IsTradable;
+                break;
+            case Item_ArrowDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = null; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = null; behavior.IsSellable = null; behavior.IsStackable = value.IsStackable; behavior.IsTradable = null;
+                break;
+            case Item_MaterialDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = null; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = null; behavior.IsSellable = null; behavior.IsStackable = value.IsStackable; behavior.IsTradable = null;
+                break;
+            case Item_PotionDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = value.ForNpc; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = value.IsOlyRestricted; behavior.IsSellable = null; behavior.IsStackable = value.IsStackable; behavior.IsTradable = null;
+                break;
+            case Item_RecipeDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = null; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = value.IsDepositable; behavior.IsDestroyable = value.IsDestroyable; behavior.IsDropable = value.IsDropable; behavior.IsOlyRestricted = null; behavior.IsSellable = value.IsSellable; behavior.IsStackable = value.IsStackable; behavior.IsTradable = value.IsTradable;
+                break;
+            case Item_EnchantDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = null; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = value.IsOlyRestricted; behavior.IsSellable = null; behavior.IsStackable = value.IsStackable; behavior.IsTradable = null;
+                break;
+            case Item_ScrollDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = value.ForNpc; behavior.ImmediateEffect = null; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = value.IsOlyRestricted; behavior.IsSellable = null; behavior.IsStackable = value.IsStackable; behavior.IsTradable = null;
+                break;
+            case Item_PetCollarDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = null; behavior.ImmediateEffect = null; behavior.IsDepositable = null; behavior.IsDestroyable = null; behavior.IsDropable = null; behavior.IsOlyRestricted = value.IsOlyRestricted; behavior.IsSellable = null; behavior.IsStackable = null; behavior.IsTradable = null;
+                break;
+            case Item_EtcDefinition value:
+                behavior.EnchantEnabled = null; behavior.ForNpc = value.ForNpc; behavior.ImmediateEffect = value.ImmediateEffect; behavior.IsDepositable = value.IsDepositable; behavior.IsDestroyable = value.IsDestroyable; behavior.IsDropable = value.IsDropable; behavior.IsOlyRestricted = value.IsOlyRestricted; behavior.IsSellable = value.IsSellable; behavior.IsStackable = value.IsStackable; behavior.IsTradable = value.IsTradable;
+                break;
+        }
+    }
+
+    private static void EnsureNoOtherFamily(Item item, ItemDefinition definition)
+    {
+        var existing = new object?[] { item.Armor, item.Weapon, item.Arrow, item.Material, item.Potion, item.Recipe, item.Enchant, item.Scroll, item.PetCollar, item.Etc }.Count(value => value is not null);
+        if (existing > 1) throw new InvalidOperationException($"Item {item.Id} has more than one family row.");
+        var matches = definition switch
+        {
+            Item_ArmorDefinition => item.Armor is not null,
+            Item_WeaponDefinition => item.Weapon is not null,
+            Item_ArrowDefinition => item.Arrow is not null,
+            Item_MaterialDefinition => item.Material is not null,
+            Item_PotionDefinition => item.Potion is not null,
+            Item_RecipeDefinition => item.Recipe is not null,
+            Item_EnchantDefinition => item.Enchant is not null,
+            Item_ScrollDefinition => item.Scroll is not null,
+            Item_PetCollarDefinition => item.PetCollar is not null,
+            Item_EtcDefinition => item.Etc is not null,
+            _ => false
+        };
+        if (existing == 1 && !matches) throw new InvalidOperationException($"Item {item.Id} cannot change family during restore.");
+    }
+
+    private static void Apply(Item_Armor item, Item_ArmorDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.ItemBodyPartName = value.BodyPartName; item.ItemCrystalTypeName = value.CrystalTypeName; item.CrystalCount = value.CrystalCount;
+    }
+
+    private static void Apply(Item_Weapon item, Item_WeaponDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.ItemBodyPartName = value.BodyPartName; item.ItemCrystalTypeName = value.CrystalTypeName; item.DisplayId = value.DisplayId; item.CrystalCount = value.CrystalCount; item.Soulshots = value.Soulshots; item.Spiritshots = value.Spiritshots; item.MpConsume = value.MpConsume; item.ReducedMpConsume = value.ReducedMpConsume; item.ReuseDelay = value.ReuseDelay; item.ElementEnabled = value.ElementEnabled; item.IsAttackWeapon = value.IsAttackWeapon; item.IsForceEquip = value.IsForceEquip; item.IsMagicWeapon = value.IsMagicWeapon; item.UseWeaponSkillsOnly = value.UseWeaponSkillsOnly;
+    }
+
+    private static void Apply(Item_Arrow item, Item_ArrowDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.ItemBodyPartName = value.BodyPartName; item.ItemCrystalTypeName = value.CrystalTypeName;
+    }
+
+    private static void Apply(Item_Potion item, Item_PotionDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.ReuseDelay = value.ReuseDelay; item.HandlerName = value.HandlerName;
+    }
+
+    private static void Apply(Item_Recipe item, Item_RecipeDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.RecipeId = value.RecipeId; item.HandlerName = value.HandlerName;
+    }
+
+    private static void Apply(Item_Enchant item, Item_EnchantDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.HandlerName = value.HandlerName;
+    }
+
+    private static void Apply(Item_Scroll item, Item_ScrollDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.HandlerName = value.HandlerName;
+    }
+
+    private static void Apply(Item_PetCollar item, Item_PetCollarDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.HandlerName = value.HandlerName; item.UseCondition = value.UseCondition;
+    }
+
+    private static void Apply(Item_Etc item, Item_EtcDefinition value)
+    {
+        item.ItemActionName = value.ActionName; item.ItemBodyPartName = value.BodyPartName; item.ItemCrystalTypeName = value.CrystalTypeName; item.DisplayId = value.DisplayId; item.ReuseDelay = value.ReuseDelay; item.HandlerName = value.HandlerName; item.ItemSkill = value.ItemSkill; item.UseCondition = value.UseCondition; item.IsQuestItem = value.IsQuestItem;
     }
 
     private static ItemStats ToEntity(string gameVersion, int itemId, ItemStatsDefinition stats)
@@ -212,20 +400,22 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
 
     private static void AddMissingSkills(Item item, ItemDefinition definition)
     {
+        var definitionSkills = Skills(definition);
         var existing = item.Skills.Select(skill => (skill.SkillId, skill.SkillLevel)).ToHashSet();
-        foreach (var skill in definition.Skills.Where(skill => !existing.Contains((skill.SkillId, skill.SkillLevel))))
+        foreach (var skill in definitionSkills.Where(skill => !existing.Contains((skill.SkillId, skill.SkillLevel))))
             item.Skills.Add(ToEntity(item.GameVersion, item.Id, skill));
     }
 
     private static void RestoreSkills(GameContentDbContext? context, Item item, ItemDefinition definition)
     {
-        var definitions = definition.Skills.ToDictionary(skill => (skill.SkillId, skill.SkillLevel));
+        var definitionSkills = Skills(definition);
+        var definitions = definitionSkills.ToDictionary(skill => (skill.SkillId, skill.SkillLevel));
         foreach (var skill in item.Skills.Where(skill => !definitions.ContainsKey((skill.SkillId, skill.SkillLevel))).ToArray())
         {
             if (context is not null) context.ItemSkills.Remove(skill);
             item.Skills.Remove(skill);
         }
-        foreach (var definitionSkill in definition.Skills)
+        foreach (var definitionSkill in definitionSkills)
         {
             var skill = item.Skills.SingleOrDefault(value => value.SkillId == definitionSkill.SkillId && value.SkillLevel == definitionSkill.SkillLevel);
             if (skill is null)
@@ -236,6 +426,9 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
             Apply(skill, definitionSkill);
         }
     }
+
+    private static IReadOnlyList<ItemSkillDefinition> Skills(ItemDefinition definition) =>
+        (definition as IItemSkillsDefinition)?.Skills ?? [];
 
     private static ItemSkill ToEntity(string gameVersion, int itemId, ItemSkillDefinition definition)
     {

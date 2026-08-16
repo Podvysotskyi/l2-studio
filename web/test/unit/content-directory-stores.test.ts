@@ -2,13 +2,16 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getNpcDirectory,
+  getItemDirectory,
   getSkillDirectory
 } from '../../app/services/studio-api'
+import { useItemDirectoryStore } from '../../app/stores/item-directory'
 import { useNpcDirectoryStore } from '../../app/stores/npc-directory'
 import { useSkillDirectoryStore } from '../../app/stores/skill-directory'
 
 vi.mock('../../app/services/studio-api', () => ({
   getNpcDirectory: vi.fn(),
+  getItemDirectory: vi.fn(),
   getSkillDirectory: vi.fn()
 }))
 
@@ -16,6 +19,7 @@ describe('Content directory stores', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.mocked(getNpcDirectory).mockReset()
+    vi.mocked(getItemDirectory).mockReset()
     vi.mocked(getSkillDirectory).mockReset()
   })
 
@@ -71,6 +75,18 @@ describe('Content directory stores', () => {
 
     expect(store.items[0]?.name).toBe('Latest')
     expect(store.total).toBe(2)
+  })
+
+  it('loads item definitions using their family', async () => {
+    vi.mocked(getItemDirectory).mockResolvedValue({
+      items: [], total: 0, page: 1, pageSize: 25
+    })
+    const store = useItemDirectoryStore()
+    store.family = 'armor'
+
+    await store.load()
+
+    expect(getItemDirectory).toHaveBeenCalledWith('armor', expect.any(Object))
   })
 
   it('reports a stable skill-directory failure', async () => {

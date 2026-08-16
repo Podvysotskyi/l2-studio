@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getItemDirectory } from '../services/studio-api'
 import type { ItemRecord } from '../types/models/item'
+import type { ItemFamily } from '../types/requests/directory-request'
 
 export const useItemDirectoryStore = defineStore('item-directory', () => {
   const items = ref<ItemRecord[]>([])
@@ -9,6 +10,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
   const query = ref('')
   const page = ref(1)
   const pageSize = ref(25)
+  const family = ref<ItemFamily>('etc')
   const itemTypeName = ref<string>()
   const itemActionName = ref<string>()
   const itemBodyPartName = ref<string>()
@@ -23,7 +25,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     loading.value = true
     error.value = undefined
     try {
-      const response = await getItemDirectory({
+      const response = await getItemDirectory(family.value, {
         query: query.value,
         page: page.value,
         pageSize: pageSize.value,
@@ -49,6 +51,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     query,
     page,
     pageSize,
+    family,
     itemTypeName,
     itemActionName,
     itemBodyPartName,

@@ -30,6 +30,17 @@ public sealed class GameContentModelTests
         Assert.Equal("item_handlers", Entity<ItemHandler>(context).GetTableName());
         Assert.Equal("item_skill_types", Entity<ItemSkillType>(context).GetTableName());
         Assert.Equal("item_skills", Entity<ItemSkill>(context).GetTableName());
+        Assert.Equal("item_armor", Entity<Item_Armor>(context).GetTableName());
+        Assert.Equal("item_weapon", Entity<Item_Weapon>(context).GetTableName());
+        Assert.Equal("item_arrow", Entity<Item_Arrow>(context).GetTableName());
+        Assert.Equal("item_material", Entity<Item_Material>(context).GetTableName());
+        Assert.Equal("item_potion", Entity<Item_Potion>(context).GetTableName());
+        Assert.Equal("item_recipe", Entity<Item_Recipe>(context).GetTableName());
+        Assert.Equal("item_enchant", Entity<Item_Enchant>(context).GetTableName());
+        Assert.Equal("item_scroll", Entity<Item_Scroll>(context).GetTableName());
+        Assert.Equal("item_pet_collar", Entity<Item_PetCollar>(context).GetTableName());
+        Assert.Equal("item_etc", Entity<Item_Etc>(context).GetTableName());
+        Assert.Equal("item_behavior_availability", Entity<ItemBehaviorAvailability>(context).GetTableName());
     }
 
     [Fact]
@@ -134,6 +145,28 @@ public sealed class GameContentModelTests
     }
 
     [Fact]
+    public void ModelsItemBehaviorAndAvailabilityAsAnOptionalVersionScopedDependent()
+    {
+        using var context = CreateContext();
+        var behavior = Entity<ItemBehaviorAvailability>(context);
+
+        Assert.Equal(
+            [nameof(ItemBehaviorAvailability.GameVersion), nameof(ItemBehaviorAvailability.ItemId)],
+            behavior.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("enchant_enabled", behavior.FindProperty(nameof(ItemBehaviorAvailability.EnchantEnabled))!.GetColumnName());
+        Assert.Equal("is_stackable", behavior.FindProperty(nameof(ItemBehaviorAvailability.IsStackable))!.GetColumnName());
+        Assert.True(behavior.FindProperty(nameof(ItemBehaviorAvailability.IsTradable))!.IsNullable);
+        var item = Assert.Single(behavior.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item));
+        Assert.Equal(DeleteBehavior.Cascade, item.DeleteBehavior);
+        Assert.Equal(
+            [nameof(ItemBehaviorAvailability.GameVersion), nameof(ItemBehaviorAvailability.ItemId)],
+            item.Properties.Select(property => property.Name));
+        Assert.Null(Entity<Item_Armor>(context).FindProperty("EnchantEnabled"));
+        Assert.Null(Entity<Item_Weapon>(context).FindProperty("ForNpc"));
+        Assert.Null(Entity<Item_Etc>(context).FindProperty("IsStackable"));
+    }
+
+    [Fact]
     public void ModelsVersionScopedItemHandlersAndSkills()
     {
         using var context = CreateContext();
@@ -143,10 +176,12 @@ public sealed class GameContentModelTests
         Assert.Equal([nameof(ItemHandler.GameVersion), nameof(ItemHandler.Name)], handler.FindPrimaryKey()!.Properties.Select(property => property.Name));
         Assert.Equal([nameof(ItemSkillType.GameVersion), nameof(ItemSkillType.Name)], skillType.FindPrimaryKey()!.Properties.Select(property => property.Name));
 
-        var item = Entity<Item>(context);
-        Assert.Contains(item.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemHandler) &&
+        var petCollar = Entity<Item_PetCollar>(context);
+        Assert.Contains(petCollar.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemHandler) &&
             key.DeleteBehavior == DeleteBehavior.Restrict && key.Properties.Select(property => property.Name).SequenceEqual(
-                [nameof(Item.GameVersion), nameof(Item.HandlerName)]));
+                [nameof(Item_PetCollar.GameVersion), nameof(Item_PetCollar.HandlerName)]));
+        Assert.Contains(petCollar.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item) &&
+            key.DeleteBehavior == DeleteBehavior.Cascade);
 
         var skill = Entity<ItemSkill>(context);
         Assert.Equal(

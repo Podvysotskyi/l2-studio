@@ -10,9 +10,10 @@ import {
 } from '~/services/studio-api'
 import type { SkillRecord } from '~/types/models/content-directory'
 import type { ItemDetailRecord, ItemLookupRecord, ItemSkillRecord } from '~/types/models/item'
+import type { ItemFamily } from '~/types/requests/directory-request'
 import { loadDirectoryOptions } from '~/utils/directory-pages'
 
-const props = defineProps<{ item: ItemDetailRecord }>()
+const props = defineProps<{ item: ItemDetailRecord; family: ItemFamily }>()
 const emit = defineEmits<{ changed: [] }>()
 const dialogs = useStudioDialogs()
 const notifications = useStudioToasts()
@@ -132,13 +133,13 @@ async function save() {
   editorError.value = undefined
   try {
     if (editorMode.value === 'primary') {
-      await setItemPrimarySkill(item.id, {
+      await setItemPrimarySkill(props.family, item.id, {
         skillId: selectedSkill.value!.id,
         skillLevel: form.skillLevel
       })
       notifications.success({ title: 'Primary item skill saved' })
     } else if (editorMode.value === 'add') {
-      await createItemSkill(item.id, {
+      await createItemSkill(props.family, item.id, {
         skillId: selectedSkill.value!.id,
         skillLevel: form.skillLevel,
         itemSkillTypeName: form.itemSkillTypeName,
@@ -146,7 +147,7 @@ async function save() {
       })
       notifications.success({ title: 'Item skill attached' })
     } else if (attachedSkill.value) {
-      await updateItemSkill(item.id, attachedSkill.value.skillId, attachedSkill.value.skillLevel, {
+      await updateItemSkill(props.family, item.id, attachedSkill.value.skillId, attachedSkill.value.skillLevel, {
         itemSkillTypeName: form.itemSkillTypeName,
         chance: form.chance
       })
@@ -172,7 +173,7 @@ async function removeSkill(skill: ItemSkillRecord) {
   const key = `${skill.skillId}-${skill.skillLevel}`
   deletingKey.value = key
   try {
-    await deleteItemSkill(definition.value.id, skill.skillId, skill.skillLevel)
+    await deleteItemSkill(props.family, definition.value.id, skill.skillId, skill.skillLevel)
     notifications.success({ title: 'Item skill removed' })
     emit('changed')
   } catch {
@@ -191,7 +192,7 @@ async function clearPrimarySkill() {
   })
   if (!confirmed) return
   try {
-    await clearItemPrimarySkill(definition.value.id)
+    await clearItemPrimarySkill(props.family, definition.value.id)
     notifications.success({ title: 'Primary item skill cleared' })
     emit('changed')
   } catch {
@@ -213,7 +214,7 @@ function state(value: boolean | null) {
           <h2 class="text-sm font-semibold text-highlighted">Skill behavior</h2>
           <p class="mt-1 text-xs text-muted">Handler and use settings defined on the item itself.</p>
         </div>
-        <div class="flex gap-2">
+        <div v-if="props.family === 'etc'" class="flex gap-2">
           <UButton label="Set primary skill" icon="i-lucide-sparkles" size="sm" @click="openEditor('primary')" />
           <UButton v-if="primarySkill" label="Clear" icon="i-lucide-trash-2" color="error" variant="soft" size="sm" @click="clearPrimarySkill" />
         </div>

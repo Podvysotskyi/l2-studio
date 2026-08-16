@@ -21,6 +21,8 @@ export interface ItemDirectoryRequest extends DirectoryRequest {
   handlerName?: string
 }
 
+export type ItemFamily = 'armor' | 'weapon' | 'arrow' | 'material' | 'potion' | 'recipe' | 'enchant' | 'scroll' | 'pet-collar' | 'etc'
+
 export interface PlayerAppearanceDirectoryRequest extends DirectoryRequest {
   playerRaceId?: number
   playerSexId?: number

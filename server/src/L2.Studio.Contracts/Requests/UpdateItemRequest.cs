@@ -2,7 +2,6 @@ namespace L2.Studio.Contracts.Requests;
 
 public sealed record UpdateItemRequest(
     string? Name,
-    string? ItemTypeName,
     string? ItemActionName,
     string? ItemBodyPartName,
     string? ItemMaterialName,

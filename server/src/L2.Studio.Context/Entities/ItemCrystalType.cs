@@ -14,5 +14,4 @@ public sealed class ItemCrystalType
     public required string Name { get; set; }
     [Column("display_name"), MaxLength(64)]
     public required string DisplayName { get; set; }
-    public ICollection<Item> Items { get; } = [];
 }

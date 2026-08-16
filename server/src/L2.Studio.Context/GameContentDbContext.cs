@@ -21,6 +21,17 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
     public DbSet<NpcSex> NpcSexes => Set<NpcSex>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<Item_Armor> ItemArmor => Set<Item_Armor>();
+    public DbSet<Item_Weapon> ItemWeapons => Set<Item_Weapon>();
+    public DbSet<Item_Arrow> ItemArrows => Set<Item_Arrow>();
+    public DbSet<Item_Material> ItemMaterialDefinitions => Set<Item_Material>();
+    public DbSet<Item_Potion> ItemPotions => Set<Item_Potion>();
+    public DbSet<Item_Recipe> ItemRecipes => Set<Item_Recipe>();
+    public DbSet<Item_Enchant> ItemEnchants => Set<Item_Enchant>();
+    public DbSet<Item_Scroll> ItemScrolls => Set<Item_Scroll>();
+    public DbSet<Item_PetCollar> ItemPetCollars => Set<Item_PetCollar>();
+    public DbSet<Item_Etc> ItemEtc => Set<Item_Etc>();
+    public DbSet<ItemBehaviorAvailability> ItemBehaviorAvailabilities => Set<ItemBehaviorAvailability>();
     public DbSet<ItemAttackGeometry> ItemAttackGeometries => Set<ItemAttackGeometry>();
     public DbSet<ItemSkill> ItemSkills => Set<ItemSkill>();
     public DbSet<ItemStats> ItemStats => Set<ItemStats>();
@@ -333,12 +344,31 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         item.HasIndex(entity => new { entity.GameVersion, entity.Name }).HasDatabaseName("ix_items_name");
         item.HasIndex(entity => new { entity.GameVersion, entity.ItemTypeName }).HasDatabaseName("ix_items_item_type_name");
         item.HasOne(entity => entity.ItemType).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemTypeName }).OnDelete(DeleteBehavior.Restrict);
-        item.HasOne(entity => entity.ItemAction).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemActionName }).OnDelete(DeleteBehavior.Restrict);
-        item.HasOne(entity => entity.ItemBodyPart).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemBodyPartName }).OnDelete(DeleteBehavior.Restrict);
         item.HasOne(entity => entity.ItemMaterial).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemMaterialName }).OnDelete(DeleteBehavior.Restrict);
-        item.HasOne(entity => entity.ItemCrystalType).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.ItemCrystalTypeName }).OnDelete(DeleteBehavior.Restrict);
-        item.HasIndex(entity => new { entity.GameVersion, entity.HandlerName }).HasDatabaseName("ix_items_handler_name");
-        item.HasOne(entity => entity.ItemHandler).WithMany(entity => entity.Items).HasForeignKey(entity => new { entity.GameVersion, entity.HandlerName }).OnDelete(DeleteBehavior.Restrict);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Armor>(), entity => entity.Armor);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Weapon>(), entity => entity.Weapon);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Arrow>(), entity => entity.Arrow);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Material>(), entity => entity.Material);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Potion>(), entity => entity.Potion);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Recipe>(), entity => entity.Recipe);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Enchant>(), entity => entity.Enchant);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Scroll>(), entity => entity.Scroll);
+        ConfigureItemFamily(modelBuilder.Entity<Item_PetCollar>(), entity => entity.PetCollar);
+        ConfigureItemFamily(modelBuilder.Entity<Item_Etc>(), entity => entity.Etc);
+        var itemBehaviorAvailability = modelBuilder.Entity<ItemBehaviorAvailability>();
+        itemBehaviorAvailability.HasOne(entity => entity.Item).WithOne(entity => entity.BehaviorAvailability)
+            .HasForeignKey<ItemBehaviorAvailability>(entity => new { entity.GameVersion, entity.ItemId })
+            .OnDelete(DeleteBehavior.Cascade);
+        ConfigureItemLookups(modelBuilder.Entity<Item_Armor>());
+        ConfigureItemLookups(modelBuilder.Entity<Item_Weapon>());
+        ConfigureItemLookups(modelBuilder.Entity<Item_Arrow>());
+        ConfigureActionAndHandler(modelBuilder.Entity<Item_Potion>());
+        ConfigureActionAndHandler(modelBuilder.Entity<Item_Recipe>());
+        ConfigureActionAndHandler(modelBuilder.Entity<Item_Enchant>());
+        ConfigureActionAndHandler(modelBuilder.Entity<Item_Scroll>());
+        ConfigureActionAndHandler(modelBuilder.Entity<Item_PetCollar>());
+        ConfigureItemLookups(modelBuilder.Entity<Item_Etc>());
+        modelBuilder.Entity<Item_Etc>().HasOne(entity => entity.ItemHandler).WithMany().HasForeignKey(entity => new { entity.GameVersion, entity.HandlerName }).OnDelete(DeleteBehavior.Restrict);
         var itemAttackGeometry = modelBuilder.Entity<ItemAttackGeometry>();
         itemAttackGeometry.HasOne(entity => entity.Item).WithOne(entity => entity.AttackGeometry).HasForeignKey<ItemAttackGeometry>(entity => new { entity.GameVersion, entity.ItemId }).OnDelete(DeleteBehavior.Cascade);
         var itemSkill = modelBuilder.Entity<ItemSkill>();
@@ -399,6 +429,7 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         itemHandler.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemSkillType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         item.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemBehaviorAvailability.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemSkill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -415,7 +446,10 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             typeof(NpcSex), typeof(Npc), typeof(NpcStatus), typeof(NpcStats), typeof(NpcStatsVitals),
             typeof(NpcStatsAttack), typeof(NpcStatsDefence), typeof(NpcStatsSpeed),
             typeof(ItemType), typeof(ItemAction), typeof(ItemBodyPart), typeof(ItemMaterial), typeof(ItemCrystalType),
-            typeof(ItemHandler), typeof(ItemSkillType), typeof(Item), typeof(ItemAttackGeometry), typeof(ItemSkill), typeof(ItemStats), typeof(ContentImportRun),
+            typeof(ItemHandler), typeof(ItemSkillType), typeof(Item), typeof(Item_Armor), typeof(Item_Weapon), typeof(Item_Arrow), typeof(Item_Material),
+            typeof(Item_Potion), typeof(Item_Recipe), typeof(Item_Enchant), typeof(Item_Scroll), typeof(Item_PetCollar), typeof(Item_Etc),
+            typeof(ItemBehaviorAvailability),
+            typeof(ItemAttackGeometry), typeof(ItemSkill), typeof(ItemStats), typeof(ContentImportRun),
             typeof(SkillOperateType), typeof(SkillTargetType),
             typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),
             typeof(AssetCatalog)
@@ -435,5 +469,37 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             .WithOne(navigation)
             .HasForeignKey<TEntity>(entity => new { entity.GameVersion, entity.NpcId })
             .OnDelete(DeleteBehavior.Cascade);
+    }
+
+    private static void ConfigureItemFamily<TEntity>(
+        EntityTypeBuilder<TEntity> family,
+        Expression<Func<Item, TEntity?>> navigation)
+        where TEntity : class
+    {
+        family.HasOne<Item>("Item")
+            .WithOne(navigation)
+            .HasForeignKey<TEntity>("GameVersion", "ItemId")
+            .OnDelete(DeleteBehavior.Cascade);
+        family.HasOne<GameVersion>().WithMany().HasForeignKey("GameVersion").OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureItemLookups<TEntity>(EntityTypeBuilder<TEntity> family)
+        where TEntity : class
+    {
+        family.HasOne<ItemAction>("ItemAction").WithMany()
+            .HasForeignKey("GameVersion", "ItemActionName").OnDelete(DeleteBehavior.Restrict);
+        family.HasOne<ItemBodyPart>("ItemBodyPart").WithMany()
+            .HasForeignKey("GameVersion", "ItemBodyPartName").OnDelete(DeleteBehavior.Restrict);
+        family.HasOne<ItemCrystalType>("ItemCrystalType").WithMany()
+            .HasForeignKey("GameVersion", "ItemCrystalTypeName").OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureActionAndHandler<TEntity>(EntityTypeBuilder<TEntity> family)
+        where TEntity : class
+    {
+        family.HasOne<ItemAction>("ItemAction").WithMany()
+            .HasForeignKey("GameVersion", "ItemActionName").OnDelete(DeleteBehavior.Restrict);
+        family.HasOne<ItemHandler>("ItemHandler").WithMany()
+            .HasForeignKey("GameVersion", "HandlerName").OnDelete(DeleteBehavior.Restrict);
     }
 }

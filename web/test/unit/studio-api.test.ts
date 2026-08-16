@@ -93,14 +93,14 @@ describe('Studio API service', () => {
 
   it('loads and updates structured item attack geometry through the content API', async () => {
     fetchMock.mockResolvedValue({})
-    await getItemDefinition(3028)
-    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/items/3028')
+    await getItemDefinition('weapon', 3028)
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/items/weapon/3028')
 
     const request = {
-      name: 'Crescent Moon Bow', itemTypeName: 'BOW', attackGeometry: { offsetX: 0, offsetY: 0, radius: 10, length: 0 }
+      name: 'Crescent Moon Bow', attackGeometry: { offsetX: 0, offsetY: 0, radius: 10, length: 0 }
     }
-    await updateItemDefinition(3028, request)
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028', {
+    await updateItemDefinition('weapon', 3028, request)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/weapon/3028', {
       method: 'PATCH', body: request
     })
   })
@@ -108,8 +108,8 @@ describe('Studio API service', () => {
   it('filters item definitions and loads item-handler lookups through the content API', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
 
-    await getItemDirectory({ handlerName: ' ItemSkills ' })
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items', {
+    await getItemDirectory('weapon', { handlerName: ' ItemSkills ' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/weapon', {
       query: { page: 1, pageSize: 25, handlerName: 'ItemSkills' }
     })
 
@@ -122,28 +122,28 @@ describe('Studio API service', () => {
   it('manages primary and attached item skills through the content API', async () => {
     fetchMock.mockResolvedValue({})
 
-    await setItemPrimarySkill(3028, { skillId: 3005, skillLevel: 1 })
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/primary-skill', {
+    await setItemPrimarySkill('etc', 3028, { skillId: 3005, skillLevel: 1 })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/etc/3028/primary-skill', {
       method: 'PUT', body: { skillId: 3005, skillLevel: 1 }
     })
 
-    await createItemSkill(3028, { skillId: 3005, skillLevel: 1, itemSkillTypeName: 'ON_CRITICAL_SKILL', chance: 50 })
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills', {
+    await createItemSkill('weapon', 3028, { skillId: 3005, skillLevel: 1, itemSkillTypeName: 'ON_CRITICAL_SKILL', chance: 50 })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/weapon/3028/skills', {
       method: 'POST', body: { skillId: 3005, skillLevel: 1, itemSkillTypeName: 'ON_CRITICAL_SKILL', chance: 50 }
     })
 
-    await updateItemSkill(3028, 3005, 1, { itemSkillTypeName: null, chance: null })
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills/3005/1', {
+    await updateItemSkill('weapon', 3028, 3005, 1, { itemSkillTypeName: null, chance: null })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/weapon/3028/skills/3005/1', {
       method: 'PATCH', body: { itemSkillTypeName: null, chance: null }
     })
 
-    await deleteItemSkill(3028, 3005, 1)
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/skills/3005/1', {
+    await deleteItemSkill('weapon', 3028, 3005, 1)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/weapon/3028/skills/3005/1', {
       method: 'DELETE'
     })
 
-    await clearItemPrimarySkill(3028)
-    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/3028/primary-skill', {
+    await clearItemPrimarySkill('etc', 3028)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/etc/3028/primary-skill', {
       method: 'DELETE'
     })
   })

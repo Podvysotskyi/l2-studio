@@ -2,9 +2,16 @@
 import type { TableColumn } from '@nuxt/ui'
 import { deleteItemDefinition, getItemLookups, updateItemDefinition } from '../../../services/studio-api'
 import type { ItemLookupKind, ItemLookupRecord, ItemRecord } from '../../../types/models/item'
+import type { ItemFamily } from '../../../types/requests/directory-request'
 import { loadDirectoryOptions } from '../../../utils/directory-pages'
 
-const props = defineProps<{ items: ItemRecord[]; total: number; loading: boolean; error?: string }>()
+const props = defineProps<{
+  items: ItemRecord[]
+  total: number
+  loading: boolean
+  error?: string
+  family: ItemFamily
+}>()
 const query = defineModel<string>('query', { required: true })
 const page = defineModel<number>('page', { required: true })
 const pageSize = defineModel<number>('pageSize', { required: true })
@@ -41,18 +48,20 @@ const editForm = reactive({
   attackGeometryRadius: 0,
   attackGeometryLength: 0
 })
-const columns: TableColumn<ItemRecord>[] = [
+const hasBodyAndCrystal = computed(() => ['armor', 'weapon', 'arrow', 'etc'].includes(props.family))
+const hasHandler = computed(() => ['potion', 'recipe', 'enchant', 'scroll', 'pet-collar', 'etc'].includes(props.family))
+const columns = computed<TableColumn<ItemRecord>[]>(() => [
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'name', header: 'Name' },
   { accessorKey: 'itemTypeDisplayName', header: 'Type' },
-  { accessorKey: 'handlerDisplayName', header: 'Handler' },
-  { accessorKey: 'itemBodyPartDisplayName', header: 'Body part' },
+  ...(hasHandler.value ? [{ accessorKey: 'handlerDisplayName', header: 'Handler' }] : []),
+  ...(hasBodyAndCrystal.value ? [{ accessorKey: 'itemBodyPartDisplayName', header: 'Body part' }] : []),
   { accessorKey: 'itemMaterialDisplayName', header: 'Material' },
-  { accessorKey: 'itemCrystalTypeDisplayName', header: 'Crystal type' },
+  ...(hasBodyAndCrystal.value ? [{ accessorKey: 'itemCrystalTypeDisplayName', header: 'Crystal type' }] : []),
   { accessorKey: 'price', header: 'Price' },
   { accessorKey: 'weight', header: 'Weight' },
   { id: 'actions', header: '' }
-]
+])
 const filterValues = computed({
   get: () => ({
     itemTypeName: itemTypeName.value,
@@ -71,20 +80,34 @@ const filterValues = computed({
     handlerName.value = stringValue(value.handlerName)
   }
 })
+const showItemTypeFilter = computed(() => filteredLookupOptions('item-types').length > 1)
 const filters = computed(() => [
-  lookupFilter('itemTypeName', 'All types', 'item-types'),
-  lookupFilter('itemActionName', 'All actions', 'item-actions'),
-  lookupFilter('itemBodyPartName', 'All body parts', 'item-body-parts'),
+  ...(showItemTypeFilter.value ? [lookupFilter('itemTypeName', 'All types', 'item-types')] : []),
+  ...(props.family !== 'material' ? [lookupFilter('itemActionName', 'All actions', 'item-actions')] : []),
+  ...(hasBodyAndCrystal.value ? [lookupFilter('itemBodyPartName', 'All body parts', 'item-body-parts')] : []),
   lookupFilter('itemMaterialName', 'All materials', 'item-materials'),
-  lookupFilter('itemCrystalTypeName', 'All crystal types', 'item-crystal-types'),
-  lookupFilter('handlerName', 'All handlers', 'item-handlers')
+  ...(hasBodyAndCrystal.value ? [lookupFilter('itemCrystalTypeName', 'All crystal types', 'item-crystal-types')] : []),
+  ...(hasHandler.value ? [lookupFilter('handlerName', 'All handlers', 'item-handlers')] : [])
 ])
-const itemTypeOptions = computed(() => lookupSelectOptions('item-types'))
 const itemActionOptions = computed(() => optionalLookupSelectOptions('item-actions'))
 const itemBodyPartOptions = computed(() => optionalLookupSelectOptions('item-body-parts'))
 const itemMaterialOptions = computed(() => optionalLookupSelectOptions('item-materials'))
 const itemCrystalTypeOptions = computed(() => optionalLookupSelectOptions('item-crystal-types'))
 const handlerOptions = computed(() => optionalLookupSelectOptions('item-handlers'))
+const definitionTitle = computed(() => ({
+  armor: 'Armor definitions',
+  weapon: 'Weapon definitions', arrow: 'Arrow definitions', material: 'Material definitions',
+  potion: 'Potion definitions', recipe: 'Recipe definitions', enchant: 'Enchant definitions',
+  scroll: 'Scroll definitions', 'pet-collar': 'Pet Collar definitions', etc: 'Etc Item definitions'
+}[props.family]))
+const definitionDescription = computed(() => ({
+  armor: 'C1 Mobius armor catalogue and combat statistics.',
+  weapon: 'C1 Mobius weapon catalogue and combat statistics.', arrow: 'C1 Mobius ammunition catalogue.',
+  material: 'C1 Mobius crafting material catalogue.', potion: 'C1 Mobius potion catalogue.',
+  recipe: 'C1 Mobius recipe catalogue.', enchant: 'C1 Mobius enchant scroll catalogue.',
+  scroll: 'C1 Mobius scroll catalogue.', 'pet-collar': 'C1 Mobius pet collar catalogue.',
+  etc: 'C1 Mobius remaining item catalogue.'
+}[props.family]))
 
 async function loadFilters() {
   filtersLoading.value = true
@@ -118,7 +141,7 @@ async function remove(item: ItemRecord) {
   if (!confirmed) return
   deletingId.value = item.id
   try {
-    await deleteItemDefinition(item.id)
+    await deleteItemDefinition(props.family, item.id)
     notifications.success({ title: 'Item definition deleted' })
     emit('refresh')
   } catch {
@@ -156,15 +179,15 @@ async function save() {
   const item = selectedItem.value
   const name = editForm.name.trim()
   if (!item) return
-  if (!name || name.length > 100 || !editForm.itemTypeName) {
-    editError.value = 'Name must contain between 1 and 100 characters and an item type is required.'
+  if (!name || name.length > 100) {
+    editError.value = 'Name must contain between 1 and 100 characters.'
     return
   }
   saving.value = true
   editError.value = undefined
   try {
-    const { hasAttackGeometry, attackGeometryOffsetX, attackGeometryOffsetY, attackGeometryRadius, attackGeometryLength, ...definition } = editForm
-    await updateItemDefinition(item.id, {
+    const { itemTypeName: _, hasAttackGeometry, attackGeometryOffsetX, attackGeometryOffsetY, attackGeometryRadius, attackGeometryLength, ...definition } = editForm
+    await updateItemDefinition(props.family, item.id, {
       ...definition,
       name,
       attackGeometry: hasAttackGeometry
@@ -187,15 +210,15 @@ function lookupFilter(key: string, placeholder: string, kind: ItemLookupKind) {
     placeholder,
     ariaLabel: placeholder,
     loading: filtersLoading.value,
-    items: (lookupOptions.value[kind] ?? []).map(item => ({
-      label: lookupLabel(item),
+    items: filteredLookupOptions(kind).map(item => ({
+      label: kind === 'item-types' ? lookupValueLabel(item) : lookupLabel(item),
       value: item.name
     }))
   }
 }
 
 function lookupSelectOptions(kind: ItemLookupKind) {
-  return (lookupOptions.value[kind] ?? []).map(item => ({
+  return filteredLookupOptions(kind).map(item => ({
     label: lookupLabel(item),
     value: item.name
   }))
@@ -205,8 +228,23 @@ function optionalLookupSelectOptions(kind: ItemLookupKind) {
   return [{ label: 'Unassigned', value: null }, ...lookupSelectOptions(kind)]
 }
 
+function filteredLookupOptions(kind: ItemLookupKind) {
+  const options = lookupOptions.value[kind] ?? []
+  if (kind !== 'item-types') return options
+  return options.filter(item => matchesItemFamily(item))
+}
+
+function matchesItemFamily(item: ItemLookupRecord) {
+  const root = item.parentTypeName ?? item.name
+  if (props.family === 'weapon' || props.family === 'armor') return root === (props.family === 'weapon' ? 'Weapon' : 'Armor')
+  if (props.family === 'enchant') return item.name === 'SCRL_ENCHANT_AM' || item.name === 'SCRL_ENCHANT_WP'
+  if (props.family === 'pet-collar') return item.name === 'PET_COLLAR'
+  if (props.family === 'etc') return root === 'EtcItem' && !['ARROW', 'MATERIAL', 'POTION', 'RECIPE', 'SCRL_ENCHANT_AM', 'SCRL_ENCHANT_WP', 'SCROLL', 'PET_COLLAR'].includes(item.name)
+  return item.name === props.family.toUpperCase()
+}
+
 function lookupLabel(item: ItemLookupRecord) {
-  const label = item.displayName === item.name ? item.name : `${item.displayName} (${item.name})`
+  const label = lookupValueLabel(item)
   if (!item.parentTypeName) return label
   const parent = item.parentTypeDisplayName === item.parentTypeName
     ? item.parentTypeName
@@ -214,22 +252,34 @@ function lookupLabel(item: ItemLookupRecord) {
   return `${parent} › ${label}`
 }
 
+function lookupValueLabel(item: ItemLookupRecord) {
+  return item.displayName === item.name ? item.name : `${item.displayName} (${item.name})`
+}
+
 function itemTypeLabel(item: ItemRecord) {
   if (!item.itemParentTypeName) return item.itemTypeDisplayName
   return `${item.itemParentTypeDisplayName ?? item.itemParentTypeName} › ${item.itemTypeDisplayName}`
+}
+
+function viewTo(item: ItemRecord) {
+  return `/authoring/items/${props.family}/${item.id}`
 }
 
 function stringValue(value: string | number | boolean | undefined) {
   return typeof value === 'string' ? value : undefined
 }
 
+watch([showItemTypeFilter, filtersLoading], ([show, loading]) => {
+  if (!loading && !show) itemTypeName.value = undefined
+})
+
 onMounted(() => void loadFilters())
 </script>
 
 <template>
   <StudioContentDirectoryLayout
-    title="Item definitions"
-    description="C1 Mobius item catalogue and combat statistics."
+    :title="definitionTitle"
+    :description="definitionDescription"
     icon="i-lucide-package-search"
     import-target="items"
     import-label="items"
@@ -248,7 +298,7 @@ onMounted(() => void loadFilters())
         :columns="columns"
         :filters="filters"
         :loading="loading"
-        empty="No item definitions match these filters."
+        :empty="`No ${definitionTitle.toLowerCase()} match these filters.`"
         search-placeholder="Search item names"
         search-aria-label="Search item names"
         :page-size-options="[10, 25, 50, 100]"
@@ -262,7 +312,7 @@ onMounted(() => void loadFilters())
         </template>
         <template #actions-cell="{ row }">
           <StudioTableRowActions
-            :view-to="`/authoring/items/${row.original.id}`"
+            :view-to="viewTo(row.original)"
             :show-edit="true"
             :show-delete="true"
             :delete-loading="deletingId === row.original.id"
@@ -294,16 +344,16 @@ onMounted(() => void loadFilters())
           <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <UFormField label="Name" required><UInput v-model="editForm.name" maxlength="100" class="w-full" /></UFormField>
-            <UFormField label="Type" required><USelect v-model="editForm.itemTypeName" :items="itemTypeOptions" :loading="filtersLoading" class="w-full" /></UFormField>
-            <UFormField label="Action"><USelect v-model="editForm.itemActionName" :items="itemActionOptions" :loading="filtersLoading" class="w-full" /></UFormField>
-            <UFormField label="Body part"><USelect v-model="editForm.itemBodyPartName" :items="itemBodyPartOptions" :loading="filtersLoading" class="w-full" /></UFormField>
+            <UFormField label="Type"><UInput :model-value="selectedItem ? itemTypeLabel(selectedItem) : ''" disabled class="w-full" /></UFormField>
+            <UFormField v-if="props.family !== 'material'" label="Action"><USelect v-model="editForm.itemActionName" :items="itemActionOptions" :loading="filtersLoading" class="w-full" /></UFormField>
+            <UFormField v-if="['armor', 'weapon', 'arrow', 'etc'].includes(props.family)" label="Body part"><USelect v-model="editForm.itemBodyPartName" :items="itemBodyPartOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField label="Material"><USelect v-model="editForm.itemMaterialName" :items="itemMaterialOptions" :loading="filtersLoading" class="w-full" /></UFormField>
-            <UFormField label="Crystal type"><USelect v-model="editForm.itemCrystalTypeName" :items="itemCrystalTypeOptions" :loading="filtersLoading" class="w-full" /></UFormField>
-            <UFormField label="Handler"><USelect v-model="editForm.handlerName" :items="handlerOptions" :loading="filtersLoading" class="w-full" /></UFormField>
+            <UFormField v-if="['armor', 'weapon', 'arrow', 'etc'].includes(props.family)" label="Crystal type"><USelect v-model="editForm.itemCrystalTypeName" :items="itemCrystalTypeOptions" :loading="filtersLoading" class="w-full" /></UFormField>
+            <UFormField v-if="['potion', 'recipe', 'enchant', 'scroll', 'pet-collar', 'etc'].includes(props.family)" label="Handler"><USelect v-model="editForm.handlerName" :items="handlerOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField label="Icon"><UInput v-model="editForm.icon" class="w-full" /></UFormField>
             <UFormField label="Weight"><UInput v-model.number="editForm.weight" type="number" class="w-full" /></UFormField>
             <UFormField label="Price"><UInput v-model.number="editForm.price" type="number" class="w-full" /></UFormField>
-            <div class="col-span-full space-y-3 rounded-md border border-default p-3">
+            <div v-if="props.family === 'weapon'" class="col-span-full space-y-3 rounded-md border border-default p-3">
               <UCheckbox v-model="editForm.hasAttackGeometry" label="Client attack geometry" />
               <div v-if="editForm.hasAttackGeometry" class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <UFormField label="Start offset X"><UInput v-model.number="editForm.attackGeometryOffsetX" type="number" class="w-full" /></UFormField>

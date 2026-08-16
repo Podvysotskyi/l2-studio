@@ -25,11 +25,13 @@ export interface ItemPrimarySkillRecord {
 export interface ItemPropertiesRecord {
   displayId: number | null; crystalCount: number | null; soulshots: number | null; spiritshots: number | null
   mpConsume: number | null; reducedMpConsume: string | null; reuseDelay: number | null; recipeId: number | null
-  itemSkill: string | null; useCondition: string | null; elementEnabled: boolean | null; enchantEnabled: boolean | null
-  forNpc: boolean | null; immediateEffect: boolean | null; isAttackWeapon: boolean | null; isForceEquip: boolean | null
-  isDepositable: boolean | null; isDestroyable: boolean | null; isDropable: boolean | null; isMagicWeapon: boolean | null
-  isOlyRestricted: boolean | null; isQuestItem: boolean | null; isSellable: boolean | null; isStackable: boolean | null
-  isTradable: boolean | null; useWeaponSkillsOnly: boolean | null
+  itemSkill: string | null; useCondition: string | null; elementEnabled: boolean | null; isAttackWeapon: boolean | null
+  isForceEquip: boolean | null; isMagicWeapon: boolean | null; isQuestItem: boolean | null; useWeaponSkillsOnly: boolean | null
+}
+export interface ItemBehaviorAvailabilityRecord {
+  enchantEnabled: boolean | null; forNpc: boolean | null; immediateEffect: boolean | null
+  isDepositable: boolean | null; isDestroyable: boolean | null; isDropable: boolean | null
+  isOlyRestricted: boolean | null; isSellable: boolean | null; isStackable: boolean | null; isTradable: boolean | null
 }
 export interface ItemRecord {
   id: number; name: string; itemTypeName: string; itemTypeDisplayName: string
@@ -46,6 +48,7 @@ export interface ItemRecord {
 export interface ItemDetailRecord {
   item: ItemRecord
   properties: ItemPropertiesRecord
+  behaviorAvailability: ItemBehaviorAvailabilityRecord | null
   primarySkill: ItemPrimarySkillRecord | null
 }
 export interface ItemPage { items: ItemRecord[]; total: number; page: number; pageSize: number }

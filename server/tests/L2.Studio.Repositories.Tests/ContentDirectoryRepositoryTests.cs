@@ -245,9 +245,9 @@ public sealed class ContentDirectoryRepositoryTests
                 new Item
                 {
                     GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name,
-                    ItemType = type, HandlerName = handler.Name, ItemHandler = handler, ItemSkill = "3005-1",
-                    DisplayId = 19, Soulshots = 2, MpConsume = 5, UseCondition = "weapon",
-                    IsSellable = true, UseWeaponSkillsOnly = true,
+                    ItemType = type,
+                    Etc = new Item_Etc { GameVersion = "c1", ItemId = 1, HandlerName = handler.Name, ItemHandler = handler, ItemSkill = "3005-1", DisplayId = 19, UseCondition = "weapon" },
+                    BehaviorAvailability = new ItemBehaviorAvailability { GameVersion = "c1", ItemId = 1, IsSellable = true, IsStackable = false },
                     Skills =
                     {
                         new ItemSkill
@@ -259,26 +259,25 @@ public sealed class ContentDirectoryRepositoryTests
                 },
                 new Item
                 {
-                    GameVersion = "c1", Id = 2, Name = "Other", ItemTypeName = type.Name, ItemType = type
+                    GameVersion = "c1", Id = 2, Name = "Other", ItemTypeName = type.Name, ItemType = type,
+                    Etc = new Item_Etc { GameVersion = "c1", ItemId = 2 }
                 });
             await context.SaveChangesAsync();
         }
         var repository = new ContentDirectoryRepository(new TestContextFactory(options));
 
-        var page = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(HandlerName: "ItemSkills"), CancellationToken.None);
+        var page = await repository.SearchItemsAsync("c1", ItemFamilyValues.Etc, new ItemDirectoryRequest(HandlerName: "ItemSkills"), CancellationToken.None);
 
         var item = Assert.Single(page.Items);
         Assert.Equal("ItemSkills", item.HandlerName);
         Assert.Equal("Item Skills", item.HandlerDisplayName);
         Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_CRITICAL_SKILL", "On Critical Skill", 50), Assert.Single(item.Skills));
 
-        var detail = await repository.GetItemAsync("c1", 1, CancellationToken.None);
+        var detail = await repository.GetItemAsync("c1", ItemFamilyValues.Etc, 1, CancellationToken.None);
         Assert.Equal(19, detail?.Properties.DisplayId);
-        Assert.Equal(2, detail?.Properties.Soulshots);
-        Assert.Equal(5, detail?.Properties.MpConsume);
         Assert.Equal("weapon", detail?.Properties.UseCondition);
-        Assert.True(detail?.Properties.IsSellable);
-        Assert.True(detail?.Properties.UseWeaponSkillsOnly);
+        Assert.True(detail?.BehaviorAvailability?.IsSellable);
+        Assert.False(detail?.BehaviorAvailability?.IsStackable);
         Assert.Equal(new ItemPrimarySkillSummary("3005-1", 3005, 1, "Bleed"), detail?.PrimarySkill);
     }
 
@@ -294,29 +293,29 @@ public sealed class ContentDirectoryRepositoryTests
             var skillType = new ItemSkillType { GameVersion = "c1", Name = "ON_ENCHANT_4", DisplayName = "On enchant 4" };
             context.AddRange(type, skillType,
                 new Skill { GameVersion = "c1", Id = 3005, Levels = 2, Name = "Bleed" },
-                new Item { GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name, ItemType = type });
+                new Item { GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name, ItemType = type, Etc = new Item_Etc { GameVersion = "c1", ItemId = 1 } });
             await context.SaveChangesAsync();
         }
         var repository = new ContentDirectoryRepository(new TestContextFactory(options));
 
         var primary = await repository.SetItemPrimarySkillAsync(
-            "c1", 1, new SetItemPrimarySkillRequest(3005, 2), CancellationToken.None);
+            "c1", ItemFamilyValues.Etc, 1, new SetItemPrimarySkillRequest(3005, 2), CancellationToken.None);
         Assert.Equal(new ItemPrimarySkillSummary("3005-2", 3005, 2, "Bleed"), primary);
 
         var created = await repository.CreateItemSkillAsync(
-            "c1", 1, new CreateItemSkillRequest(3005, 1, "ON_ENCHANT_4", 50), CancellationToken.None);
+            "c1", ItemFamilyValues.Etc, 1, new CreateItemSkillRequest(3005, 1, "ON_ENCHANT_4", 50), CancellationToken.None);
         Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", "ON_ENCHANT_4", "On enchant 4", 50), created);
 
         await Assert.ThrowsAsync<ItemSkillConflictException>(() => repository.CreateItemSkillAsync(
-            "c1", 1, new CreateItemSkillRequest(3005, 1, null, null), CancellationToken.None));
+            "c1", ItemFamilyValues.Etc, 1, new CreateItemSkillRequest(3005, 1, null, null), CancellationToken.None));
         await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateItemSkillAsync(
-            "c1", 1, new CreateItemSkillRequest(3005, 3, null, null), CancellationToken.None));
+            "c1", ItemFamilyValues.Etc, 1, new CreateItemSkillRequest(3005, 3, null, null), CancellationToken.None));
 
         var updated = await repository.UpdateItemSkillAsync(
-            "c1", 1, 3005, 1, new UpdateItemSkillRequest(null, null), CancellationToken.None);
+            "c1", ItemFamilyValues.Etc, 1, 3005, 1, new UpdateItemSkillRequest(null, null), CancellationToken.None);
         Assert.Equal(new ItemSkillSummary(3005, 1, "Bleed", null, null, null), updated);
-        Assert.True(await repository.DeleteItemSkillAsync("c1", 1, 3005, 1, CancellationToken.None));
-        Assert.True(await repository.ClearItemPrimarySkillAsync("c1", 1, CancellationToken.None));
+        Assert.True(await repository.DeleteItemSkillAsync("c1", ItemFamilyValues.Etc, 1, 3005, 1, CancellationToken.None));
+        Assert.True(await repository.ClearItemPrimarySkillAsync("c1", ItemFamilyValues.Etc, 1, CancellationToken.None));
     }
 
     [Fact]
@@ -338,23 +337,41 @@ public sealed class ContentDirectoryRepositoryTests
                 GameVersion = "c1", Name = "BLUNT", DisplayName = "Blunt", ParentTypeName = weapon.Name,
                 ParentType = weapon
             };
+            var armor = new ItemType { GameVersion = "c1", Name = "Armor", DisplayName = "Armor" };
+            var heavy = new ItemType
+            {
+                GameVersion = "c1", Name = "HEAVY", DisplayName = "Heavy", ParentTypeName = armor.Name,
+                ParentType = armor
+            };
+            var etcItem = new ItemType { GameVersion = "c1", Name = "EtcItem", DisplayName = "Etc item" };
             context.AddRange(
                 weapon,
                 sword,
                 blunt,
-                new Item { GameVersion = "c1", Id = 1, Name = "Unclassified", ItemTypeName = weapon.Name, ItemType = weapon },
-                new Item { GameVersion = "c1", Id = 2, Name = "Sword", ItemTypeName = sword.Name, ItemType = sword },
-                new Item { GameVersion = "c1", Id = 3, Name = "Club", ItemTypeName = blunt.Name, ItemType = blunt });
+                armor,
+                heavy,
+                etcItem,
+                new Item { GameVersion = "c1", Id = 1, Name = "Unclassified", ItemTypeName = weapon.Name, ItemType = weapon, Weapon = new Item_Weapon { GameVersion = "c1", ItemId = 1 } },
+                new Item { GameVersion = "c1", Id = 2, Name = "Sword", ItemTypeName = sword.Name, ItemType = sword, Weapon = new Item_Weapon { GameVersion = "c1", ItemId = 2 } },
+                new Item { GameVersion = "c1", Id = 3, Name = "Club", ItemTypeName = blunt.Name, ItemType = blunt, Weapon = new Item_Weapon { GameVersion = "c1", ItemId = 3 } },
+                new Item { GameVersion = "c1", Id = 4, Name = "Tunic", ItemTypeName = heavy.Name, ItemType = heavy, Armor = new Item_Armor { GameVersion = "c1", ItemId = 4 } },
+                new Item { GameVersion = "c1", Id = 5, Name = "Potion", ItemTypeName = etcItem.Name, ItemType = etcItem, Etc = new Item_Etc { GameVersion = "c1", ItemId = 5 } });
             await context.SaveChangesAsync();
         }
         var repository = new ContentDirectoryRepository(new TestContextFactory(options));
 
-        var weapons = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(ItemTypeName: "Weapon"), CancellationToken.None);
-        var swords = await repository.SearchItemsAsync("c1", new ItemDirectoryRequest(ItemTypeName: "SWORD"), CancellationToken.None);
+        var weapons = await repository.SearchItemsAsync("c1", ItemFamilyValues.Weapon, new ItemDirectoryRequest(ItemTypeName: "Weapon"), CancellationToken.None);
+        var swords = await repository.SearchItemsAsync("c1", ItemFamilyValues.Weapon, new ItemDirectoryRequest(ItemTypeName: "SWORD"), CancellationToken.None);
+        var armorItems = await repository.SearchItemsAsync("c1", ItemFamilyValues.Armor, new ItemDirectoryRequest(), CancellationToken.None);
+        var otherItems = await repository.SearchItemsAsync("c1", ItemFamilyValues.Etc, new ItemDirectoryRequest(), CancellationToken.None);
+        var weaponSwords = await repository.SearchItemsAsync("c1", ItemFamilyValues.Weapon, new ItemDirectoryRequest(ItemTypeName: "SWORD"), CancellationToken.None);
         var types = await repository.SearchItemTypesAsync("c1", new DirectoryRequest(), CancellationToken.None);
 
         Assert.Equal(3, weapons.Total);
         Assert.Collection(swords.Items, item => Assert.Equal(2, item.Id));
+        Assert.Collection(armorItems.Items, item => Assert.Equal(4, item.Id));
+        Assert.Collection(otherItems.Items, item => Assert.Equal(5, item.Id));
+        Assert.Collection(weaponSwords.Items, item => Assert.Equal(2, item.Id));
         Assert.Contains(types.Items, type => type == new ItemTypeSummary("SWORD", "Sword", "Weapon", "Weapon"));
         await Assert.ThrowsAsync<ContentDeleteConflictException>(() =>
             repository.DeleteItemLookupAsync("c1", "item-types", "Weapon", CancellationToken.None));

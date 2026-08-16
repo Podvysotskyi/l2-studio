@@ -5,15 +5,15 @@ namespace L2.Studio.Repositories.Interfaces;
 
 public interface IContentDirectoryRepository
 {
-    Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, ItemDirectoryRequest request, CancellationToken cancellationToken);
-    Task<ItemDetailSummary?> GetItemAsync(string gameVersion, int id, CancellationToken cancellationToken);
-    Task<ItemSummary?> UpdateItemAsync(string gameVersion, int id, UpdateItemRequest request, CancellationToken cancellationToken);
-    Task<bool> DeleteItemAsync(string gameVersion, int id, CancellationToken cancellationToken);
-    Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken);
-    Task<bool> ClearItemPrimarySkillAsync(string gameVersion, int itemId, CancellationToken cancellationToken);
-    Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken);
-    Task<ItemSkillSummary?> UpdateItemSkillAsync(string gameVersion, int itemId, int skillId, short skillLevel, UpdateItemSkillRequest request, CancellationToken cancellationToken);
-    Task<bool> DeleteItemSkillAsync(string gameVersion, int itemId, int skillId, short skillLevel, CancellationToken cancellationToken);
+    Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken);
+    Task<ItemDetailSummary?> GetItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken);
+    Task<ItemSummary?> UpdateItemAsync(string gameVersion, string family, int id, UpdateItemRequest request, CancellationToken cancellationToken);
+    Task<bool> DeleteItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken);
+    Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, string family, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken);
+    Task<bool> ClearItemPrimarySkillAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken);
+    Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, string family, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken);
+    Task<ItemSkillSummary?> UpdateItemSkillAsync(string gameVersion, string family, int itemId, int skillId, short skillLevel, UpdateItemSkillRequest request, CancellationToken cancellationToken);
+    Task<bool> DeleteItemSkillAsync(string gameVersion, string family, int itemId, int skillId, short skillLevel, CancellationToken cancellationToken);
     Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
     Task<DirectoryPage<ItemLookupSummary>> SearchItemLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken);
     Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken);

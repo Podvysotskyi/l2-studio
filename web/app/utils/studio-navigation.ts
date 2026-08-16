@@ -1,4 +1,5 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { isItemFamily, itemFamilyLabels } from './item-family'
 
 export const studioNavigationGroups = {
   players: 'players',
@@ -119,14 +120,35 @@ export const studioNavigation: NavigationMenuItem[] = [
     value: studioNavigationGroups.items,
     icon: 'i-lucide-swords',
     children: [
-      { label: 'Definitions', icon: 'i-lucide-list', to: '/authoring/items' },
-      { label: 'Types', icon: 'i-lucide-workflow', to: '/authoring/items/types' },
-      { label: 'Actions', icon: 'i-lucide-play', to: '/authoring/items/actions' },
-      { label: 'Body parts', icon: 'i-lucide-shirt', to: '/authoring/items/body-parts' },
-      { label: 'Materials', icon: 'i-lucide-gem', to: '/authoring/items/materials' },
-      { label: 'Crystal types', icon: 'i-lucide-sparkles', to: '/authoring/items/crystal-types' },
-      { label: 'Handlers', icon: 'i-lucide-hand', to: '/authoring/items/handlers' },
-      { label: 'Skill types', icon: 'i-lucide-list-plus', to: '/authoring/items/skill-types' }
+      {
+        label: 'Definitions',
+        icon: 'i-lucide-list',
+        children: [
+          { label: 'Armor', icon: 'i-lucide-shield', to: '/authoring/items/armor' },
+          { label: 'Weapons', icon: 'i-lucide-sword', to: '/authoring/items/weapon' },
+          { label: 'Arrows', icon: 'i-lucide-navigation', to: '/authoring/items/arrow' },
+          { label: 'Materials', icon: 'i-lucide-gem', to: '/authoring/items/material' },
+          { label: 'Potions', icon: 'i-lucide-flask-conical', to: '/authoring/items/potion' },
+          { label: 'Recipes', icon: 'i-lucide-scroll-text', to: '/authoring/items/recipe' },
+          { label: 'Enchants', icon: 'i-lucide-sparkles', to: '/authoring/items/enchant' },
+          { label: 'Scrolls', icon: 'i-lucide-scroll', to: '/authoring/items/scroll' },
+          { label: 'Pet collars', icon: 'i-lucide-dog', to: '/authoring/items/pet-collar' },
+          { label: 'Etc items', icon: 'i-lucide-package', to: '/authoring/items/etc' }
+        ]
+      },
+      {
+        label: 'Lookups',
+        icon: 'i-lucide-tags',
+        children: [
+          { label: 'Types', icon: 'i-lucide-workflow', to: '/authoring/items/lookups/types' },
+          { label: 'Actions', icon: 'i-lucide-play', to: '/authoring/items/lookups/actions' },
+          { label: 'Body parts', icon: 'i-lucide-shirt', to: '/authoring/items/lookups/body-parts' },
+          { label: 'Materials', icon: 'i-lucide-gem', to: '/authoring/items/lookups/materials' },
+          { label: 'Crystal types', icon: 'i-lucide-sparkles', to: '/authoring/items/lookups/crystal-types' },
+          { label: 'Handlers', icon: 'i-lucide-hand', to: '/authoring/items/lookups/handlers' },
+          { label: 'Skill types', icon: 'i-lucide-list-plus', to: '/authoring/items/lookups/skill-types' }
+        ]
+      }
     ]
   },
   {
@@ -248,15 +270,19 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/npcs/sexes') return 'NPC sexes'
   if (path === '/authoring/npcs/types') return 'NPC types'
   if (path === '/authoring/items') return 'Item definitions'
-  if (/^\/authoring\/items\/\d+$/.test(path)) return 'Item definition'
-  if (/^\/authoring\/items\/\d+\/skills$/.test(path)) return 'Item skills'
-  if (path === '/authoring/items/types') return 'Item types'
-  if (path === '/authoring/items/actions') return 'Item actions'
-  if (path === '/authoring/items/body-parts') return 'Item body parts'
-  if (path === '/authoring/items/materials') return 'Item materials'
-  if (path === '/authoring/items/crystal-types') return 'Item crystal types'
-  if (path === '/authoring/items/handlers') return 'Item handlers'
-  if (path === '/authoring/items/skill-types') return 'Item skill types'
+  const itemMatch = path.match(/^\/authoring\/items\/([^/]+)(?:\/\d+)?(\/skills)?$/)
+  if (itemMatch?.[1] && isItemFamily(itemMatch[1])) {
+    const label = itemFamilyLabels[itemMatch[1]]
+    if (itemMatch[2]) return `${label} skills`
+    return /\/\d+$/.test(path) ? `${label} definition` : `${label} definitions`
+  }
+  if (path === '/authoring/items/lookups/types') return 'Item types'
+  if (path === '/authoring/items/lookups/actions') return 'Item actions'
+  if (path === '/authoring/items/lookups/body-parts') return 'Item body parts'
+  if (path === '/authoring/items/lookups/materials') return 'Item materials'
+  if (path === '/authoring/items/lookups/crystal-types') return 'Item crystal types'
+  if (path === '/authoring/items/lookups/handlers') return 'Item handlers'
+  if (path === '/authoring/items/lookups/skill-types') return 'Item skill types'
   if (path === '/authoring/players/classes') return 'Player classes'
   if (path === '/authoring/players/races') return 'Player races'
   if (path === '/authoring/players/sexes') return 'Player sexes'

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSystemStore } from '../../stores/system'
 import {
+  studioRouteGroup,
   studioNavigation,
   withStudioRouteGroup
 } from '../../utils/studio-navigation'
@@ -11,14 +12,8 @@ import {
 const route = useRoute()
 const systemStore = useSystemStore()
 const { serviceState, description } = storeToRefs(systemStore)
-const expandedGroups = ref(withStudioRouteGroup([], route.path))
-
-watch(
-  () => route.path,
-  path => {
-    expandedGroups.value = withStudioRouteGroup(expandedGroups.value, path)
-  }
-)
+const expandedGroups = computed(() => withStudioRouteGroup([], route.path))
+const navigationKey = computed(() => studioRouteGroup(route.path) ?? 'overview')
 </script>
 
 <template>
@@ -52,7 +47,8 @@ watch(
 
     <template #default="{ collapsed }">
       <UNavigationMenu
-        v-model="expandedGroups"
+        :key="navigationKey"
+        :default-value="expandedGroups"
         :items="studioNavigation"
         orientation="vertical"
         type="multiple"
