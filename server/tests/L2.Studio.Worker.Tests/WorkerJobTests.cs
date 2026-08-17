@@ -109,6 +109,7 @@ public sealed class WorkerJobTests
         Assert.Equal(10, catalog.Handlers.Count);
         Assert.Equal(2, catalog.SkillTypes.Count);
         Assert.Equal(158, ((C1ItemCatalog)catalog).Items.OfType<IItemSkillsDefinition>().Sum(item => item.Skills.Count));
+        Assert.Equal(238, ((C1ItemCatalog)catalog).Items.Count(item => item.Condition is not null));
         Assert.Contains(catalog.Types, definition => definition is { Name: "Weapon", DisplayName: "Weapon" });
         Assert.Contains(catalog.Types, definition => definition is
             { Name: "SWORD", DisplayName: "Sword", ParentTypeName: "Weapon" });
@@ -130,6 +131,16 @@ public sealed class WorkerJobTests
         {
             Id: 3028,
             AttackGeometry: { OffsetX: 0, OffsetY: 0, Radius: 10, Length: 0 }
+        });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        {
+            Id: 726,
+            Condition: { MessageId: 113, AddName: true, IsPvpFlagged: false, PlayerRaces: null, PlayerCategoryTypes: null }
+        });
+        Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is
+        {
+            Id: 2515,
+            Condition: { MessageId: 600, AddName: false, IsPvpFlagged: null, PlayerRaces: null, PlayerCategoryTypes: "WOLF,SIN_EATER_GROUP" }
         });
         Assert.Contains(((C1ItemCatalog)catalog).Items, item => item is Item_WeaponDefinition
         {
@@ -169,6 +180,20 @@ public sealed class WorkerJobTests
             Assert.True(item.IsOlyRestricted);
             Assert.Contains(item.Skills, skill => skill is { SkillId: 2046, SkillLevel: 1 });
         });
+    }
+
+    [Fact]
+    public void DefinesCompleteImportableC1ItemSetCatalog()
+    {
+        var catalog = new C1ItemSetCatalog();
+
+        Assert.Equal(30, catalog.ItemSets.Count);
+        Assert.Equal(113, catalog.ItemSets.Sum(itemSet => itemSet.BodyParts.Count));
+        Assert.All(catalog.ItemSets, itemSet => Assert.Equal(new ItemSetSkillDefinition(3006, 1), itemSet.Skill));
+        Assert.Contains(catalog.ItemSets, itemSet => itemSet is { SetId: 3, BodyParts: var parts } && parts.Contains(new ItemSetBodyPartDefinition("lhand", 628)));
+        Assert.Contains(catalog.ItemSets, itemSet => itemSet is { SetId: 19, BodyParts: var parts } && parts.Contains(new ItemSetBodyPartDefinition("onepiece", 60)));
+        Assert.Contains(catalog.ItemSets, itemSet => itemSet is { SetId: 25, BodyParts: var parts } && parts.Contains(new ItemSetBodyPartDefinition("gloves", 5710)));
+        Assert.Contains(catalog.ItemSets, itemSet => itemSet is { SetId: 32, Stats: { Str: 3, Dex: -2, Con: -1 } });
     }
 
     [Fact]
@@ -253,7 +278,7 @@ public sealed class WorkerJobTests
             .Where(type => type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0)
             .ToArray();
 
-        Assert.Equal(12, handlerTypes.Length);
+        Assert.Equal(13, handlerTypes.Length);
         Assert.All(handlerTypes, type => Assert.Equal("L2.Studio.Worker", type.Namespace));
         Assert.DoesNotContain(typeof(AssetImportJobProcessor).Assembly.GetTypes(), type =>
             type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0);

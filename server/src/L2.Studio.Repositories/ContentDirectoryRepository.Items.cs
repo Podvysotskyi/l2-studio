@@ -254,6 +254,44 @@ public sealed partial class ContentDirectoryRepository
         return true;
     }
 
+    public async Task<ItemConditionSummary?> UpdateItemConditionAsync(
+        string gameVersion,
+        string family,
+        int itemId,
+        UpdateItemConditionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await FamilyItems(context.Items.Include(value => value.Condition).ThenInclude(value => value!.Player), family)
+            .SingleOrDefaultAsync(value => value.GameVersion == gameVersion && value.Id == itemId, cancellationToken);
+        if (item is null) return null;
+
+        item.Condition ??= new ItemCondition
+        {
+            GameVersion = gameVersion,
+            ItemId = itemId,
+            Player = new ItemCondition_Player { GameVersion = gameVersion, ItemId = itemId }
+        };
+        item.Condition.MessageId = request.MessageId;
+        item.Condition.AddName = request.AddName;
+        item.Condition.Player.IsPvpFlagged = request.IsPvpFlagged;
+        item.Condition.Player.PlayerRaces = JoinTokens(request.PlayerRaces);
+        item.Condition.Player.PlayerCategoryTypes = JoinTokens(request.PlayerCategoryTypes);
+        await context.SaveChangesAsync(cancellationToken);
+        return ToSummary(item.Condition);
+    }
+
+    public async Task<bool> DeleteItemConditionAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await FamilyItems(context.Items.Include(value => value.Condition), family)
+            .SingleOrDefaultAsync(value => value.GameVersion == gameVersion && value.Id == itemId, cancellationToken);
+        if (item?.Condition is null) return false;
+        context.ItemConditions.Remove(item.Condition);
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<DirectoryPage<ItemTypeSummary>> SearchItemTypesAsync(
         string gameVersion,
         DirectoryRequest request,
@@ -427,7 +465,30 @@ public sealed partial class ContentDirectoryRepository
             item.BehaviorAvailability.IsSellable,
             item.BehaviorAvailability.IsStackable,
             item.BehaviorAvailability.IsTradable),
-        null));
+        null,
+        item.Condition == null ? null : new ItemConditionSummary(
+            item.Condition.MessageId,
+            item.Condition.AddName,
+            item.Condition.Player.IsPvpFlagged,
+            item.Condition.Player.PlayerRaces,
+            item.Condition.Player.PlayerCategoryTypes)));
+
+    private static ItemConditionSummary ToSummary(ItemCondition condition) => new(
+        condition.MessageId,
+        condition.AddName,
+        condition.Player.IsPvpFlagged,
+        condition.Player.PlayerRaces,
+        condition.Player.PlayerCategoryTypes);
+
+    private static string? JoinTokens(IReadOnlyList<string>? values)
+    {
+        var tokens = values?.Select(value => value.Trim().ToUpperInvariant())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray() ?? [];
+        return tokens.Length == 0 ? null : string.Join(',', tokens);
+    }
 
     private static IQueryable<ItemSkillSummary> ProjectItemSkills(
         IQueryable<ItemSkill> itemSkills,

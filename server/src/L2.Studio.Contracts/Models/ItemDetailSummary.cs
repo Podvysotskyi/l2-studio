@@ -4,4 +4,5 @@ public sealed record ItemDetailSummary(
     ItemSummary Item,
     ItemPropertiesSummary Properties,
     ItemBehaviorAvailabilitySummary? BehaviorAvailability,
-    ItemPrimarySkillSummary? PrimarySkill);
+    ItemPrimarySkillSummary? PrimarySkill,
+    ItemConditionSummary? Condition);

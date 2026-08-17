@@ -9,4 +9,5 @@ public abstract record ItemDefinition
     public string? Icon { get; init; }
     public int? Weight { get; init; }
     public long? Price { get; init; }
+    public ItemConditionDefinition? Condition { get; init; }
 }

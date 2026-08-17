@@ -34,7 +34,8 @@ import type {
   PlayerAppearanceDirectoryRequest
 } from '../types/requests/directory-request'
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
-import type { ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
+import type { ItemConditionRecord, ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
+import type { ItemSetPage, ItemSetRecord } from '../types/models/item-set'
 import type { ItemFamily } from '../types/requests/directory-request'
 import type {
   NpcPage,
@@ -125,6 +126,27 @@ export function updateItemDefinition(family: ItemFamily, id: number, request: {
 export function deleteItemDefinition(family: ItemFamily, id: number): Promise<void> {
   return $fetch<void>(versionPath(`/content/items/${family}/${id}`), { method: 'DELETE' })
 }
+export function updateItemCondition(family: ItemFamily, id: number, request: {
+  messageId: number; addName: boolean; isPvpFlagged: boolean | null
+  playerRaces: string[]; playerCategoryTypes: string[]
+}): Promise<ItemConditionRecord> {
+  return $fetch<ItemConditionRecord>(versionPath(`/content/items/${family}/${id}/condition`), { method: 'PUT', body: request })
+}
+export function deleteItemCondition(family: ItemFamily, id: number): Promise<void> {
+  return $fetch<void>(versionPath(`/content/items/${family}/${id}/condition`), { method: 'DELETE' })
+}
+export function getItemSetDirectory(request: { query?: string; page?: number; pageSize?: number } = {}): Promise<ItemSetPage> {
+  return $fetch<ItemSetPage>(versionPath('/content/item-sets'), { query: directoryQuery(request) })
+}
+export function getItemSet(id: number): Promise<ItemSetRecord> {
+  return $fetch<ItemSetRecord>(versionPath(`/content/item-sets/${id}`))
+}
+export function updateItemSet(id: number, request: {
+  skillId: number; skillLevel: number; str: number | null; dex: number | null; con: number | null
+  int: number | null; wit: number | null; men: number | null
+}): Promise<ItemSetRecord> {
+  return $fetch<ItemSetRecord>(versionPath(`/content/item-sets/${id}`), { method: 'PATCH', body: request })
+}
 export function setItemPrimarySkill(family: ItemFamily, id: number, request: { skillId: number; skillLevel: number }): Promise<ItemPrimarySkillRecord> {
   return $fetch<ItemPrimarySkillRecord>(versionPath(`/content/items/${family}/${id}/primary-skill`), { method: 'PUT', body: request })
 }
@@ -181,6 +203,9 @@ export function getSkillDirectory(
   return $fetch<SkillPage>(versionPath('/content/skills'), {
     query: directoryQuery(request)
   })
+}
+export function getSkillDefinition(id: number): Promise<SkillRecord> {
+  return $fetch<SkillRecord>(versionPath(`/content/skills/${id}`))
 }
 export function updateSkillDefinition(id: number, request: {
   name: string

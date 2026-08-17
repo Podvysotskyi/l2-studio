@@ -9,6 +9,11 @@ public interface IContentDirectoryRepository
     Task<ItemDetailSummary?> GetItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken);
     Task<ItemSummary?> UpdateItemAsync(string gameVersion, string family, int id, UpdateItemRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken);
+    Task<ItemConditionSummary?> UpdateItemConditionAsync(string gameVersion, string family, int itemId, UpdateItemConditionRequest request, CancellationToken cancellationToken);
+    Task<bool> DeleteItemConditionAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken);
+    Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
+    Task<ItemSetSummary?> GetItemSetAsync(string gameVersion, int setId, CancellationToken cancellationToken);
+    Task<ItemSetSummary?> UpdateItemSetAsync(string gameVersion, int setId, UpdateItemSetRequest request, CancellationToken cancellationToken);
     Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, string family, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken);
     Task<bool> ClearItemPrimarySkillAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken);
     Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, string family, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken);
@@ -35,6 +40,7 @@ public interface IContentDirectoryRepository
     Task<PlayerAppearanceSummary?> UpdatePlayerAppearanceNameAsync(string gameVersion, string kind, int id, int playerRaceId, int playerSexId, string name, CancellationToken cancellationToken);
     Task<bool> DeletePlayerAppearanceAsync(string gameVersion, string kind, int id, int playerRaceId, int playerSexId, CancellationToken cancellationToken);
     Task<SkillDirectoryPage> SearchSkillsAsync(string gameVersion, string query, int page, int pageSize, CancellationToken cancellationToken);
+    Task<SkillSummary?> GetSkillAsync(string gameVersion, int id, CancellationToken cancellationToken);
     Task<SkillSummary?> UpdateSkillAsync(string gameVersion, int id, UpdateSkillRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteSkillAsync(string gameVersion, int id, CancellationToken cancellationToken);
     Task<DirectoryPage<SkillLookupSummary>> SearchSkillLookupsAsync(string gameVersion, string kind, DirectoryRequest request, CancellationToken cancellationToken);

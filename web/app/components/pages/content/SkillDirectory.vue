@@ -205,6 +205,7 @@ async function remove(skill: SkillRecord) {
           </template>
           <template #actions-cell="{ row }">
             <StudioTableRowActions
+              :view-to="`/authoring/skills/${row.original.id}`"
               :show-edit="true"
               :show-delete="true"
               :delete-loading="deletingId === row.original.id"

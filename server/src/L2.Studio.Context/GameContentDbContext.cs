@@ -32,6 +32,12 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<Item_PetCollar> ItemPetCollars => Set<Item_PetCollar>();
     public DbSet<Item_Etc> ItemEtc => Set<Item_Etc>();
     public DbSet<ItemBehaviorAvailability> ItemBehaviorAvailabilities => Set<ItemBehaviorAvailability>();
+    public DbSet<ItemCondition> ItemConditions => Set<ItemCondition>();
+    public DbSet<ItemCondition_Player> ItemConditionPlayers => Set<ItemCondition_Player>();
+    public DbSet<ItemSet> ItemSets => Set<ItemSet>();
+    public DbSet<ItemSetBodyPart> ItemSetBodyParts => Set<ItemSetBodyPart>();
+    public DbSet<ItemSetSkill> ItemSetSkills => Set<ItemSetSkill>();
+    public DbSet<ItemSetStats> ItemSetStats => Set<ItemSetStats>();
     public DbSet<ItemAttackGeometry> ItemAttackGeometries => Set<ItemAttackGeometry>();
     public DbSet<ItemSkill> ItemSkills => Set<ItemSkill>();
     public DbSet<ItemStats> ItemStats => Set<ItemStats>();
@@ -359,6 +365,28 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         itemBehaviorAvailability.HasOne(entity => entity.Item).WithOne(entity => entity.BehaviorAvailability)
             .HasForeignKey<ItemBehaviorAvailability>(entity => new { entity.GameVersion, entity.ItemId })
             .OnDelete(DeleteBehavior.Cascade);
+        var itemCondition = modelBuilder.Entity<ItemCondition>();
+        itemCondition.HasOne(entity => entity.Item).WithOne(entity => entity.Condition)
+            .HasForeignKey<ItemCondition>(entity => new { entity.GameVersion, entity.ItemId })
+            .OnDelete(DeleteBehavior.Cascade);
+        var itemConditionPlayer = modelBuilder.Entity<ItemCondition_Player>();
+        itemConditionPlayer.HasOne(entity => entity.Condition).WithOne(entity => entity.Player)
+            .HasForeignKey<ItemCondition_Player>(entity => new { entity.GameVersion, entity.ItemId })
+            .OnDelete(DeleteBehavior.Cascade);
+        var itemSet = modelBuilder.Entity<ItemSet>();
+        var itemSetBodyPart = modelBuilder.Entity<ItemSetBodyPart>();
+        itemSetBodyPart.HasOne(entity => entity.ItemSet).WithMany(entity => entity.BodyParts)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SetId }).OnDelete(DeleteBehavior.Cascade);
+        itemSetBodyPart.HasOne(entity => entity.BodyPart).WithMany()
+            .HasForeignKey(entity => new { entity.GameVersion, entity.BodyPartName }).OnDelete(DeleteBehavior.Restrict);
+        var itemSetSkill = modelBuilder.Entity<ItemSetSkill>();
+        itemSetSkill.HasOne(entity => entity.ItemSet).WithMany(entity => entity.Skills)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SetId }).OnDelete(DeleteBehavior.Cascade);
+        itemSetSkill.HasOne(entity => entity.Skill).WithMany()
+            .HasForeignKey(entity => new { entity.GameVersion, entity.SkillId }).OnDelete(DeleteBehavior.Restrict);
+        var itemSetStats = modelBuilder.Entity<ItemSetStats>();
+        itemSetStats.HasOne(entity => entity.ItemSet).WithOne(entity => entity.Stats)
+            .HasForeignKey<ItemSetStats>(entity => new { entity.GameVersion, entity.SetId }).OnDelete(DeleteBehavior.Cascade);
         ConfigureItemLookups(modelBuilder.Entity<Item_Armor>());
         ConfigureItemLookups(modelBuilder.Entity<Item_Weapon>());
         ConfigureItemLookups(modelBuilder.Entity<Item_Arrow>());
@@ -430,6 +458,12 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         itemSkillType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         item.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemBehaviorAvailability.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemCondition.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemConditionPlayer.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSet.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSetBodyPart.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSetSkill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        itemSetStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemSkill.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemStats.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         skillOperateType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -449,6 +483,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             typeof(ItemHandler), typeof(ItemSkillType), typeof(Item), typeof(Item_Armor), typeof(Item_Weapon), typeof(Item_Arrow), typeof(Item_Material),
             typeof(Item_Potion), typeof(Item_Recipe), typeof(Item_Enchant), typeof(Item_Scroll), typeof(Item_PetCollar), typeof(Item_Etc),
             typeof(ItemBehaviorAvailability),
+            typeof(ItemCondition), typeof(ItemCondition_Player),
+            typeof(ItemSet), typeof(ItemSetBodyPart), typeof(ItemSetSkill), typeof(ItemSetStats),
             typeof(ItemAttackGeometry), typeof(ItemSkill), typeof(ItemStats), typeof(ContentImportRun),
             typeof(SkillOperateType), typeof(SkillTargetType),
             typeof(Skill), typeof(SkillIcon), typeof(AssetImportRun), typeof(AssetImportWorkItem),

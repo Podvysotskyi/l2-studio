@@ -492,6 +492,23 @@ public sealed partial class ContentDirectoryRepository(
         return new SkillDirectoryPage(items, total, page, pageSize);
     }
 
+    public async Task<SkillSummary?> GetSkillAsync(string gameVersion, int id, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Skills.AsNoTracking()
+            .Where(skill => skill.GameVersion == gameVersion && skill.Id == id)
+            .Select(skill => new SkillSummary(
+                skill.Id,
+                skill.Levels,
+                skill.Name,
+                skill.SkillOperateTypeName,
+                skill.SkillOperateType == null ? null : skill.SkillOperateType.DisplayName,
+                skill.SkillTargetTypeName,
+                skill.SkillTargetType == null ? null : skill.SkillTargetType.DisplayName,
+                skill.SkillIcons.Count))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<SkillSummary?> UpdateSkillAsync(
         string gameVersion,
         int id,

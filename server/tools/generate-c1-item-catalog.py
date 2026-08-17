@@ -93,6 +93,37 @@ def skills(item: ElementTree.Element) -> str:
     return "[" + ", ".join(values) + "]"
 
 
+def condition(item: ElementTree.Element) -> str:
+    values = item.findall("conditions")
+    if not values:
+        return "null"
+    if len(values) != 1:
+        raise ValueError(f"Item {item.attrib['id']} defines more than one condition block")
+    value = values[0]
+    player = value.find("player")
+    if player is None or len(list(value)) != 1:
+        raise ValueError(f"Item {item.attrib['id']} has an unsupported condition shape")
+    unsupported = set(player.attrib) - {"races", "categoryType", "isPvpFlagged"}
+    if unsupported:
+        raise ValueError(f"Item {item.attrib['id']} has unsupported player condition attributes: {', '.join(sorted(unsupported))}")
+    if "msgId" not in value.attrib:
+        raise ValueError(f"Item {item.attrib['id']} condition does not define msgId")
+    try:
+        message_id = int(value.attrib["msgId"])
+    except ValueError as error:
+        raise ValueError(f"Item {item.attrib['id']} has an invalid condition msgId") from error
+    pvp = player.attrib.get("isPvpFlagged")
+    if pvp is not None and pvp.lower() not in {"true", "false"}:
+        raise ValueError(f"Item {item.attrib['id']} has an invalid isPvpFlagged value")
+    return "new(" + ", ".join([
+        str(message_id),
+        "true" if "addName" in value.attrib else "false",
+        "null" if pvp is None else pvp.lower(),
+        csharp_string(player.attrib.get("races")),
+        csharp_string(player.attrib.get("categoryType"))
+    ]) + ")"
+
+
 TYPE_SUBTYPE_FIELDS = {
     "Weapon": "weapon_type",
     "Armor": "armor_type",
@@ -141,6 +172,9 @@ def expression(item: ElementTree.Element) -> str:
         sets["bodypart"] = BODY_PART_NAMES.get(sets["bodypart"], sets["bodypart"])
     family = item_family(item, sets)
     values = [f"Id = {item.attrib['id']}", f"Name = {csharp_string(item.attrib['name'])}", f"TypeName = {csharp_string(item_type(item, sets))}"]
+    item_condition = condition(item)
+    if item_condition != "null":
+        values.append(f"Condition = {item_condition}")
     for source, (target, kind) in FIELDS.items():
         if source in COMMON_FIELDS or source in FAMILY_FIELDS[family]:
             values.append(f"{target} = {csharp(sets.get(source), kind)}")

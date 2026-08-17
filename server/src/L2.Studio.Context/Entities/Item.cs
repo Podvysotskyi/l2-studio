@@ -37,6 +37,7 @@ public sealed class Item
     public Item_PetCollar? PetCollar { get; set; }
     public Item_Etc? Etc { get; set; }
     public ItemBehaviorAvailability? BehaviorAvailability { get; set; }
+    public ItemCondition? Condition { get; set; }
     public ItemAttackGeometry? AttackGeometry { get; set; }
     public ICollection<ItemSkill> Skills { get; } = [];
     public ItemStats? Stats { get; set; }

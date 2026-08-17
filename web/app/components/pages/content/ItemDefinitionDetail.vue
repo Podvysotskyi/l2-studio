@@ -20,9 +20,10 @@ const itemId = computed(() => {
   const id = Number(value)
   return Number.isSafeInteger(id) && id >= 0 ? id : undefined
 })
-const activeTab = computed(() => route.path.endsWith('/skills') ? 'skills' : 'overview')
+const activeTab = computed(() => route.path.endsWith('/skills') ? 'skills' : route.path.endsWith('/conditions') ? 'conditions' : 'overview')
 const tabs = computed(() => [
   { label: 'Overview', icon: 'i-lucide-notebook-tabs', value: 'overview' },
+  { label: 'Conditions', icon: 'i-lucide-shield-check', value: 'conditions' },
   ...(skillItemFamilies.includes(props.family) ? [{ label: 'Skills', icon: 'i-lucide-sparkles', value: 'skills' }] : [])
 ])
 const categoryLabel = computed(() => itemFamilyLabels[props.family])
@@ -50,11 +51,11 @@ async function load() {
 
 function selectTab(value: string | number) {
   if (itemId.value === undefined) return
-  void navigateTo(detailPath(props.family, itemId.value, value === 'skills' ? 'skills' : 'overview'))
+  void navigateTo(detailPath(props.family, itemId.value, value === 'skills' || value === 'conditions' ? value : 'overview'))
 }
 
 function detailPath(family: ItemFamily, id: number, tab: string) {
-  const suffix = tab === 'skills' ? '/skills' : ''
+  const suffix = tab === 'overview' ? '' : `/${tab}`
   return `/authoring/items/${family}/${id}${suffix}`
 }
 

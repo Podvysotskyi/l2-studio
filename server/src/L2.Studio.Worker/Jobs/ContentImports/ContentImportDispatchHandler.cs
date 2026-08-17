@@ -25,6 +25,7 @@ public sealed class ContentImportDispatchHandler(IDbContextFactory<GameContentDb
             ("c1", ContentImportTargetValues.ItemCrystalTypes) => new ImportC1ItemCrystalTypes(run.Id),
             ("c1", ContentImportTargetValues.ItemHandlers) => new ImportC1ItemHandlers(run.Id),
             ("c1", ContentImportTargetValues.ItemSkillTypes) => new ImportC1ItemSkillTypes(run.Id),
+            ("c1", ContentImportTargetValues.ItemSets) => new ImportC1ItemSets(run.Id),
             ("c1", ContentImportTargetValues.Npcs) => new ImportC1Npcs(run.Id),
             ("c1", ContentImportTargetValues.NpcTypes) => new ImportC1NpcTypes(run.Id),
             ("c4", ContentImportTargetValues.NpcTypes) => new ImportC4NpcTypes(run.Id),

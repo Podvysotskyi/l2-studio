@@ -16,6 +16,7 @@ export type ContentImportTarget =
   | 'item-crystal-types'
   | 'item-handlers'
   | 'item-skill-types'
+  | 'item-sets'
   | 'npcs'
   | 'npc-types'
   | 'npc-races'

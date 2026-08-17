@@ -137,6 +137,11 @@ export const studioNavigation: NavigationMenuItem[] = [
         ]
       },
       {
+        label: 'Item sets',
+        icon: 'i-lucide-shield-check',
+        to: '/authoring/items/sets'
+      },
+      {
         label: 'Lookups',
         icon: 'i-lucide-tags',
         children: [
@@ -270,6 +275,8 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/npcs/sexes') return 'NPC sexes'
   if (path === '/authoring/npcs/types') return 'NPC types'
   if (path === '/authoring/items') return 'Item definitions'
+  if (path === '/authoring/items/sets') return 'Item sets'
+  if (/^\/authoring\/items\/sets\/\d+$/.test(path)) return 'Item set'
   const itemMatch = path.match(/^\/authoring\/items\/([^/]+)(?:\/\d+)?(\/skills)?$/)
   if (itemMatch?.[1] && isItemFamily(itemMatch[1])) {
     const label = itemFamilyLabels[itemMatch[1]]
@@ -290,6 +297,7 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/players/hair-styles') return 'Player hair styles'
   if (path === '/authoring/players/hair-colors') return 'Player hair colors'
   if (path === '/authoring/skills') return 'Skill definitions'
+  if (/^\/authoring\/skills\/\d+$/.test(path)) return 'Skill definition'
   if (path === '/authoring/skills/operate-types') return 'Skill operate types'
   if (path === '/authoring/skills/target-types') return 'Skill target types'
   if (path === '/library/textures') return 'Textures'

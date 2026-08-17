@@ -33,6 +33,7 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
                 .Include(item => item.Material).Include(item => item.Potion).Include(item => item.Recipe)
                 .Include(item => item.Enchant).Include(item => item.Scroll).Include(item => item.PetCollar).Include(item => item.Etc)
                 .Include(item => item.BehaviorAvailability)
+                .Include(item => item.Condition).ThenInclude(condition => condition!.Player)
                 .Include(item => item.AttackGeometry).Include(item => item.Skills).Include(item => item.Stats)
                 .Where(item => item.GameVersion == run.GameVersion).ToDictionaryAsync(item => item.Id, token);
             var missing = Catalog.Items.Where(definition => !existing.ContainsKey(definition.Id)).ToArray();
@@ -169,6 +170,7 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
         item.Icon = definition.Icon;
         item.Weight = definition.Weight;
         item.Price = definition.Price;
+        ApplyCondition(context, item, definition.Condition);
         ApplyFamily(context, item, definition);
         ApplyBehaviorAvailability(context, item, definition);
         RestoreSkills(context, item, definition);
@@ -264,6 +266,37 @@ public sealed class ItemImportHandlers(IDbContextFactory<GameContentDbContext> c
     {
         if (context is not null) context.Set<T>().Add(entity);
         return entity;
+    }
+
+    private static void ApplyCondition(GameContentDbContext? context, Item item, ItemConditionDefinition? definition)
+    {
+        if (definition is null)
+        {
+            if (item.Condition is not null && context is not null) context.ItemConditions.Remove(item.Condition);
+            item.Condition = null;
+            return;
+        }
+
+        if (item.Condition is null)
+        {
+            item.Condition = new ItemCondition
+            {
+                GameVersion = item.GameVersion,
+                ItemId = item.Id,
+                Player = new ItemCondition_Player
+                {
+                    GameVersion = item.GameVersion,
+                    ItemId = item.Id
+                }
+            };
+            if (context is not null) context.ItemConditions.Add(item.Condition);
+        }
+
+        item.Condition.MessageId = definition.MessageId;
+        item.Condition.AddName = definition.AddName;
+        item.Condition.Player.IsPvpFlagged = definition.IsPvpFlagged;
+        item.Condition.Player.PlayerRaces = definition.PlayerRaces;
+        item.Condition.Player.PlayerCategoryTypes = definition.PlayerCategoryTypes;
     }
 
     private static void AddMissingBehaviorAvailability(

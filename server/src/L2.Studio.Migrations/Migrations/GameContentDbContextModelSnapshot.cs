@@ -1266,6 +1266,64 @@ namespace L2.Studio.Migrations.Migrations
                     b.ToTable("item_body_parts", "content");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCondition", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_id");
+
+                    b.Property<bool>("AddName")
+                        .HasColumnType("boolean")
+                        .HasColumnName("add_name");
+
+                    b.Property<int>("MessageId")
+                        .HasColumnType("integer")
+                        .HasColumnName("message_id");
+
+                    b.HasKey("GameVersion", "ItemId");
+
+                    b.ToTable("item_conditions", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCondition_Player", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_id");
+
+                    b.Property<bool?>("IsPvpFlagged")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_pvp_flagged");
+
+                    b.Property<string>("PlayerCategoryTypes")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("player_category_types");
+
+                    b.Property<string>("PlayerRaces")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("player_races");
+
+                    b.HasKey("GameVersion", "ItemId");
+
+                    b.ToTable("item_condition_players", "content");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
                 {
                     b.Property<string>("GameVersion")
@@ -1339,6 +1397,123 @@ namespace L2.Studio.Migrations.Migrations
                     b.HasKey("GameVersion", "Name");
 
                     b.ToTable("item_materials", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSet", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("SetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("set_id");
+
+                    b.HasKey("GameVersion", "SetId");
+
+                    b.ToTable("item_sets", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetBodyPart", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("SetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("set_id");
+
+                    b.Property<string>("BodyPartName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("body_part_name");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_id");
+
+                    b.HasKey("GameVersion", "SetId", "BodyPartName");
+
+                    b.HasIndex("GameVersion", "BodyPartName");
+
+                    b.ToTable("item_set_body_parts", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetSkill", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("SetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("set_id");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("integer")
+                        .HasColumnName("skill_id");
+
+                    b.Property<short>("SkillLevel")
+                        .HasColumnType("smallint")
+                        .HasColumnName("skill_level");
+
+                    b.HasKey("GameVersion", "SetId", "SkillId", "SkillLevel");
+
+                    b.HasIndex("GameVersion", "SkillId");
+
+                    b.ToTable("item_set_skills", "content");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetStats", b =>
+                {
+                    b.Property<string>("GameVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("interlude")
+                        .HasColumnName("game_version");
+
+                    b.Property<int>("SetId")
+                        .HasColumnType("integer")
+                        .HasColumnName("set_id");
+
+                    b.Property<int?>("Con")
+                        .HasColumnType("integer")
+                        .HasColumnName("con");
+
+                    b.Property<int?>("Dex")
+                        .HasColumnType("integer")
+                        .HasColumnName("dex");
+
+                    b.Property<int?>("Int")
+                        .HasColumnType("integer")
+                        .HasColumnName("int");
+
+                    b.Property<int?>("Men")
+                        .HasColumnType("integer")
+                        .HasColumnName("men");
+
+                    b.Property<int?>("Str")
+                        .HasColumnType("integer")
+                        .HasColumnName("str");
+
+                    b.Property<int?>("Wit")
+                        .HasColumnType("integer")
+                        .HasColumnName("wit");
+
+                    b.HasKey("GameVersion", "SetId");
+
+                    b.ToTable("item_set_stats", "content");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemSkill", b =>
@@ -3126,6 +3301,40 @@ namespace L2.Studio.Migrations.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCondition", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Item", "Item")
+                        .WithOne("Condition")
+                        .HasForeignKey("L2.Studio.Context.Entities.ItemCondition", "GameVersion", "ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCondition_Player", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemCondition", "Condition")
+                        .WithOne("Player")
+                        .HasForeignKey("L2.Studio.Context.Entities.ItemCondition_Player", "GameVersion", "ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Condition");
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemCrystalType", b =>
                 {
                     b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
@@ -3151,6 +3360,82 @@ namespace L2.Studio.Migrations.Migrations
                         .HasForeignKey("GameVersion")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSet", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetBodyPart", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemBodyPart", "BodyPart")
+                        .WithMany()
+                        .HasForeignKey("GameVersion", "BodyPartName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemSet", "ItemSet")
+                        .WithMany("BodyParts")
+                        .HasForeignKey("GameVersion", "SetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BodyPart");
+
+                    b.Navigation("ItemSet");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetSkill", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemSet", "ItemSet")
+                        .WithMany("Skills")
+                        .HasForeignKey("GameVersion", "SetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("GameVersion", "SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ItemSet");
+
+                    b.Navigation("Skill");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSetStats", b =>
+                {
+                    b.HasOne("L2.Studio.Context.Entities.GameVersion", null)
+                        .WithMany()
+                        .HasForeignKey("GameVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("L2.Studio.Context.Entities.ItemSet", "ItemSet")
+                        .WithOne("Stats")
+                        .HasForeignKey("L2.Studio.Context.Entities.ItemSetStats", "GameVersion", "SetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ItemSet");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemSkill", b =>
@@ -3945,6 +4230,8 @@ namespace L2.Studio.Migrations.Migrations
 
                     b.Navigation("BehaviorAvailability");
 
+                    b.Navigation("Condition");
+
                     b.Navigation("Enchant");
 
                     b.Navigation("Etc");
@@ -3966,9 +4253,24 @@ namespace L2.Studio.Migrations.Migrations
                     b.Navigation("Weapon");
                 });
 
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemCondition", b =>
+                {
+                    b.Navigation("Player")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemMaterial", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("L2.Studio.Context.Entities.ItemSet", b =>
+                {
+                    b.Navigation("BodyParts");
+
+                    b.Navigation("Skills");
+
+                    b.Navigation("Stats");
                 });
 
             modelBuilder.Entity("L2.Studio.Context.Entities.ItemSkillType", b =>

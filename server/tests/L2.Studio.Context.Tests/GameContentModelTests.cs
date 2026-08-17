@@ -41,6 +41,12 @@ public sealed class GameContentModelTests
         Assert.Equal("item_pet_collar", Entity<Item_PetCollar>(context).GetTableName());
         Assert.Equal("item_etc", Entity<Item_Etc>(context).GetTableName());
         Assert.Equal("item_behavior_availability", Entity<ItemBehaviorAvailability>(context).GetTableName());
+        Assert.Equal("item_conditions", Entity<ItemCondition>(context).GetTableName());
+        Assert.Equal("item_condition_players", Entity<ItemCondition_Player>(context).GetTableName());
+        Assert.Equal("item_sets", Entity<ItemSet>(context).GetTableName());
+        Assert.Equal("item_set_body_parts", Entity<ItemSetBodyPart>(context).GetTableName());
+        Assert.Equal("item_set_skills", Entity<ItemSetSkill>(context).GetTableName());
+        Assert.Equal("item_set_stats", Entity<ItemSetStats>(context).GetTableName());
     }
 
     [Fact]
@@ -164,6 +170,46 @@ public sealed class GameContentModelTests
         Assert.Null(Entity<Item_Armor>(context).FindProperty("EnchantEnabled"));
         Assert.Null(Entity<Item_Weapon>(context).FindProperty("ForNpc"));
         Assert.Null(Entity<Item_Etc>(context).FindProperty("IsStackable"));
+    }
+
+    [Fact]
+    public void ModelsItemConditionsAsAnOptionalPlayerDependent()
+    {
+        using var context = CreateContext();
+        var condition = Entity<ItemCondition>(context);
+        var player = Entity<ItemCondition_Player>(context);
+
+        Assert.Equal([nameof(ItemCondition.GameVersion), nameof(ItemCondition.ItemId)], condition.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("message_id", condition.FindProperty(nameof(ItemCondition.MessageId))!.GetColumnName());
+        Assert.Equal("add_name", condition.FindProperty(nameof(ItemCondition.AddName))!.GetColumnName());
+        Assert.Contains(condition.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.Equal([nameof(ItemCondition_Player.GameVersion), nameof(ItemCondition_Player.ItemId)], player.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("player_races", player.FindProperty(nameof(ItemCondition_Player.PlayerRaces))!.GetColumnName());
+        Assert.Equal(128, player.FindProperty(nameof(ItemCondition_Player.PlayerRaces))!.GetMaxLength());
+        Assert.True(player.FindProperty(nameof(ItemCondition_Player.PlayerRaces))!.IsNullable);
+        Assert.Equal("player_category_types", player.FindProperty(nameof(ItemCondition_Player.PlayerCategoryTypes))!.GetColumnName());
+        Assert.Contains(player.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemCondition) && key.DeleteBehavior == DeleteBehavior.Cascade);
+    }
+
+    [Fact]
+    public void ModelsItemSetsWithBodyPartAndSkillReferencesButNoItemReference()
+    {
+        using var context = CreateContext();
+        var itemSet = Entity<ItemSet>(context);
+        var bodyPart = Entity<ItemSetBodyPart>(context);
+        var skill = Entity<ItemSetSkill>(context);
+        var stats = Entity<ItemSetStats>(context);
+
+        Assert.Equal([nameof(ItemSet.GameVersion), nameof(ItemSet.SetId)], itemSet.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(ItemSetBodyPart.GameVersion), nameof(ItemSetBodyPart.SetId), nameof(ItemSetBodyPart.BodyPartName)], bodyPart.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("item_id", bodyPart.FindProperty(nameof(ItemSetBodyPart.ItemId))!.GetColumnName());
+        Assert.Contains(bodyPart.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemBodyPart) && key.DeleteBehavior == DeleteBehavior.Restrict);
+        Assert.DoesNotContain(bodyPart.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item));
+        Assert.Equal([nameof(ItemSetSkill.GameVersion), nameof(ItemSetSkill.SetId), nameof(ItemSetSkill.SkillId), nameof(ItemSetSkill.SkillLevel)], skill.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Contains(skill.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Skill) && key.DeleteBehavior == DeleteBehavior.Restrict);
+        Assert.Equal([nameof(ItemSetStats.GameVersion), nameof(ItemSetStats.SetId)], stats.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.True(stats.FindProperty(nameof(ItemSetStats.Str))!.IsNullable);
+        Assert.Equal("int", stats.FindProperty(nameof(ItemSetStats.Int))!.GetColumnName());
     }
 
     [Fact]

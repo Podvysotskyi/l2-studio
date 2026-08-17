@@ -12,12 +12,15 @@ import {
   getAssetImportWorkItems,
   getNpcDirectory,
   getItemDirectory,
+  getItemSet,
+  getItemSetDirectory,
   getNpcDefinition,
   getItemDefinition,
   getItemLookups,
   getNpcAppearanceManifest,
   getNpcLookupDirectory,
   getSkillLookupDirectory,
+  getSkillDefinition,
   getStudioServiceInfo,
   startAssetFileImport,
   startAssetResourceImport,
@@ -27,11 +30,14 @@ import {
   updateSkillLookupDisplayName,
   updateNpcDefinition,
   updateItemDefinition,
+  updateItemSet,
   setItemPrimarySkill,
   clearItemPrimarySkill,
   createItemSkill,
   updateItemSkill,
   deleteItemSkill,
+  deleteItemCondition,
+  updateItemCondition,
   rebuildStaleAssetSources,
   verifyAssetArtifact
 } from '../../app/services/studio-api'
@@ -105,6 +111,12 @@ describe('Studio API service', () => {
     })
   })
 
+  it('loads a skill definition through the content API', async () => {
+    fetchMock.mockResolvedValue({})
+    await getSkillDefinition(3006)
+    expect(fetchMock).toHaveBeenCalledWith('/api/game-versions/c1/content/skills/3006')
+  })
+
   it('filters item definitions and loads item-handler lookups through the content API', async () => {
     fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
 
@@ -145,6 +157,37 @@ describe('Studio API service', () => {
     await clearItemPrimarySkill('etc', 3028)
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/etc/3028/primary-skill', {
       method: 'DELETE'
+    })
+  })
+
+  it('manages item conditions through the content API', async () => {
+    fetchMock.mockResolvedValue({})
+    const request = {
+      messageId: 1518, addName: false, isPvpFlagged: null,
+      playerRaces: ['HUMAN'], playerCategoryTypes: ['WOLF']
+    }
+    await updateItemCondition('etc', 57, request)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/etc/57/condition', {
+      method: 'PUT', body: request
+    })
+    await deleteItemCondition('etc', 57)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/items/etc/57/condition', { method: 'DELETE' })
+  })
+
+  it('loads and updates item sets through the content API', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
+    await getItemSetDirectory({ query: '  mithril  ' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-sets', {
+      query: { query: 'mithril', page: 1, pageSize: 25 }
+    })
+
+    await getItemSet(1)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-sets/1')
+
+    const request = { skillId: 3006, skillLevel: 1, str: 1, dex: null, con: null, int: null, wit: null, men: null }
+    await updateItemSet(1, request)
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-sets/1', {
+      method: 'PATCH', body: request
     })
   })
 

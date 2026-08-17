@@ -33,6 +33,10 @@ export interface ItemBehaviorAvailabilityRecord {
   isDepositable: boolean | null; isDestroyable: boolean | null; isDropable: boolean | null
   isOlyRestricted: boolean | null; isSellable: boolean | null; isStackable: boolean | null; isTradable: boolean | null
 }
+export interface ItemConditionRecord {
+  messageId: number; addName: boolean; isPvpFlagged: boolean | null
+  playerRaces: string | null; playerCategoryTypes: string | null
+}
 export interface ItemRecord {
   id: number; name: string; itemTypeName: string; itemTypeDisplayName: string
   itemParentTypeName: string | null; itemParentTypeDisplayName: string | null
@@ -50,5 +54,6 @@ export interface ItemDetailRecord {
   properties: ItemPropertiesRecord
   behaviorAvailability: ItemBehaviorAvailabilityRecord | null
   primarySkill: ItemPrimarySkillRecord | null
+  condition: ItemConditionRecord | null
 }
 export interface ItemPage { items: ItemRecord[]; total: number; page: number; pageSize: number }

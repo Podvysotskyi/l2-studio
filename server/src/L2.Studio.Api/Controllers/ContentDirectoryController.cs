@@ -10,6 +10,31 @@ namespace L2.Studio.Api.Controllers;
 [Route("api/game-versions/{gameVersion}/content")]
 public sealed class ContentDirectoryController(IContentDirectoryRepository repository) : ControllerBase
 {
+    [HttpGet("item-sets"), ValidateDirectoryRequest]
+    public Task<L2.Studio.Contracts.ItemSetDirectoryPage> SearchItemSets(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
+        repository.SearchItemSetsAsync(gameVersion, request with { Query = request.Query?.Trim() }, token);
+
+    [HttpGet("item-sets/{setId:int}")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemSetSummary>> GetItemSet(string gameVersion, int setId, CancellationToken token)
+    {
+        var itemSet = await repository.GetItemSetAsync(gameVersion, setId, token);
+        return itemSet is null ? NotFound() : Ok(itemSet);
+    }
+
+    [HttpPatch("item-sets/{setId:int}")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemSetSummary>> UpdateItemSet(string gameVersion, int setId, UpdateItemSetRequest request, CancellationToken token)
+    {
+        try
+        {
+            var itemSet = await repository.UpdateItemSetAsync(gameVersion, setId, request, token);
+            return itemSet is null ? NotFound() : Ok(itemSet);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]> { ["skill"] = [exception.Message] }));
+        }
+    }
+
     [HttpGet("items/{family}"), ValidateDirectoryRequest]
     public async Task<ActionResult<L2.Studio.Contracts.ItemDirectoryPage>> SearchItems(string gameVersion, string family, [FromQuery] ItemDirectoryRequest request, CancellationToken token)
     {
@@ -62,6 +87,29 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
         {
             return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]> { ["definition"] = [exception.Message] }));
         }
+    }
+
+    [HttpPut("items/{family}/{itemId:int}/condition")]
+    public async Task<ActionResult<L2.Studio.Contracts.ItemConditionSummary>> UpdateItemCondition(
+        string gameVersion,
+        string family,
+        int itemId,
+        UpdateItemConditionRequest request,
+        CancellationToken token)
+    {
+        family = family.Trim().ToLowerInvariant();
+        if (!ItemFamilyValues.All.Contains(family)) return NotFound();
+        if (!ValidItemConditionRequest(request)) return BadRequest(ItemConditionValidationProblem());
+        var condition = await repository.UpdateItemConditionAsync(gameVersion, family, itemId, request, token);
+        return condition is null ? NotFound() : Ok(condition);
+    }
+
+    [HttpDelete("items/{family}/{itemId:int}/condition")]
+    public async Task<IActionResult> DeleteItemCondition(string gameVersion, string family, int itemId, CancellationToken token)
+    {
+        family = family.Trim().ToLowerInvariant();
+        if (!ItemFamilyValues.All.Contains(family)) return NotFound();
+        return await repository.DeleteItemConditionAsync(gameVersion, family, itemId, token) ? NoContent() : NotFound();
     }
 
     [HttpPut("items/{family}/{itemId:int}/primary-skill")]
@@ -272,6 +320,12 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
     [HttpGet("skills"), ValidateDirectoryRequest]
     public Task<L2.Studio.Contracts.SkillDirectoryPage> SearchSkills(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
         repository.SearchSkillsAsync(gameVersion, request.Query?.Trim() ?? string.Empty, request.Page, request.PageSize, token);
+    [HttpGet("skills/{id:int}")]
+    public async Task<ActionResult<L2.Studio.Contracts.SkillSummary>> GetSkill(string gameVersion, int id, CancellationToken token)
+    {
+        var skill = await repository.GetSkillAsync(gameVersion, id, token);
+        return skill is null ? NotFound() : Ok(skill);
+    }
     [HttpPatch("skills/{id:int}")]
     public async Task<ActionResult<L2.Studio.Contracts.SkillSummary>> UpdateSkill(string gameVersion, int id, UpdateSkillRequest request, CancellationToken token)
     {
@@ -529,4 +583,22 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
             });
         }
     }
+
+    private static bool ValidItemConditionRequest(UpdateItemConditionRequest request)
+    {
+        if (request.MessageId <= 0) return false;
+        var races = request.PlayerRaces ?? [];
+        var categories = request.PlayerCategoryTypes ?? [];
+        var hasRestriction = request.IsPvpFlagged is not null || races.Count > 0 || categories.Count > 0;
+        return hasRestriction && races.All(IsPlayerRace) && categories.All(IsPlayerCategoryType);
+    }
+
+    private static bool IsPlayerRace(string value) => value.Trim().ToUpperInvariant() is "HUMAN" or "ELF" or "DARK_ELF" or "ORC" or "DWARF";
+
+    private static bool IsPlayerCategoryType(string value) => value.Trim().ToUpperInvariant() is "WOLF" or "HATCHLING_GROUP" or "SIN_EATER_GROUP";
+
+    private static ValidationProblemDetails ItemConditionValidationProblem() => new(new Dictionary<string, string[]>
+    {
+        ["condition"] = ["Provide a positive message ID and at least one supported player restriction."]
+    });
 }

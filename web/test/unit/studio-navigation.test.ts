@@ -29,6 +29,7 @@ describe('Studio navigation', () => {
     ])
     expect(group('Items').children?.map(item => item.label)).toEqual([
       'Definitions',
+      'Item sets',
       'Lookups'
     ])
     expect(child(group('Items'), 'Definitions').children?.map(item => item.label)).toEqual([
@@ -68,6 +69,7 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/items/armor')
     expect(routes).toContain('/authoring/items/pet-collar')
     expect(routes).toContain('/authoring/items/etc')
+    expect(routes).toContain('/authoring/items/sets')
     expect(routes).toContain('/authoring/items/lookups/handlers')
     expect(routes).toContain('/authoring/items/lookups/skill-types')
     expect(routes).toContain('/authoring/skills/target-types')
@@ -132,6 +134,8 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
     expect(studioRouteTitle('/authoring/items')).toBe('Item definitions')
+    expect(studioRouteTitle('/authoring/items/sets')).toBe('Item sets')
+    expect(studioRouteTitle('/authoring/items/sets/1')).toBe('Item set')
     expect(studioRouteTitle('/authoring/items/etc')).toBe('Etc Item definitions')
     expect(studioRouteTitle('/authoring/items/etc/1')).toBe('Etc Item definition')
     expect(studioRouteTitle('/authoring/items/etc/1/skills')).toBe('Etc Item skills')
@@ -146,6 +150,7 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/authoring/items/lookups/skill-types')).toBe('Item skill types')
     expect(studioRouteTitle('/authoring/skills/operate-types'))
       .toBe('Skill operate types')
+    expect(studioRouteTitle('/authoring/skills/3006')).toBe('Skill definition')
     expect(studioRouteTitle('/authoring/players/hair-colors')).toBe('Player hair colors')
     expect(studioRouteTitle('/library/maps')).toBe('Maps')
     expect(studioRouteTitle('/library/maps/17_25')).toBe('Map')

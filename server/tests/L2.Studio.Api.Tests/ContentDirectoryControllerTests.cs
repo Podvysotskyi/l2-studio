@@ -46,6 +46,23 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task GetsSkillDefinitionsOrReturnsNotFound()
+    {
+        var expected = new SkillSummary(3006, 1, "Armor Set", "A2", "Active", "SELF", "Self", 1);
+        var repository = new StubContentDirectoryRepository { Skill = expected };
+        var controller = new ContentDirectoryController(repository);
+
+        var result = await controller.GetSkill("c1", 3006, CancellationToken.None);
+
+        var response = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(expected, response.Value);
+        Assert.Equal(3006, repository.SkillId);
+        var missing = await new ContentDirectoryController(new StubContentDirectoryRepository())
+            .GetSkill("c1", 9999, CancellationToken.None);
+        Assert.IsType<NotFoundResult>(missing.Result);
+    }
+
+    [Fact]
     public async Task DelegatesItemSearchToTheRequestedFamily()
     {
         var repository = new StubContentDirectoryRepository();
@@ -205,6 +222,22 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task ValidatesAndDelegatesItemConditions()
+    {
+        var expected = new ItemConditionSummary(1518, false, null, "DWARF,HUMAN", "WOLF");
+        var repository = new StubContentDirectoryRepository { UpdatedItemCondition = expected };
+        var controller = new ContentDirectoryController(repository);
+        var request = new UpdateItemConditionRequest(1518, false, null, ["human", "dwarf"], ["wolf"]);
+
+        var result = await controller.UpdateItemCondition("c1", "etc", 57, request, CancellationToken.None);
+
+        Assert.Equal(expected, Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal(request, repository.UpdatedItemConditionRequest);
+        var invalid = await controller.UpdateItemCondition("c1", "etc", 57, request with { PlayerRaces = [], PlayerCategoryTypes = [] }, CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(invalid.Result);
+    }
+
+    [Fact]
     public async Task ValidatesAndNormalizesItemSkillMutations()
     {
         var expected = new ItemSkillSummary(3005, 1, "Bleed", "ON_CRITICAL_SKILL", "On critical skill", 50);
@@ -247,6 +280,12 @@ public sealed class ContentDirectoryControllerTests
 
     private sealed class StubContentDirectoryRepository : IContentDirectoryRepository
     {
+        public Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(new ItemSetDirectoryPage([], 0, request.Page, request.PageSize));
+        public Task<ItemSetSummary?> GetItemSetAsync(string gameVersion, int setId, CancellationToken cancellationToken) =>
+            Task.FromResult<ItemSetSummary?>(null);
+        public Task<ItemSetSummary?> UpdateItemSetAsync(string gameVersion, int setId, UpdateItemSetRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<ItemSetSummary?>(null);
         public ItemDirectoryRequest? ItemRequest { get; private set; }
         public string? ItemFamily { get; private set; }
         public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken)
@@ -262,6 +301,12 @@ public sealed class ContentDirectoryControllerTests
             return Task.FromResult<ItemSummary?>(null);
         }
         public Task<bool> DeleteItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<ItemConditionSummary?> UpdateItemConditionAsync(string gameVersion, string family, int itemId, UpdateItemConditionRequest request, CancellationToken cancellationToken)
+        {
+            UpdatedItemConditionRequest = request;
+            return Task.FromResult(UpdatedItemCondition);
+        }
+        public Task<bool> DeleteItemConditionAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, string family, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken) => Task.FromResult<ItemPrimarySkillSummary?>(null);
         public Task<bool> ClearItemPrimarySkillAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<ItemSkillSummary?> CreateItemSkillAsync(string gameVersion, string family, int itemId, CreateItemSkillRequest request, CancellationToken cancellationToken)
@@ -287,6 +332,8 @@ public sealed class ContentDirectoryControllerTests
         public CancellationToken NpcToken { get; private set; }
         public NpcDirectoryRequest? NpcRequest { get; private set; }
         public string? SkillQuery { get; private set; }
+        public int SkillId { get; private set; }
+        public SkillSummary? Skill { get; init; }
         public string? NpcLookupKind { get; private set; }
         public DirectoryRequest? NpcLookupRequest { get; private set; }
         public CancellationToken NpcLookupToken { get; private set; }
@@ -299,6 +346,8 @@ public sealed class ContentDirectoryControllerTests
         public string? UpdatedNpcRaceName { get; private set; }
         public string? UpdatedNpcSexName { get; private set; }
         public UpdateItemRequest? UpdatedItemRequest { get; private set; }
+        public UpdateItemConditionRequest? UpdatedItemConditionRequest { get; private set; }
+        public ItemConditionSummary? UpdatedItemCondition { get; init; }
         public CreateItemSkillRequest? CreatedItemSkillRequest { get; private set; }
         public ItemSkillSummary? CreatedItemSkill { get; init; }
 
@@ -366,6 +415,11 @@ public sealed class ContentDirectoryControllerTests
         {
             SkillQuery = query;
             return Task.FromResult(new SkillDirectoryPage([], 0, page, pageSize));
+        }
+        public Task<SkillSummary?> GetSkillAsync(string gameVersion, int id, CancellationToken cancellationToken)
+        {
+            SkillId = id;
+            return Task.FromResult(Skill);
         }
         public Task<SkillSummary?> UpdateSkillAsync(string gameVersion, int id, UpdateSkillRequest request, CancellationToken cancellationToken) => Task.FromResult<SkillSummary?>(null);
         public Task<bool> DeleteSkillAsync(string gameVersion, int id, CancellationToken cancellationToken) => Task.FromResult(false);

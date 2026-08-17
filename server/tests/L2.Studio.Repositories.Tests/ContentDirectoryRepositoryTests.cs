@@ -213,6 +213,8 @@ public sealed class ContentDirectoryRepositoryTests
             "c1", "skill-operate-types", new DirectoryRequest(), CancellationToken.None);
         var skills = await repository.SearchSkillsAsync("c1", string.Empty, 1, 25, CancellationToken.None);
         var numericSkills = await repository.SearchSkillsAsync("c1", "1", 1, 25, CancellationToken.None);
+        var skill = await repository.GetSkillAsync("c1", 1, CancellationToken.None);
+        var missingSkill = await repository.GetSkillAsync("c1", 2, CancellationToken.None);
 
         Assert.Collection(races.Items, item => Assert.Equal(new PlayerLookupSummary(0, "Human"), item));
         Assert.Collection(appearances.Items, item => Assert.Equal("Human male", item.Name));
@@ -220,6 +222,8 @@ public sealed class ContentDirectoryRepositoryTests
         Assert.Collection(skills.Items, item => Assert.Equal(
             new SkillSummary(1, 1, "Triple Slash", "A1", "Active", "ONE", "One", 0), item));
         Assert.Collection(numericSkills.Items, item => Assert.Equal(1, item.Id));
+        Assert.Equal(new SkillSummary(1, 1, "Triple Slash", "A1", "Active", "ONE", "One", 0), skill);
+        Assert.Null(missingSkill);
 
         var updated = await repository.UpdateSkillLookupDisplayNameAsync(
             "c1", "skill-operate-types", "A1", "Single target", CancellationToken.None);
