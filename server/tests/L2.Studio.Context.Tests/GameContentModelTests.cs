@@ -52,6 +52,12 @@ public sealed class GameContentModelTests
         Assert.Equal("item_recipe_ingredients", Entity<ItemRecipeIngredient>(context).GetTableName());
         Assert.Equal("item_recipe_productions", Entity<ItemRecipeProduction>(context).GetTableName());
         Assert.Equal("item_recipe_stat_uses", Entity<ItemRecipeStatUse>(context).GetTableName());
+        Assert.Equal("npc_spawn_zones", Entity<NpcSpawnZone>(context).GetTableName());
+        Assert.Equal("npc_spawn_zone_territories", Entity<NpcSpawnZoneTerritory>(context).GetTableName());
+        Assert.Equal("npc_spawn_zone_territory_nodes", Entity<NpcSpawnZoneTerritoryNode>(context).GetTableName());
+        Assert.Equal("npc_spawn_zone_entities", Entity<NpcSpawnZoneEntity>(context).GetTableName());
+        Assert.Equal("npc_spawns", Entity<NpcSpawn>(context).GetTableName());
+        Assert.Equal("npc_spawn_entities", Entity<NpcSpawnEntity>(context).GetTableName());
     }
 
     [Fact]
@@ -246,6 +252,40 @@ public sealed class GameContentModelTests
             Assert.Contains(dependent.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemRecipe) && key.DeleteBehavior == DeleteBehavior.Cascade);
             Assert.DoesNotContain(dependent.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item));
         });
+    }
+
+    [Fact]
+    public void ModelsVersionScopedNpcSpawnsWithoutNpcForeignKeys()
+    {
+        using var context = CreateContext();
+        var zone = Entity<NpcSpawnZone>(context);
+        var territory = Entity<NpcSpawnZoneTerritory>(context);
+        var node = Entity<NpcSpawnZoneTerritoryNode>(context);
+        var zoneEntity = Entity<NpcSpawnZoneEntity>(context);
+        var spawn = Entity<NpcSpawn>(context);
+        var spawnEntity = Entity<NpcSpawnEntity>(context);
+
+        Assert.Equal([nameof(NpcSpawnZone.GameVersion), nameof(NpcSpawnZone.Name)], zone.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(NpcSpawnZoneTerritory.GameVersion), nameof(NpcSpawnZoneTerritory.NpcSpawnZoneName)], territory.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(NpcSpawnZoneTerritoryNode.GameVersion), nameof(NpcSpawnZoneTerritoryNode.NpcSpawnZoneName), nameof(NpcSpawnZoneTerritoryNode.Sequence)], node.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(NpcSpawnZoneEntity.GameVersion), nameof(NpcSpawnZoneEntity.NpcSpawnZoneName), nameof(NpcSpawnZoneEntity.Sequence)], zoneEntity.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(NpcSpawn.GameVersion), nameof(NpcSpawn.Name)], spawn.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(NpcSpawnEntity.GameVersion), nameof(NpcSpawnEntity.NpcSpawnName), nameof(NpcSpawnEntity.Sequence)], spawnEntity.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("respawn_delay_seconds", zoneEntity.FindProperty(nameof(NpcSpawnZoneEntity.RespawnDelaySeconds))!.GetColumnName());
+        Assert.Equal("respawn_random_seconds", zoneEntity.FindProperty(nameof(NpcSpawnZoneEntity.RespawnRandomSeconds))!.GetColumnName());
+        Assert.True(zoneEntity.FindProperty(nameof(NpcSpawnZoneEntity.RespawnRandomSeconds))!.IsNullable);
+        Assert.Equal("heading", spawnEntity.FindProperty(nameof(NpcSpawnEntity.Heading))!.GetColumnName());
+
+        Assert.Contains(territory.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(NpcSpawnZone) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.Contains(node.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(NpcSpawnZoneTerritory) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.Contains(zoneEntity.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(NpcSpawnZone) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.Contains(spawnEntity.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(NpcSpawn) && key.DeleteBehavior == DeleteBehavior.Cascade);
+        Assert.DoesNotContain(zoneEntity.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Npc));
+        Assert.DoesNotContain(spawnEntity.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Npc));
+        Assert.Contains(zoneEntity.GetIndexes(), index => index.Properties.Select(property => property.Name).SequenceEqual(
+            [nameof(NpcSpawnZoneEntity.GameVersion), nameof(NpcSpawnZoneEntity.NpcId)]));
+        Assert.Contains(spawnEntity.GetIndexes(), index => index.Properties.Select(property => property.Name).SequenceEqual(
+            [nameof(NpcSpawnEntity.GameVersion), nameof(NpcSpawnEntity.NpcId)]));
     }
 
     [Fact]

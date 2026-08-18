@@ -235,6 +235,55 @@ public sealed class WorkerJobTests
     }
 
     [Fact]
+    public void DefinesCompleteImportableC1NpcSpawnCatalog()
+    {
+        var catalog = new C1NpcSpawnCatalog();
+
+        Assert.Equal(1255, catalog.Zones.Count);
+        Assert.Equal(73, catalog.Spawns.Count);
+        Assert.Equal(catalog.Zones.Count, catalog.Zones.Select(value => value.Name).Distinct().Count());
+        Assert.Equal(catalog.Spawns.Count, catalog.Spawns.Select(value => value.Name).Distinct().Count());
+        Assert.Equal(5960, catalog.Zones.Sum(value => value.TerritoryNodes.Count));
+        Assert.Equal(3090, catalog.Zones.Sum(value => value.Entities.Count));
+        Assert.Equal(5671, catalog.Spawns.Sum(value => value.Entities.Count));
+        var blazingSwamp = Assert.Single(catalog.Zones, value => value.Name == "aden03_2417_20");
+        Assert.Equal(-4588, blazingSwamp.MinZ);
+        Assert.Equal(-3988, blazingSwamp.MaxZ);
+        Assert.Contains(blazingSwamp.TerritoryNodes, value => value is { Sequence: 0, X: 146668, Y: -10168 });
+        Assert.Contains(blazingSwamp.Entities, value => value is
+        {
+            Sequence: 0,
+            NpcId: 20676,
+            Count: 3,
+            RespawnDelaySeconds: 45,
+            RespawnRandomSeconds: null
+        });
+
+        var aden = Assert.Single(catalog.Spawns, value => value.Name == "AdenNPCs");
+        Assert.Contains(aden.Entities, value => value is
+        {
+            Sequence: 0,
+            NpcId: 30857,
+            X: 147456,
+            Y: 22576,
+            Z: -1989,
+            Heading: 16384,
+            RespawnDelaySeconds: 60
+        });
+        Assert.Contains(catalog.Zones.SelectMany(value => value.Entities), value => value.RespawnRandomSeconds == 50);
+        Assert.All(catalog.Zones.SelectMany(value => value.Entities), value => Assert.True(value.Count > 0));
+    }
+
+    [Fact]
+    public void SupportsC1NpcSpawnImportsInTheNpcConcurrencyFamily()
+    {
+        Assert.True(ContentImportTargetValues.All.Contains(ContentImportTargetValues.NpcSpawns));
+        Assert.True(ContentImportTargetValues.Supports("c1", ContentImportTargetValues.NpcSpawns));
+        Assert.False(ContentImportTargetValues.Supports("c4", ContentImportTargetValues.NpcSpawns));
+        Assert.Equal("npcs", ContentImportTargetValues.Family(ContentImportTargetValues.NpcSpawns));
+    }
+
+    [Fact]
     public void DefinesCompleteImportableC1PlayerCatalog()
     {
         var catalog = new C1PlayerCatalog();
@@ -316,7 +365,7 @@ public sealed class WorkerJobTests
             .Where(type => type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0)
             .ToArray();
 
-        Assert.Equal(14, handlerTypes.Length);
+        Assert.Equal(15, handlerTypes.Length);
         Assert.All(handlerTypes, type => Assert.Equal("L2.Studio.Worker", type.Namespace));
         Assert.DoesNotContain(typeof(AssetImportJobProcessor).Assembly.GetTypes(), type =>
             type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0);

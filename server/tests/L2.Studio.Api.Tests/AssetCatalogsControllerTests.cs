@@ -92,6 +92,18 @@ public sealed class AssetCatalogsControllerTests
     }
 
     [Fact]
+    public async Task ReturnsThePublishedWorldMapOverviewReference()
+    {
+        var expected = new WorldMapOverviewReference("/versions/c1/Maps/world/manifest.json", 101);
+        var repository = new StubAssetCatalogRepository { WorldMapOverview = expected };
+
+        var result = await new AssetCatalogsController(repository)
+            .GetWorldMapOverview("c1", CancellationToken.None);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result.Result).Value);
+    }
+
+    [Fact]
     public async Task ReturnsDiagnosticsForThePublishedCatalogItem()
     {
         var expected = new AssetCatalogDiagnosticPage(
@@ -151,6 +163,7 @@ public sealed class AssetCatalogsControllerTests
         public JsonElement? ItemResult { get; init; }
         public AssetCatalogDiagnosticPage? DiagnosticResult { get; init; }
         public NpcAppearanceManifestReference? NpcAppearanceManifest { get; init; }
+        public WorldMapOverviewReference? WorldMapOverview { get; init; }
         public string? SearchKind { get; private set; }
         public string? SearchQuery { get; private set; }
         public string? SearchGroupName { get; private set; }
@@ -183,6 +196,10 @@ public sealed class AssetCatalogsControllerTests
             NpcAppearanceId = npcId;
             return Task.FromResult(NpcAppearanceManifest);
         }
+
+        public Task<WorldMapOverviewReference?> GetWorldMapOverviewAsync(
+            string gameVersion,
+            CancellationToken cancellationToken) => Task.FromResult(WorldMapOverview);
 
         public Task<AssetCatalogPage?> SearchAsync(
             string gameVersion,

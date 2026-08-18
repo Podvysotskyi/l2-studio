@@ -10,6 +10,12 @@ namespace L2.Studio.Api.Controllers;
 [Route("api/game-versions/{gameVersion}/content")]
 public sealed class ContentDirectoryController(IContentDirectoryRepository repository) : ControllerBase
 {
+    [HttpGet("npc-spawns/world-map")]
+    public Task<L2.Studio.Contracts.NpcSpawnWorldMap> GetNpcSpawnWorldMap(
+        string gameVersion,
+        CancellationToken token) =>
+        repository.GetNpcSpawnWorldMapAsync(gameVersion, token);
+
     [HttpGet("item-sets"), ValidateDirectoryRequest]
     public Task<L2.Studio.Contracts.ItemSetDirectoryPage> SearchItemSets(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
         repository.SearchItemSetsAsync(gameVersion, request with { Query = request.Query?.Trim() }, token);

@@ -62,6 +62,27 @@ public sealed class AssetCatalogRepository(
             manifestUrlTemplate.GetString()!.Replace("{id}", npcId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
     }
 
+    public async Task<WorldMapOverviewReference?> GetWorldMapOverviewAsync(
+        string gameVersion,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var metadataJson = await context.AssetCatalogs.AsNoTracking()
+            .Where(catalog => catalog.GameVersion == gameVersion &&
+                catalog.Kind == AssetImportJobValues.Maps && catalog.IsActive)
+            .Select(catalog => catalog.MetadataJson)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (metadataJson is null) return null;
+
+        using var document = JsonDocument.Parse(metadataJson);
+        if (!document.RootElement.TryGetProperty("worldOverview", out var overview) ||
+            overview.ValueKind != JsonValueKind.Object)
+            return null;
+        return JsonSerializer.Deserialize<WorldMapOverviewReference>(
+            overview.GetRawText(),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    }
+
     public async Task<AssetCatalogPage?> SearchAsync(
         string gameVersion, string kind, string query, string? groupName, string? originalFolder, int page, int pageSize, CancellationToken cancellationToken)
     {

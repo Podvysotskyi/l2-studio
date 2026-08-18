@@ -35,6 +35,18 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task GetsTheCompleteNpcSpawnWorldMap()
+    {
+        var expected = new NpcSpawnWorldMap([], []);
+        var repository = new StubContentDirectoryRepository { NpcSpawnWorldMap = expected };
+
+        var result = await new ContentDirectoryController(repository)
+            .GetNpcSpawnWorldMap("c1", CancellationToken.None);
+
+        Assert.Same(expected, result);
+    }
+
+    [Fact]
     public async Task SearchesSkillsWithAnEmptyQueryWhenItIsMissing()
     {
         var repository = new StubContentDirectoryRepository();
@@ -354,6 +366,7 @@ public sealed class ContentDirectoryControllerTests
         public Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken) => Task.FromResult<ItemLookupSummary?>(new(name, displayName));
         public Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken) => Task.FromResult(false);
         public NpcDirectoryPage Npcs { get; init; } = new([], 0, 1, 25);
+        public NpcSpawnWorldMap NpcSpawnWorldMap { get; init; } = new([], []);
         public DirectoryPage<NpcLookupSummary> NpcLookups { get; init; } = new([], 0, 1, 25);
         public NpcSummary? Npc { get; init; }
         public NpcSummary? UpdatedNpc { get; init; }
@@ -393,6 +406,9 @@ public sealed class ContentDirectoryControllerTests
             NpcToken = cancellationToken;
             return Task.FromResult(Npcs);
         }
+
+        public Task<NpcSpawnWorldMap> GetNpcSpawnWorldMapAsync(string gameVersion, CancellationToken cancellationToken) =>
+            Task.FromResult(NpcSpawnWorldMap);
 
         public Task<NpcSummary?> GetNpcAsync(string gameVersion, int id, CancellationToken cancellationToken)
         {

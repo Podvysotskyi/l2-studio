@@ -25,6 +25,15 @@ public sealed class AssetCatalogsController(IAssetCatalogRepository repository) 
         return result is null ? NotFound() : Ok(result);
     }
 
+    [HttpGet("maps/world-overview")]
+    public async Task<ActionResult<WorldMapOverviewReference>> GetWorldMapOverview(
+        string gameVersion,
+        CancellationToken token)
+    {
+        var result = await repository.GetWorldMapOverviewAsync(gameVersion, token);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpGet("artifacts")]
     public async Task<ActionResult<AssetArtifactPage>> GetArtifacts(
         string gameVersion,

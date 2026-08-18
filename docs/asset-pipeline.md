@@ -72,6 +72,10 @@ provides an explicit file.
   gameplay water-volume meshes remain optional diagnostics, default to hidden
   in the map inspector, and are omitted from generated map previews.
   PlayerStart data is not authoritative Game Server spawn configuration.
+  Map imports additionally publish a versioned world-overview manifest with
+  one 101 × 101 terrain mesh per imported terrain tile. Studio uses this
+  low-detail artifact for the NPC spawn-map workspace; it is an inspection
+  surface, not authoritative game-world geometry.
 - Chronicle 1 `.ukx` packages publish skeletal meshes, skin weights, skeletons,
   resolved per-section default materials, and reusable compatible animation
   sets as browser-playable GLB. Animation

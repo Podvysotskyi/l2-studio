@@ -27,6 +27,8 @@ import type {
   SkillLookupKind,
   SkillLookupRecord
 } from '../types/models/content-directory'
+import type { NpcSpawnWorldMap } from '../types/models/npc-spawn-world-map'
+import type { WorldMapOverviewReference } from '../types/models/world-map-overview'
 import type {
   DirectoryRequest,
   ItemDirectoryRequest,
@@ -111,6 +113,10 @@ export function getNpcDirectory(
   return $fetch<NpcPage>(versionPath('/content/npcs'), {
     query: npcDirectoryQuery(request)
   })
+}
+
+export function getNpcSpawnWorldMap(): Promise<NpcSpawnWorldMap> {
+  return $fetch<NpcSpawnWorldMap>(versionPath('/content/npc-spawns/world-map'))
 }
 
 export function getItemDirectory(family: ItemFamily, request: ItemDirectoryRequest = {}): Promise<ItemPage> {
@@ -320,6 +326,10 @@ export async function getNpcAppearanceManifest(id: number): Promise<NpcAppearanc
   return $fetch<NpcAppearanceManifestReference>(
     versionPath(`/assets/npcappearances/npcs/${id}/manifest`)
   )
+}
+
+export function getWorldMapOverview(): Promise<WorldMapOverviewReference> {
+  return $fetch<WorldMapOverviewReference>(versionPath('/assets/maps/world-overview'))
 }
 
 export function getAssetArtifacts(request: {

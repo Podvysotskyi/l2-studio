@@ -11,6 +11,7 @@ import {
   getStaleAssetSources,
   getAssetImportWorkItems,
   getNpcDirectory,
+  getNpcSpawnWorldMap,
   getItemDirectory,
   getItemSet,
   getItemSetDirectory,
@@ -20,6 +21,7 @@ import {
   getItemDefinition,
   getItemLookups,
   getNpcAppearanceManifest,
+  getWorldMapOverview,
   getNpcLookupDirectory,
   getSkillLookupDirectory,
   getSkillDefinition,
@@ -97,6 +99,16 @@ describe('Studio API service', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npcs/100', {
       method: 'PATCH', body: request
     })
+  })
+
+  it('loads NPC spawn data and the terrain overview through version-scoped APIs', async () => {
+    fetchMock.mockResolvedValue({})
+
+    await getNpcSpawnWorldMap()
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/npc-spawns/world-map')
+
+    await getWorldMapOverview()
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/assets/maps/world-overview')
   })
 
   it('loads and updates structured item attack geometry through the content API', async () => {

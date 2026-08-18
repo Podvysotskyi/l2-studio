@@ -434,6 +434,7 @@ public sealed partial class AssetImportJobProcessor
         Directory.CreateDirectory(stagingPath);
         var catalogEntries = new List<MapCatalogEntry>();
         var sceneCatalogEntries = new List<SceneCatalogEntry>();
+        var worldOverviewTiles = new List<WorldMapOverviewTerrainTile>();
         IReadOnlyList<UnrealSkyZoneInfo> sharedSkyZones = [];
         if (scenes)
         {
@@ -541,6 +542,25 @@ public sealed partial class AssetImportJobProcessor
                                 var fileName = $"{terrain.Name}.glb";
                                 await File.WriteAllBytesAsync(Path.Combine(mapPath, fileName), glb, cancellationToken);
                                 terrainUrl = VersionedUrl(outputUrlRoot, source.Name, fileName, hash);
+                                if (!scenes)
+                                {
+                                    var overviewGlb = GlbStaticMeshEncoder.Encode(
+                                        WorldMapTerrainMeshBuilder.Build(
+                                            texture,
+                                            terrain.ToWorld,
+                                            $"{source.Name}/{terrain.Name}"));
+                                    var overviewHash = Convert.ToHexStringLower(SHA256.HashData(overviewGlb));
+                                    var overviewFolder = Path.Combine(stagingPath, "world-overview");
+                                    Directory.CreateDirectory(overviewFolder);
+                                    var overviewFileName = $"{worldOverviewTiles.Count:D4}.glb";
+                                    await File.WriteAllBytesAsync(
+                                        Path.Combine(overviewFolder, overviewFileName),
+                                        overviewGlb,
+                                        cancellationToken);
+                                    worldOverviewTiles.Add(new WorldMapOverviewTerrainTile(
+                                        $"{source.Name}/{terrain.Name}",
+                                        $"/{EscapedUrlRoot(outputUrlRoot)}/world-overview/{Uri.EscapeDataString(overviewFileName)}?v={overviewHash[..12]}"));
+                                }
                             }
                             else
                             {
@@ -762,6 +782,21 @@ public sealed partial class AssetImportJobProcessor
             }
 
             job.WarningsJson = JsonSerializer.Serialize(warnings);
+            WorldMapOverviewReference? worldOverview = null;
+            if (!scenes && worldOverviewTiles.Count > 0)
+            {
+                var overviewFolder = Path.Combine(stagingPath, "world-overview");
+                var overviewManifestHash = await WriteManifestAsync(
+                    Path.Combine(overviewFolder, "manifest.json"),
+                    new WorldMapOverviewManifest(
+                        1,
+                        WorldMapTerrainMeshBuilder.Resolution,
+                        worldOverviewTiles),
+                    cancellationToken);
+                worldOverview = new WorldMapOverviewReference(
+                    $"/{EscapedUrlRoot(outputUrlRoot)}/world-overview/manifest.json?v={overviewManifestHash[..12]}",
+                    WorldMapTerrainMeshBuilder.Resolution);
+            }
             await File.WriteAllTextAsync(Path.Combine(stagingPath, ".l2-asset-version"), job.SourceHash, cancellationToken);
             Promote(stagingPath, finalPath);
             if (scenes)
@@ -772,7 +807,7 @@ public sealed partial class AssetImportJobProcessor
             else
             {
                 await PublishCatalogAsync(context, job, finalPath, outputUrlRoot, MapSchemaVersion, 111, Array.Empty<string>(), catalogEntries,
-                    group => group, item => item.Name, _ => null, item => item.Status, new { }, cancellationToken);
+                    group => group, item => item.Name, _ => null, item => item.Status, new { worldOverview }, cancellationToken);
             }
             job.Status = warnings.Count == 0
                 ? AssetImportJobValues.Succeeded

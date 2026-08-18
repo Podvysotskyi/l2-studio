@@ -77,6 +77,11 @@ export const studioNavigation: NavigationMenuItem[] = [
         to: '/authoring/npcs'
       },
       {
+        label: 'Spawn map',
+        icon: 'i-lucide-map-pinned',
+        to: '/authoring/npcs/spawn-map'
+      },
+      {
         label: 'Races',
         icon: 'i-lucide-orbit',
         to: '/authoring/npcs/races'
@@ -278,6 +283,7 @@ export function withStudioRouteGroup(
 export function studioRouteTitle(path: string) {
   if (path === '/') return 'Dashboard'
   if (path === '/authoring/npcs') return 'NPC definitions'
+  if (path === '/authoring/npcs/spawn-map') return 'NPC spawn map'
   if (/^\/authoring\/npcs\/\d+$/.test(path)) return 'NPC definition'
   if (path === '/authoring/npcs/races') return 'NPC races'
   if (path === '/authoring/npcs/sexes') return 'NPC sexes'

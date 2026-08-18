@@ -17,6 +17,12 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
     public DbSet<NpcStatsAttack> NpcStatsAttacks => Set<NpcStatsAttack>();
     public DbSet<NpcStatsDefence> NpcStatsDefences => Set<NpcStatsDefence>();
     public DbSet<NpcStatsSpeed> NpcStatsSpeeds => Set<NpcStatsSpeed>();
+    public DbSet<NpcSpawnZone> NpcSpawnZones => Set<NpcSpawnZone>();
+    public DbSet<NpcSpawnZoneTerritory> NpcSpawnZoneTerritories => Set<NpcSpawnZoneTerritory>();
+    public DbSet<NpcSpawnZoneTerritoryNode> NpcSpawnZoneTerritoryNodes => Set<NpcSpawnZoneTerritoryNode>();
+    public DbSet<NpcSpawnZoneEntity> NpcSpawnZoneEntities => Set<NpcSpawnZoneEntity>();
+    public DbSet<NpcSpawn> NpcSpawns => Set<NpcSpawn>();
+    public DbSet<NpcSpawnEntity> NpcSpawnEntities => Set<NpcSpawnEntity>();
     public DbSet<NpcType> NpcTypes => Set<NpcType>();
     public DbSet<NpcRace> NpcRaces => Set<NpcRace>();
     public DbSet<NpcSex> NpcSexes => Set<NpcSex>();
@@ -336,6 +342,32 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         var npcAttack = modelBuilder.Entity<NpcStatsAttack>();
         var npcDefence = modelBuilder.Entity<NpcStatsDefence>();
         var npcSpeed = modelBuilder.Entity<NpcStatsSpeed>();
+        var npcSpawnZone = modelBuilder.Entity<NpcSpawnZone>();
+        var npcSpawnZoneTerritory = modelBuilder.Entity<NpcSpawnZoneTerritory>();
+        npcSpawnZoneTerritory.ToTable("npc_spawn_zone_territories", table =>
+            table.HasCheckConstraint("ck_npc_spawn_zone_territories_z_bounds", "min_z <= max_z"));
+        npcSpawnZoneTerritory.HasOne(entity => entity.NpcSpawnZone).WithOne(entity => entity.Territory)
+            .HasForeignKey<NpcSpawnZoneTerritory>(entity => new { entity.GameVersion, entity.NpcSpawnZoneName })
+            .OnDelete(DeleteBehavior.Cascade);
+        var npcSpawnZoneTerritoryNode = modelBuilder.Entity<NpcSpawnZoneTerritoryNode>();
+        npcSpawnZoneTerritoryNode.HasOne(entity => entity.Territory).WithMany(entity => entity.Nodes)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSpawnZoneName })
+            .OnDelete(DeleteBehavior.Cascade);
+        var npcSpawnZoneEntity = modelBuilder.Entity<NpcSpawnZoneEntity>();
+        npcSpawnZoneEntity.ToTable("npc_spawn_zone_entities", table =>
+            table.HasCheckConstraint("ck_npc_spawn_zone_entities_count", "count > 0"));
+        npcSpawnZoneEntity.HasIndex(entity => new { entity.GameVersion, entity.NpcId })
+            .HasDatabaseName("ix_npc_spawn_zone_entities_npc_id");
+        npcSpawnZoneEntity.HasOne(entity => entity.NpcSpawnZone).WithMany(entity => entity.Entities)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSpawnZoneName })
+            .OnDelete(DeleteBehavior.Cascade);
+        var npcSpawn = modelBuilder.Entity<NpcSpawn>();
+        var npcSpawnEntity = modelBuilder.Entity<NpcSpawnEntity>();
+        npcSpawnEntity.HasIndex(entity => new { entity.GameVersion, entity.NpcId })
+            .HasDatabaseName("ix_npc_spawn_entities_npc_id");
+        npcSpawnEntity.HasOne(entity => entity.NpcSpawn).WithMany(entity => entity.Entities)
+            .HasForeignKey(entity => new { entity.GameVersion, entity.NpcSpawnName })
+            .OnDelete(DeleteBehavior.Cascade);
 
         var itemType = modelBuilder.Entity<ItemType>();
         var itemAction = modelBuilder.Entity<ItemAction>();
@@ -469,6 +501,12 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
         npcAttack.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcDefence.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         npcSpeed.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawnZone.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawnZoneTerritory.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawnZoneTerritoryNode.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawnZoneEntity.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawn.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
+        npcSpawnEntity.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemType.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemAction.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
         itemBodyPart.HasOne<GameVersion>().WithMany().HasForeignKey(entity => entity.GameVersion).OnDelete(DeleteBehavior.Restrict);
@@ -504,6 +542,8 @@ public sealed class GameContentDbContext(DbContextOptions<GameContentDbContext> 
             typeof(PlayerHairStyle), typeof(PlayerHairColor), typeof(NpcType), typeof(NpcRace),
             typeof(NpcSex), typeof(Npc), typeof(NpcStatus), typeof(NpcStats), typeof(NpcStatsVitals),
             typeof(NpcStatsAttack), typeof(NpcStatsDefence), typeof(NpcStatsSpeed),
+            typeof(NpcSpawnZone), typeof(NpcSpawnZoneTerritory), typeof(NpcSpawnZoneTerritoryNode),
+            typeof(NpcSpawnZoneEntity), typeof(NpcSpawn), typeof(NpcSpawnEntity),
             typeof(ItemType), typeof(ItemAction), typeof(ItemBodyPart), typeof(ItemMaterial), typeof(ItemCrystalType),
             typeof(ItemHandler), typeof(ItemSkillType), typeof(Item), typeof(Item_Armor), typeof(Item_Weapon), typeof(Item_Arrow), typeof(Item_Material),
             typeof(Item_Potion), typeof(Item_Recipe), typeof(Item_Enchant), typeof(Item_Scroll), typeof(Item_PetCollar), typeof(Item_Etc),

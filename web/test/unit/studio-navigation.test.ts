@@ -69,6 +69,7 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/players/classes')
     expect(routes).toContain('/authoring/players/hair-styles')
     expect(routes).toContain('/authoring/npcs')
+    expect(routes).toContain('/authoring/npcs/spawn-map')
     expect(routes).toContain('/authoring/items/weapon')
     expect(routes).toContain('/authoring/items/armor')
     expect(routes).toContain('/authoring/items/pet-collar')
@@ -103,6 +104,8 @@ describe('Studio navigation', () => {
     expect(studioRouteGroup('/authoring/players/classes'))
       .toBe(studioNavigationGroups.players)
     expect(studioRouteGroup('/authoring/npcs/races'))
+      .toBe(studioNavigationGroups.npcs)
+    expect(studioRouteGroup('/authoring/npcs/spawn-map'))
       .toBe(studioNavigationGroups.npcs)
     expect(studioRouteGroup('/authoring/items/weapon/1'))
       .toBe(studioNavigationGroups.items)
@@ -140,6 +143,7 @@ describe('Studio navigation', () => {
 
   it('provides titles for canonical list and detail routes', () => {
     expect(studioRouteTitle('/authoring/npcs')).toBe('NPC definitions')
+    expect(studioRouteTitle('/authoring/npcs/spawn-map')).toBe('NPC spawn map')
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
     expect(studioRouteTitle('/authoring/items')).toBe('Item definitions')
     expect(studioRouteTitle('/authoring/items/sets')).toBe('Item sets')

@@ -26,6 +26,7 @@ public interface IContentDirectoryRepository
     Task<ItemLookupSummary?> UpdateItemLookupDisplayNameAsync(string gameVersion, string kind, string name, string displayName, CancellationToken cancellationToken);
     Task<bool> DeleteItemLookupAsync(string gameVersion, string kind, string name, CancellationToken cancellationToken);
     Task<NpcDirectoryPage> SearchNpcsAsync(string gameVersion, NpcDirectoryRequest request, CancellationToken cancellationToken);
+    Task<NpcSpawnWorldMap> GetNpcSpawnWorldMapAsync(string gameVersion, CancellationToken cancellationToken);
     Task<NpcSummary?> GetNpcAsync(string gameVersion, int id, CancellationToken cancellationToken);
     Task<NpcSummary?> UpdateNpcAsync(string gameVersion, int id, string name, short level, string npcTypeName, string? npcRaceName, string npcSexName, CancellationToken cancellationToken);
     Task<bool> DeleteNpcAsync(string gameVersion, int id, CancellationToken cancellationToken);
