@@ -47,6 +47,11 @@ public sealed class GameContentModelTests
         Assert.Equal("item_set_body_parts", Entity<ItemSetBodyPart>(context).GetTableName());
         Assert.Equal("item_set_skills", Entity<ItemSetSkill>(context).GetTableName());
         Assert.Equal("item_set_stats", Entity<ItemSetStats>(context).GetTableName());
+        Assert.Equal("item_recipe_types", Entity<ItemRecipeType>(context).GetTableName());
+        Assert.Equal("item_recipes", Entity<ItemRecipe>(context).GetTableName());
+        Assert.Equal("item_recipe_ingredients", Entity<ItemRecipeIngredient>(context).GetTableName());
+        Assert.Equal("item_recipe_productions", Entity<ItemRecipeProduction>(context).GetTableName());
+        Assert.Equal("item_recipe_stat_uses", Entity<ItemRecipeStatUse>(context).GetTableName());
     }
 
     [Fact]
@@ -210,6 +215,37 @@ public sealed class GameContentModelTests
         Assert.Equal([nameof(ItemSetStats.GameVersion), nameof(ItemSetStats.SetId)], stats.FindPrimaryKey()!.Properties.Select(property => property.Name));
         Assert.True(stats.FindProperty(nameof(ItemSetStats.Str))!.IsNullable);
         Assert.Equal("int", stats.FindProperty(nameof(ItemSetStats.Int))!.GetColumnName());
+    }
+
+    [Fact]
+    public void ModelsVersionScopedItemRecipesWithAggregateDependents()
+    {
+        using var context = CreateContext();
+        var type = Entity<ItemRecipeType>(context);
+        var recipe = Entity<ItemRecipe>(context);
+        var ingredient = Entity<ItemRecipeIngredient>(context);
+        var production = Entity<ItemRecipeProduction>(context);
+        var statUse = Entity<ItemRecipeStatUse>(context);
+
+        Assert.Equal([nameof(ItemRecipeType.GameVersion), nameof(ItemRecipeType.Name)], type.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(ItemRecipe.GameVersion), nameof(ItemRecipe.Id)], recipe.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal("item_recipe_type_name", recipe.FindProperty(nameof(ItemRecipe.ItemRecipeTypeName))!.GetColumnName());
+        Assert.Equal("craft_level", recipe.FindProperty(nameof(ItemRecipe.CraftLevel))!.GetColumnName());
+        Assert.Equal("success_rate", recipe.FindProperty(nameof(ItemRecipe.SuccessRate))!.GetColumnName());
+        Assert.Contains(recipe.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemRecipeType) &&
+            key.DeleteBehavior == DeleteBehavior.Restrict && key.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ItemRecipe.GameVersion), nameof(ItemRecipe.ItemRecipeTypeName)]));
+
+        Assert.Equal([nameof(ItemRecipeIngredient.GameVersion), nameof(ItemRecipeIngredient.ItemRecipeId), nameof(ItemRecipeIngredient.ItemId)], ingredient.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(ItemRecipeProduction.GameVersion), nameof(ItemRecipeProduction.ItemRecipeId), nameof(ItemRecipeProduction.ItemId)], production.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.Equal([nameof(ItemRecipeStatUse.GameVersion), nameof(ItemRecipeStatUse.ItemRecipeId)], statUse.FindPrimaryKey()!.Properties.Select(property => property.Name));
+        Assert.True(statUse.FindProperty(nameof(ItemRecipeStatUse.Mp))!.IsNullable);
+        Assert.True(statUse.FindProperty(nameof(ItemRecipeStatUse.Hp))!.IsNullable);
+        Assert.All([ingredient, production, statUse], dependent =>
+        {
+            Assert.Contains(dependent.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(ItemRecipe) && key.DeleteBehavior == DeleteBehavior.Cascade);
+            Assert.DoesNotContain(dependent.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Item));
+        });
     }
 
     [Fact]

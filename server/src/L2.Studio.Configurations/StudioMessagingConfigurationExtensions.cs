@@ -82,6 +82,7 @@ public static class StudioMessagingConfigurationExtensions
         options.PublishMessage<ActivateAssetRelease>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Npcs>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1Items>().ToPostgresqlQueue(ControlQueue);
+        options.PublishMessage<ImportC1ItemRecipes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1ItemTypes>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1ItemActions>().ToPostgresqlQueue(ControlQueue);
         options.PublishMessage<ImportC1ItemBodyParts>().ToPostgresqlQueue(ControlQueue);

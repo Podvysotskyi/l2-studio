@@ -197,6 +197,44 @@ public sealed class WorkerJobTests
     }
 
     [Fact]
+    public void DefinesCompleteImportableC1ItemRecipeCatalog()
+    {
+        var catalog = new C1ItemRecipeCatalog();
+
+        Assert.Equal([new ItemRecipeTypeDefinition("dwarven")], catalog.Types);
+        Assert.Equal(404, catalog.Recipes.Count);
+        Assert.Equal(404, catalog.Recipes.Select(recipe => recipe.Id).Distinct().Count());
+        Assert.Equal(2228, catalog.Recipes.Sum(recipe => recipe.Ingredients.Count));
+        Assert.Equal(404, catalog.Recipes.Sum(recipe => recipe.Productions.Count));
+        Assert.All(catalog.Recipes, recipe =>
+        {
+            Assert.Equal("dwarven", recipe.ItemRecipeTypeName);
+            Assert.InRange(recipe.CraftLevel, 1, 10);
+            Assert.NotEmpty(recipe.Ingredients);
+            Assert.Single(recipe.Productions);
+            Assert.NotNull(recipe.StatUse.Mp);
+            Assert.Null(recipe.StatUse.Hp);
+        });
+        Assert.Contains(catalog.Recipes, recipe => recipe is
+        {
+            Id: 1, Name: "mk_wooden_arrow", CraftLevel: 1, SuccessRate: 100,
+            Ingredients: [{ ItemId: 1864, Count: 4 }, { ItemId: 1869, Count: 2 }],
+            Productions: [{ ItemId: 17, Count: 500 }], StatUse: { Mp: 30, Hp: null }
+        });
+        Assert.Single(catalog.Recipes, recipe => recipe.SuccessRate == 25);
+        Assert.Contains(catalog.Recipes, recipe => recipe is { Id: 477, Name: "mk_maestro_mold", CraftLevel: 6 });
+    }
+
+    [Fact]
+    public void SupportsC1ItemRecipeImportsInTheItemConcurrencyFamily()
+    {
+        Assert.True(ContentImportTargetValues.All.Contains(ContentImportTargetValues.ItemRecipes));
+        Assert.True(ContentImportTargetValues.Supports("c1", ContentImportTargetValues.ItemRecipes));
+        Assert.False(ContentImportTargetValues.Supports("c4", ContentImportTargetValues.ItemRecipes));
+        Assert.Equal("items", ContentImportTargetValues.Family(ContentImportTargetValues.ItemRecipes));
+    }
+
+    [Fact]
     public void DefinesCompleteImportableC1PlayerCatalog()
     {
         var catalog = new C1PlayerCatalog();
@@ -278,7 +316,7 @@ public sealed class WorkerJobTests
             .Where(type => type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0)
             .ToArray();
 
-        Assert.Equal(13, handlerTypes.Length);
+        Assert.Equal(14, handlerTypes.Length);
         Assert.All(handlerTypes, type => Assert.Equal("L2.Studio.Worker", type.Namespace));
         Assert.DoesNotContain(typeof(AssetImportJobProcessor).Assembly.GetTypes(), type =>
             type.GetCustomAttributes(typeof(WolverineHandlerAttribute), inherit: false).Length > 0);

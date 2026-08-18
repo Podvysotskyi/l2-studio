@@ -36,6 +36,7 @@ import type {
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
 import type { ItemConditionRecord, ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
 import type { ItemSetPage, ItemSetRecord } from '../types/models/item-set'
+import type { ItemRecipePage, ItemRecipeTypePage } from '../types/models/item-recipe'
 import type { ItemFamily } from '../types/requests/directory-request'
 import type {
   NpcPage,
@@ -137,6 +138,12 @@ export function deleteItemCondition(family: ItemFamily, id: number): Promise<voi
 }
 export function getItemSetDirectory(request: { query?: string; page?: number; pageSize?: number } = {}): Promise<ItemSetPage> {
   return $fetch<ItemSetPage>(versionPath('/content/item-sets'), { query: directoryQuery(request) })
+}
+export function getItemRecipeDirectory(request: DirectoryRequest = {}): Promise<ItemRecipePage> {
+  return $fetch<ItemRecipePage>(versionPath('/content/item-recipes'), { query: directoryQuery(request) })
+}
+export function getItemRecipeTypeDirectory(request: DirectoryRequest = {}): Promise<ItemRecipeTypePage> {
+  return $fetch<ItemRecipeTypePage>(versionPath('/content/item-recipe-types'), { query: directoryQuery(request) })
 }
 export function getItemSet(id: number): Promise<ItemSetRecord> {
   return $fetch<ItemSetRecord>(versionPath(`/content/item-sets/${id}`))

@@ -3,16 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getNpcDirectory,
   getItemDirectory,
-  getSkillDirectory
+  getSkillDirectory,
+  getItemRecipeDirectory,
+  getItemRecipeTypeDirectory
 } from '../../app/services/studio-api'
 import { useItemDirectoryStore } from '../../app/stores/item-directory'
 import { useNpcDirectoryStore } from '../../app/stores/npc-directory'
 import { useSkillDirectoryStore } from '../../app/stores/skill-directory'
+import { useItemRecipeDirectoryStore } from '../../app/stores/item-recipe-directory'
+import { useItemRecipeTypeDirectoryStore } from '../../app/stores/item-recipe-type-directory'
 
 vi.mock('../../app/services/studio-api', () => ({
   getNpcDirectory: vi.fn(),
   getItemDirectory: vi.fn(),
-  getSkillDirectory: vi.fn()
+  getSkillDirectory: vi.fn(),
+  getItemRecipeDirectory: vi.fn(),
+  getItemRecipeTypeDirectory: vi.fn()
 }))
 
 describe('Content directory stores', () => {
@@ -21,6 +27,8 @@ describe('Content directory stores', () => {
     vi.mocked(getNpcDirectory).mockReset()
     vi.mocked(getItemDirectory).mockReset()
     vi.mocked(getSkillDirectory).mockReset()
+    vi.mocked(getItemRecipeDirectory).mockReset()
+    vi.mocked(getItemRecipeTypeDirectory).mockReset()
   })
 
   it('loads NPCs using the current directory state', async () => {
@@ -99,6 +107,28 @@ describe('Content directory stores', () => {
       'The skill directory could not be loaded from the Studio API.'
     )
     expect(store.loading).toBe(false)
+  })
+
+  it('loads recipe catalogs using their independent directory state', async () => {
+    vi.mocked(getItemRecipeDirectory).mockResolvedValue({
+      items: [{ id: 1, name: 'Craft Dagger', itemRecipeTypeName: 'dwarven', craftLevel: 1, successRate: 100, statUse: null, ingredients: [], productions: [] }],
+      total: 1, page: 2, pageSize: 50
+    })
+    vi.mocked(getItemRecipeTypeDirectory).mockResolvedValue({
+      items: [{ name: 'dwarven', recipeCount: 1 }], total: 1, page: 1, pageSize: 25
+    })
+    const recipes = useItemRecipeDirectoryStore()
+    const types = useItemRecipeTypeDirectoryStore()
+    recipes.query = 'Dagger'
+    recipes.page = 2
+    recipes.pageSize = 50
+
+    await Promise.all([recipes.load(), types.load()])
+
+    expect(getItemRecipeDirectory).toHaveBeenCalledWith({ query: 'Dagger', page: 2, pageSize: 50 })
+    expect(getItemRecipeTypeDirectory).toHaveBeenCalledWith({ query: undefined, page: 1, pageSize: 25 })
+    expect(recipes.items[0]?.name).toBe('Craft Dagger')
+    expect(types.items[0]?.recipeCount).toBe(1)
   })
 })
 

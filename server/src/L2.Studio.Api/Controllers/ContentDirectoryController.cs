@@ -14,6 +14,20 @@ public sealed class ContentDirectoryController(IContentDirectoryRepository repos
     public Task<L2.Studio.Contracts.ItemSetDirectoryPage> SearchItemSets(string gameVersion, [FromQuery] DirectoryRequest request, CancellationToken token) =>
         repository.SearchItemSetsAsync(gameVersion, request with { Query = request.Query?.Trim() }, token);
 
+    [HttpGet("item-recipes"), ValidateDirectoryRequest]
+    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemRecipeSummary>> SearchItemRecipes(
+        string gameVersion,
+        [FromQuery] DirectoryRequest request,
+        CancellationToken token) =>
+        repository.SearchItemRecipesAsync(gameVersion, request with { Query = request.Query?.Trim() }, token);
+
+    [HttpGet("item-recipe-types"), ValidateDirectoryRequest]
+    public Task<L2.Studio.Contracts.DirectoryPage<L2.Studio.Contracts.ItemRecipeTypeSummary>> SearchItemRecipeTypes(
+        string gameVersion,
+        [FromQuery] DirectoryRequest request,
+        CancellationToken token) =>
+        repository.SearchItemRecipeTypesAsync(gameVersion, request with { Query = request.Query?.Trim() }, token);
+
     [HttpGet("item-sets/{setId:int}")]
     public async Task<ActionResult<L2.Studio.Contracts.ItemSetSummary>> GetItemSet(string gameVersion, int setId, CancellationToken token)
     {

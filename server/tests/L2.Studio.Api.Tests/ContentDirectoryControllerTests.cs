@@ -79,6 +79,25 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task SearchesRecipeDirectoriesWithNormalizedQueries()
+    {
+        var recipes = new DirectoryPage<ItemRecipeSummary>([], 4, 2, 50);
+        var types = new DirectoryPage<ItemRecipeTypeSummary>([], 1, 1, 25);
+        var repository = new StubContentDirectoryRepository { ItemRecipes = recipes, ItemRecipeTypes = types };
+        var controller = new ContentDirectoryController(repository);
+
+        var recipeResult = await controller.SearchItemRecipes(
+            "c1", new DirectoryRequest("  mithril  ", 2, 50), CancellationToken.None);
+        var typeResult = await controller.SearchItemRecipeTypes(
+            "c1", new DirectoryRequest("  dwarven  "), CancellationToken.None);
+
+        Assert.Same(recipes, recipeResult);
+        Assert.Same(types, typeResult);
+        Assert.Equal("mithril", repository.ItemRecipeRequest?.Query);
+        Assert.Equal("dwarven", repository.ItemRecipeTypeRequest?.Query);
+    }
+
+    [Fact]
     public async Task DelegatesLookupRequestsToTheMatchingRepositoryMethod()
     {
         var expected = new DirectoryPage<NpcLookupSummary>([new("Humanoid", "Humanoid")], 1, 2, 50);
@@ -282,6 +301,20 @@ public sealed class ContentDirectoryControllerTests
     {
         public Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(new ItemSetDirectoryPage([], 0, request.Page, request.PageSize));
+        public DirectoryPage<ItemRecipeSummary> ItemRecipes { get; init; } = new([], 0, 1, 25);
+        public DirectoryPage<ItemRecipeTypeSummary> ItemRecipeTypes { get; init; } = new([], 0, 1, 25);
+        public DirectoryRequest? ItemRecipeRequest { get; private set; }
+        public DirectoryRequest? ItemRecipeTypeRequest { get; private set; }
+        public Task<DirectoryPage<ItemRecipeSummary>> SearchItemRecipesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken)
+        {
+            ItemRecipeRequest = request;
+            return Task.FromResult(ItemRecipes);
+        }
+        public Task<DirectoryPage<ItemRecipeTypeSummary>> SearchItemRecipeTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken)
+        {
+            ItemRecipeTypeRequest = request;
+            return Task.FromResult(ItemRecipeTypes);
+        }
         public Task<ItemSetSummary?> GetItemSetAsync(string gameVersion, int setId, CancellationToken cancellationToken) =>
             Task.FromResult<ItemSetSummary?>(null);
         public Task<ItemSetSummary?> UpdateItemSetAsync(string gameVersion, int setId, UpdateItemSetRequest request, CancellationToken cancellationToken) =>

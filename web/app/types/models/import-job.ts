@@ -17,6 +17,7 @@ export type ContentImportTarget =
   | 'item-handlers'
   | 'item-skill-types'
   | 'item-sets'
+  | 'item-recipes'
   | 'npcs'
   | 'npc-types'
   | 'npc-races'

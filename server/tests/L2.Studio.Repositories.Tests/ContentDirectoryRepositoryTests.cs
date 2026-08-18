@@ -381,6 +381,54 @@ public sealed class ContentDirectoryRepositoryTests
             repository.DeleteItemLookupAsync("c1", "item-types", "Weapon", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task ProjectsVersionScopedCraftingRecipesAndRecipeTypes()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var c1ItemType = new ItemType { GameVersion = "c1", Name = "EtcItem", DisplayName = "Etc item" };
+            var c4ItemType = new ItemType { GameVersion = "c4", Name = "EtcItem", DisplayName = "Etc item" };
+            var dwarven = new ItemRecipeType { GameVersion = "c1", Name = "dwarven" };
+            var common = new ItemRecipeType { GameVersion = "c1", Name = "common" };
+            var c4Type = new ItemRecipeType { GameVersion = "c4", Name = "dwarven" };
+            var craftingRecipe = new ItemRecipe
+            {
+                GameVersion = "c1", Id = 1, Name = "Craft Mithril Dagger", ItemRecipeTypeName = dwarven.Name,
+                ItemRecipeType = dwarven, CraftLevel = 3, SuccessRate = 60,
+                StatUse = new ItemRecipeStatUse { GameVersion = "c1", ItemRecipeId = 1, Mp = 24 }
+            };
+            craftingRecipe.Ingredients.Add(new ItemRecipeIngredient { GameVersion = "c1", ItemRecipeId = 1, ItemId = 57, Count = 500 });
+            craftingRecipe.Productions.Add(new ItemRecipeProduction { GameVersion = "c1", ItemRecipeId = 1, ItemId = 222, Count = 1 });
+            context.AddRange(
+                c1ItemType, c4ItemType, dwarven, common, c4Type,
+                new Item { GameVersion = "c1", Id = 57, Name = "Adena", ItemTypeName = c1ItemType.Name, ItemType = c1ItemType },
+                new Item { GameVersion = "c1", Id = 222, Name = "Mithril Dagger", ItemTypeName = c1ItemType.Name, ItemType = c1ItemType },
+                craftingRecipe,
+                new ItemRecipe
+                {
+                    GameVersion = "c4", Id = 1, Name = "Other version", ItemRecipeTypeName = c4Type.Name,
+                    ItemRecipeType = c4Type, CraftLevel = 1, SuccessRate = 100
+                });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var recipes = await repository.SearchItemRecipesAsync("c1", new DirectoryRequest(), CancellationToken.None);
+        var types = await repository.SearchItemRecipeTypesAsync("c1", new DirectoryRequest(), CancellationToken.None);
+
+        Assert.Equal(1, recipes.Total);
+        var recipe = Assert.Single(recipes.Items);
+        Assert.Equal(new ItemRecipeStatUseSummary(24, null), recipe.StatUse);
+        Assert.Equal(new ItemRecipeItemSummary(57, "Adena", 500), Assert.Single(recipe.Ingredients));
+        Assert.Equal(new ItemRecipeItemSummary(222, "Mithril Dagger", 1), Assert.Single(recipe.Productions));
+        Assert.Equal(
+            [new ItemRecipeTypeSummary("common", 0), new ItemRecipeTypeSummary("dwarven", 1)],
+            types.Items);
+    }
+
     private sealed class TestContextFactory(DbContextOptions<GameContentDbContext> options)
         : IDbContextFactory<GameContentDbContext>
     {

@@ -137,6 +137,14 @@ export const studioNavigation: NavigationMenuItem[] = [
         ]
       },
       {
+        label: 'Crafting',
+        icon: 'i-lucide-hammer',
+        children: [
+          { label: 'Recipes', icon: 'i-lucide-scroll-text', to: '/authoring/items/crafting/recipes' },
+          { label: 'Recipe types', icon: 'i-lucide-tags', to: '/authoring/items/crafting/types' }
+        ]
+      },
+      {
         label: 'Item sets',
         icon: 'i-lucide-shield-check',
         to: '/authoring/items/sets'
@@ -275,6 +283,8 @@ export function studioRouteTitle(path: string) {
   if (path === '/authoring/npcs/sexes') return 'NPC sexes'
   if (path === '/authoring/npcs/types') return 'NPC types'
   if (path === '/authoring/items') return 'Item definitions'
+  if (path === '/authoring/items/crafting/recipes') return 'Crafting recipes'
+  if (path === '/authoring/items/crafting/types') return 'Recipe types'
   if (path === '/authoring/items/sets') return 'Item sets'
   if (/^\/authoring\/items\/sets\/\d+$/.test(path)) return 'Item set'
   const itemMatch = path.match(/^\/authoring\/items\/([^/]+)(?:\/\d+)?(\/skills)?$/)

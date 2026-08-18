@@ -12,6 +12,8 @@ public interface IContentDirectoryRepository
     Task<ItemConditionSummary?> UpdateItemConditionAsync(string gameVersion, string family, int itemId, UpdateItemConditionRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteItemConditionAsync(string gameVersion, string family, int itemId, CancellationToken cancellationToken);
     Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
+    Task<DirectoryPage<ItemRecipeSummary>> SearchItemRecipesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
+    Task<DirectoryPage<ItemRecipeTypeSummary>> SearchItemRecipeTypesAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken);
     Task<ItemSetSummary?> GetItemSetAsync(string gameVersion, int setId, CancellationToken cancellationToken);
     Task<ItemSetSummary?> UpdateItemSetAsync(string gameVersion, int setId, UpdateItemSetRequest request, CancellationToken cancellationToken);
     Task<ItemPrimarySkillSummary?> SetItemPrimarySkillAsync(string gameVersion, string family, int itemId, SetItemPrimarySkillRequest request, CancellationToken cancellationToken);

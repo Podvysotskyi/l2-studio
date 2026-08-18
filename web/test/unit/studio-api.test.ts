@@ -14,6 +14,8 @@ import {
   getItemDirectory,
   getItemSet,
   getItemSetDirectory,
+  getItemRecipeDirectory,
+  getItemRecipeTypeDirectory,
   getNpcDefinition,
   getItemDefinition,
   getItemLookups,
@@ -188,6 +190,20 @@ describe('Studio API service', () => {
     await updateItemSet(1, request)
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-sets/1', {
       method: 'PATCH', body: request
+    })
+  })
+
+  it('loads crafting recipes and recipe types through the content API', async () => {
+    fetchMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 })
+
+    await getItemRecipeDirectory({ query: '  mithril  ', page: 2, pageSize: 50 })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-recipes', {
+      query: { query: 'mithril', page: 2, pageSize: 50 }
+    })
+
+    await getItemRecipeTypeDirectory({ query: ' dwarven ' })
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-recipe-types', {
+      query: { query: 'dwarven', page: 1, pageSize: 25 }
     })
   })
 

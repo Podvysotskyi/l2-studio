@@ -11,6 +11,7 @@ public static class ContentImportTargetValues
     public const string ItemHandlers = "item-handlers";
     public const string ItemSkillTypes = "item-skill-types";
     public const string ItemSets = "item-sets";
+    public const string ItemRecipes = "item-recipes";
     public const string Npcs = "npcs";
     public const string NpcTypes = "npc-types";
     public const string NpcRaces = "npc-races";
@@ -27,7 +28,7 @@ public static class ContentImportTargetValues
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        Items, ItemTypes, ItemActions, ItemBodyParts, ItemMaterials, ItemCrystalTypes, ItemHandlers, ItemSkillTypes, ItemSets,
+        Items, ItemTypes, ItemActions, ItemBodyParts, ItemMaterials, ItemCrystalTypes, ItemHandlers, ItemSkillTypes, ItemSets, ItemRecipes,
         Npcs, NpcTypes, NpcRaces, NpcSexes,
         PlayerRaces, PlayerSexes, PlayerClasses, PlayerFaces, PlayerHairStyles, PlayerHairColors,
         Skills, SkillOperateTypes, SkillTargetTypes
@@ -39,7 +40,7 @@ public static class ContentImportTargetValues
 
     public static string Family(string target) => target switch
     {
-        Items or ItemTypes or ItemActions or ItemBodyParts or ItemMaterials or ItemCrystalTypes or ItemHandlers or ItemSkillTypes or ItemSets => "items",
+        Items or ItemTypes or ItemActions or ItemBodyParts or ItemMaterials or ItemCrystalTypes or ItemHandlers or ItemSkillTypes or ItemSets or ItemRecipes => "items",
         Npcs or NpcTypes or NpcRaces or NpcSexes => "npcs",
         PlayerRaces or PlayerSexes or PlayerClasses or PlayerFaces or PlayerHairStyles or PlayerHairColors => "players",
         Skills or SkillOperateTypes or SkillTargetTypes => "skills",

@@ -29,6 +29,7 @@ describe('Studio navigation', () => {
     ])
     expect(group('Items').children?.map(item => item.label)).toEqual([
       'Definitions',
+      'Crafting',
       'Item sets',
       'Lookups'
     ])
@@ -38,6 +39,9 @@ describe('Studio navigation', () => {
     ])
     expect(child(group('Items'), 'Lookups').children?.map(item => item.label)).toEqual([
       'Types', 'Actions', 'Body parts', 'Materials', 'Crystal types', 'Handlers', 'Skill types'
+    ])
+    expect(child(group('Items'), 'Crafting').children?.map(item => item.label)).toEqual([
+      'Recipes', 'Recipe types'
     ])
     expect(group('Asset library').children?.map(item => item.label)).toEqual([
       'Textures',
@@ -70,6 +74,8 @@ describe('Studio navigation', () => {
     expect(routes).toContain('/authoring/items/pet-collar')
     expect(routes).toContain('/authoring/items/etc')
     expect(routes).toContain('/authoring/items/sets')
+    expect(routes).toContain('/authoring/items/crafting/recipes')
+    expect(routes).toContain('/authoring/items/crafting/types')
     expect(routes).toContain('/authoring/items/lookups/handlers')
     expect(routes).toContain('/authoring/items/lookups/skill-types')
     expect(routes).toContain('/authoring/skills/target-types')
@@ -101,6 +107,8 @@ describe('Studio navigation', () => {
     expect(studioRouteGroup('/authoring/items/weapon/1'))
       .toBe(studioNavigationGroups.items)
     expect(studioRouteGroup('/authoring/items/lookups/materials'))
+      .toBe(studioNavigationGroups.items)
+    expect(studioRouteGroup('/authoring/items/crafting/recipes'))
       .toBe(studioNavigationGroups.items)
     expect(studioRouteGroup('/authoring/skills'))
       .toBe(studioNavigationGroups.skills)
@@ -135,6 +143,8 @@ describe('Studio navigation', () => {
     expect(studioRouteTitle('/authoring/npcs/100')).toBe('NPC definition')
     expect(studioRouteTitle('/authoring/items')).toBe('Item definitions')
     expect(studioRouteTitle('/authoring/items/sets')).toBe('Item sets')
+    expect(studioRouteTitle('/authoring/items/crafting/recipes')).toBe('Crafting recipes')
+    expect(studioRouteTitle('/authoring/items/crafting/types')).toBe('Recipe types')
     expect(studioRouteTitle('/authoring/items/sets/1')).toBe('Item set')
     expect(studioRouteTitle('/authoring/items/etc')).toBe('Etc Item definitions')
     expect(studioRouteTitle('/authoring/items/etc/1')).toBe('Etc Item definition')
