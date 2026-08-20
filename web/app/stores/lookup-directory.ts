@@ -26,6 +26,7 @@ export const useLookupDirectoryStore = defineStore('lookup-directory', () => {
   function isLoading(kind: LookupKind) {
     return loadingKinds.value.includes(kind)
   }
+  function reset() { records.value = {}; loadingKinds.value = []; errors.value = {} }
 
-  return { records, errors, load, isLoading }
+  return { records, errors, load, isLoading, reset }
 })

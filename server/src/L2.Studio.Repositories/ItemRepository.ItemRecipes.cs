@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace L2.Studio.Repositories;
 
-public sealed partial class ContentDirectoryRepository
+public sealed partial class ItemRepository
 {
     public async Task<DirectoryPage<ItemRecipeSummary>> SearchItemRecipesAsync(
         string gameVersion,
@@ -13,7 +13,7 @@ public sealed partial class ContentDirectoryRepository
         CancellationToken cancellationToken)
     {
         var query = request.Query?.Trim() ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         var isId = int.TryParse(query, out var id);
         var offset = ((long)request.Page - 1) * request.PageSize;
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -48,7 +48,7 @@ public sealed partial class ContentDirectoryRepository
         CancellationToken cancellationToken)
     {
         var query = request.Query?.Trim() ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         var offset = ((long)request.Page - 1) * request.PageSize;
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var types = context.ItemRecipeTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion);

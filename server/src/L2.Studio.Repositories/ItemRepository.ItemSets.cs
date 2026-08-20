@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace L2.Studio.Repositories;
 
-public sealed partial class ContentDirectoryRepository
+public sealed partial class ItemRepository
 {
     public async Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken)
     {
         var query = request.Query?.Trim() ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         var offset = ((long)request.Page - 1) * request.PageSize;
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var sets = context.ItemSets.AsNoTracking().Where(value => value.GameVersion == gameVersion);

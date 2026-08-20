@@ -35,7 +35,7 @@ export interface ItemBehaviorAvailabilityRecord {
 }
 export interface ItemConditionRecord {
   messageId: number; addName: boolean; isPvpFlagged: boolean | null
-  playerRaces: string | null; playerCategoryTypes: string | null
+  playerRaces: string[]; playerCategoryTypes: string[]
 }
 export interface ItemRecord {
   id: number; name: string; itemTypeName: string; itemTypeDisplayName: string

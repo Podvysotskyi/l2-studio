@@ -49,6 +49,7 @@ export const useNpcDirectoryStore = defineStore('npc-directory', () => {
       if (version === requestVersion) loading.value = false
     }
   }
+  function reset() { requestVersion++; items.value = []; total.value = 0; loading.value = false; error.value = undefined }
 
   return {
     items,
@@ -62,6 +63,7 @@ export const useNpcDirectoryStore = defineStore('npc-directory', () => {
     visualFilter,
     loading,
     error,
-    load
+    load,
+    reset
   }
 })

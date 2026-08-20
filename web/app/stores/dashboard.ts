@@ -112,6 +112,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
+  function reset() {
+    loading.value = false
+    contentError.value = false
+    assetError.value = false
+    jobsError.value = false
+    counts.value = emptyContentCounts()
+    assets.value = createEmptyAssetSummaries()
+    jobs.value = []
+  }
+
   return {
     loading,
     contentError,
@@ -120,7 +130,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     counts,
     assets,
     jobs,
-    load
+    load,
+    reset
   }
 })
 

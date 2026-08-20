@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { getItemSetDirectory } from '~/services/studio-api'
 import type { ItemSetRecord } from '~/types/models/item-set'
 
@@ -27,6 +28,7 @@ export const useItemSetDirectoryStore = defineStore('item-set-directory', () => 
       if (version === requestVersion) loading.value = false
     }
   }
+  function reset() { requestVersion++; items.value = []; total.value = 0; loading.value = false; error.value = undefined }
 
-  return { items, total, query, page, pageSize, loading, error, load }
+  return { items, total, query, page, pageSize, loading, error, load, reset }
 })

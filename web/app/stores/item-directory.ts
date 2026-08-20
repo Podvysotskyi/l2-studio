@@ -45,6 +45,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
       if (version === requestVersion) loading.value = false
     }
   }
+  function reset() { requestVersion++; items.value = []; total.value = 0; loading.value = false; error.value = undefined }
   return {
     items,
     total,
@@ -60,6 +61,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     handlerName,
     loading,
     error,
-    load
+    load,
+    reset
   }
 })

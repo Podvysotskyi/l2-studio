@@ -28,7 +28,13 @@ const deletingId = ref<number>()
 const selectedItem = ref<ItemRecord>()
 const editOpen = ref(false)
 const saving = ref(false)
-const editError = ref<string>()
+const {
+  pageError: editError,
+  capture: captureEditError,
+  clear: clearEditError,
+  fieldError: editFieldError,
+  set: setEditError
+} = useStudioApiError()
 const filtersLoading = ref(true)
 const lookupOptions = ref<Partial<Record<ItemLookupKind, ItemLookupRecord[]>>>({})
 const editForm = reactive({
@@ -118,9 +124,9 @@ async function loadFilters() {
       await loadDirectoryOptions((nextPage, nextPageSize) => getItemLookups(kind, { page: nextPage, pageSize: nextPageSize }))
     ] as const))
     lookupOptions.value = Object.fromEntries(values)
-    editError.value = undefined
-  } catch {
-    editError.value = 'The item lookup values could not be loaded.'
+    clearEditError()
+  } catch (cause) {
+    captureEditError(cause, 'The item lookup values could not be loaded.')
   } finally {
     filtersLoading.value = false
   }
@@ -170,7 +176,7 @@ async function edit(item: ItemRecord) {
     attackGeometryRadius: item.attackGeometry?.radius ?? 0,
     attackGeometryLength: item.attackGeometry?.length ?? 0
   })
-  editError.value = undefined
+  clearEditError()
   editOpen.value = true
   if (!Object.keys(lookupOptions.value).length) await loadFilters()
 }
@@ -180,11 +186,13 @@ async function save() {
   const name = editForm.name.trim()
   if (!item) return
   if (!name || name.length > 100) {
-    editError.value = 'Name must contain between 1 and 100 characters.'
+    setEditError('Name must contain between 1 and 100 characters.', {
+      definition: ['Name must contain between 1 and 100 characters.']
+    })
     return
   }
   saving.value = true
-  editError.value = undefined
+  clearEditError()
   try {
     const { itemTypeName: _, hasAttackGeometry, attackGeometryOffsetX, attackGeometryOffsetY, attackGeometryRadius, attackGeometryLength, ...definition } = editForm
     await updateItemDefinition(props.family, item.id, {
@@ -197,8 +205,8 @@ async function save() {
     editOpen.value = false
     notifications.success({ title: 'Item definition saved' })
     emit('refresh')
-  } catch {
-    editError.value = 'The item definition could not be saved. Check the selected lookup values and try again.'
+  } catch (cause) {
+    captureEditError(cause, 'The item definition could not be saved. Check the selected lookup values and try again.')
   } finally {
     saving.value = false
   }
@@ -343,7 +351,7 @@ onMounted(() => void loadFilters())
         <form class="space-y-4" @submit.prevent="save">
           <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <UFormField label="Name" required><UInput v-model="editForm.name" maxlength="100" class="w-full" /></UFormField>
+            <UFormField label="Name" required :error="editFieldError('definition')"><UInput v-model="editForm.name" maxlength="100" class="w-full" /></UFormField>
             <UFormField label="Type"><UInput :model-value="selectedItem ? itemTypeLabel(selectedItem) : ''" disabled class="w-full" /></UFormField>
             <UFormField v-if="props.family !== 'material'" label="Action"><USelect v-model="editForm.itemActionName" :items="itemActionOptions" :loading="filtersLoading" class="w-full" /></UFormField>
             <UFormField v-if="['armor', 'weapon', 'arrow', 'etc'].includes(props.family)" label="Body part"><USelect v-model="editForm.itemBodyPartName" :items="itemBodyPartOptions" :loading="filtersLoading" class="w-full" /></UFormField>
@@ -356,10 +364,10 @@ onMounted(() => void loadFilters())
             <div v-if="props.family === 'weapon'" class="col-span-full space-y-3 rounded-md border border-default p-3">
               <UCheckbox v-model="editForm.hasAttackGeometry" label="Client attack geometry" />
               <div v-if="editForm.hasAttackGeometry" class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <UFormField label="Start offset X"><UInput v-model.number="editForm.attackGeometryOffsetX" type="number" class="w-full" /></UFormField>
-                <UFormField label="Start offset Y"><UInput v-model.number="editForm.attackGeometryOffsetY" type="number" class="w-full" /></UFormField>
-                <UFormField label="Sweep radius"><UInput v-model.number="editForm.attackGeometryRadius" type="number" min="0" class="w-full" /></UFormField>
-                <UFormField label="Forward length"><UInput v-model.number="editForm.attackGeometryLength" type="number" min="0" class="w-full" /></UFormField>
+                <UFormField label="Start offset X" :error="editFieldError('attackGeometry')"><UInput v-model.number="editForm.attackGeometryOffsetX" type="number" class="w-full" /></UFormField>
+                <UFormField label="Start offset Y" :error="editFieldError('attackGeometry')"><UInput v-model.number="editForm.attackGeometryOffsetY" type="number" class="w-full" /></UFormField>
+                <UFormField label="Sweep radius" :error="editFieldError('attackGeometry')"><UInput v-model.number="editForm.attackGeometryRadius" type="number" min="0" class="w-full" /></UFormField>
+                <UFormField label="Forward length" :error="editFieldError('attackGeometry')"><UInput v-model.number="editForm.attackGeometryLength" type="number" min="0" class="w-full" /></UFormField>
               </div>
             </div>
           </div>

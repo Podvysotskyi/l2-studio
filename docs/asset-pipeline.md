@@ -1,7 +1,8 @@
 # Asset pipeline
 
-Studio converts lawful local Lineage II resources into version-scoped browser
-assets. Original packages and generated private assets are never committed.
+Studio turns locally supplied, lawful game-client resources into
+version-scoped browser assets. Original resources and generated private output
+are never committed to this repository.
 
 ## Sources and processing
 

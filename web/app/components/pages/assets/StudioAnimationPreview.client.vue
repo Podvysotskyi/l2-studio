@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from 'vue'
-import {
+import type {
   StudioAnimationRenderer,
-  studioAnimationPreviewBackgrounds,
-  type StudioAnimationPreviewBackground,
-  type StudioAnimationMaterialBinding,
-  type StudioAnimationState
-} from '~/runtime'
+  StudioAnimationMaterialBinding,
+  StudioAnimationState
+} from '~/runtime/preview/studio-animation-renderer'
+import {
+  studioPreviewBackgrounds,
+  type StudioPreviewBackground
+} from '~/runtime/preview/studio-preview-background'
 import type { StaticMeshMaterialInspection } from '~/runtime/materials/static-mesh-material'
 
 const props = defineProps<{
@@ -22,7 +24,7 @@ const emit = defineEmits<{
 const canvas = ref<HTMLCanvasElement>()
 const state = ref<StudioAnimationState>({ clipNames: [], duration: 0, time: 0, playing: false })
 const speed = ref(1)
-const background = ref<StudioAnimationPreviewBackground>('dark')
+const background = ref<StudioPreviewBackground>('dark')
 let preview: StudioAnimationRenderer | undefined
 let resizeObserver: ResizeObserver | undefined
 
@@ -44,12 +46,14 @@ function selectClip(value: string) { preview?.select(value) }
 function togglePlayback() { preview?.setPlaying(!state.value.playing) }
 function seek(value: number) { preview?.seek(value) }
 function updateSpeed(value: number) { speed.value = value; preview?.setSpeed(value) }
-function setBackground(value: StudioAnimationPreviewBackground) {
+function setBackground(value: StudioPreviewBackground) {
   background.value = value
   preview?.setBackground(value)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!canvas.value) return
+  const { StudioAnimationRenderer } = await import('~/runtime/preview/studio-animation-renderer')
   if (!canvas.value) return
   preview = new StudioAnimationRenderer(canvas.value, value => { state.value = value })
   resizeObserver = new ResizeObserver(() => preview?.resize())
@@ -66,7 +70,7 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); preview?.dispose() })
       <canvas ref="canvas" class="h-[55vh] min-h-80 w-full touch-none outline-none" />
       <div class="absolute right-3 top-3 flex rounded-md bg-default/90 p-1 shadow-sm backdrop-blur">
         <UButton
-          v-for="preset in studioAnimationPreviewBackgrounds"
+          v-for="preset in studioPreviewBackgrounds"
           :key="preset.id"
           :aria-label="`Use ${preset.label} preview background`"
           :title="preset.label"

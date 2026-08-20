@@ -7,7 +7,13 @@
     "build": "nuxt build",
     "dev": "nuxt dev --host 0.0.0.0 --port 3001",
     "postinstall": "nuxt prepare",
-    "test": "vitest run",
+    "test": "npm run test:policy && npm run test:unit && npm run test:nuxt",
+    "test:policy": "node scripts/check-test-policy.mjs",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:nuxt": "NUXT_STUDIO_API_BASE=http://studio-api.invalid vitest run --config vitest.nuxt.config.ts",
+    "test:coverage:report": "npm run test:unit -- --coverage && npm run test:nuxt -- --coverage",
+    "test:coverage": "npm run test:policy && npm run test:coverage:report && node scripts/check-coverage-baseline.mjs",
+    "test:e2e": "npm run build && playwright test",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -18,9 +24,14 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^3.22.0",
+    "@playwright/test": "^1.61.1",
     "@iconify-json/lucide": "^1.2.121",
     "@types/node": "^26.2.0",
     "@types/three": "^0.185.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.11.1",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0",
     "vue-tsc": "^3.0.0"

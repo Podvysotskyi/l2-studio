@@ -2,9 +2,10 @@
 
 The L2 Studio product: a Nuxt web interface and .NET services for asset conversion, content inspection, validation, and publishing workflows.
 
-See [docs/architecture.md](docs/architecture.md) for product boundaries and
-[docs/asset-pipeline.md](docs/asset-pipeline.md) for the current import,
-artifact, release, and media contracts.
+Read the [documentation index](docs/README.md) first. It links the stable
+[context glossary](CONTEXT.md), current [architecture](docs/architecture.md),
+[web architecture](docs/web-architecture.md), [asset pipeline](docs/asset-pipeline.md),
+and the explicit [web/API refactor roadmap](docs/web-refactor-roadmap.md).
 
 Use the [Studio development guide](docs/development/README.md) when adding pages,
 entities, endpoints, jobs, tools, configuration, or tests. It identifies the
@@ -38,7 +39,12 @@ The Nuxt application follows Nuxt 4 conventions under `web/app`:
 - `types` groups browser contracts by models, requests, and responses.
 - `runtime`, `composables`, and `utils` contain rendering behavior and reusable helpers.
 
-Web tests are organized under `web/test/unit`, `web/test/nuxt`, and `web/test/e2e`. Server test projects are organized by the production project they verify, such as `L2.Studio.Api.Tests` and `L2.Studio.Services.Tests`.
+Tracked web tests are split by execution seam: pure modules, clients, stores,
+and Nuxt storage handlers live under `web/test/unit`; mounted Nuxt behavior
+lives under `web/test/nuxt`; focused mocked-API browser journeys live under
+`web/test/e2e`.
+Server test projects are organized by the production project they verify, such
+as `L2.Studio.Api.Tests` and `L2.Studio.Services.Tests`.
 
 ## Prerequisites
 
@@ -122,7 +128,13 @@ docker compose config
 docker compose build
 ```
 
-The web `validate` target runs Vitest, Nuxt type checking, and the production build. The server `unit-tests` target builds the solution and runs every project-owned server test assembly. The Compose checks validate the standalone stack and its images. The web workflow additionally runs Playwright end-to-end tests in CI.
+The web `validate` target runs the test policy, Node and Nuxt-runtime Vitest
+suites, type checking, and the production build. Run
+`docker build --target browser-tests web` for Playwright and `docker build
+--target coverage web` to check the tracked Node/Nuxt coverage baseline. The
+server `unit-tests` target builds the solution and runs
+every project-owned server test assembly. The Compose checks validate the
+standalone stack and its images.
 
 Do not run `npm test`, `npm run typecheck`, `npm run build`, `dotnet test`, `dotnet build`, or `dotnet publish` directly on the host for normal validation.
 

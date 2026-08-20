@@ -255,7 +255,7 @@ public sealed class ContentDirectoryControllerTests
     [Fact]
     public async Task ValidatesAndDelegatesItemConditions()
     {
-        var expected = new ItemConditionSummary(1518, false, null, "DWARF,HUMAN", "WOLF");
+        var expected = new ItemConditionSummary(1518, false, null, ["DWARF", "HUMAN"], ["WOLF"]);
         var repository = new StubContentDirectoryRepository { UpdatedItemCondition = expected };
         var controller = new ContentDirectoryController(repository);
         var request = new UpdateItemConditionRequest(1518, false, null, ["human", "dwarf"], ["wolf"]);
@@ -309,7 +309,7 @@ public sealed class ContentDirectoryControllerTests
 
     private static NpcSummary Npc() => new(100, 1, 10, "Goblin", "Monster", "Monster", "HUMANOID", "Humanoid", "MALE", "Male", false);
 
-    private sealed class StubContentDirectoryRepository : IContentDirectoryRepository
+    private sealed class StubContentDirectoryRepository : IContentDirectoryRepository, IItemRepository
     {
         public Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(new ItemSetDirectoryPage([], 0, request.Page, request.PageSize));

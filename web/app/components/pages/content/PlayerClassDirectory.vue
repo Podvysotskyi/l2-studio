@@ -24,7 +24,13 @@ const selectedClass = ref<PlayerClassNode>()
 const editOpen = ref(false)
 const saving = ref(false)
 const deletingId = ref<number>()
-const editError = ref<string>()
+const {
+  pageError: editError,
+  capture: captureEditError,
+  clear: clearEditError,
+  fieldError: editFieldError,
+  set: setEditError
+} = useStudioApiError()
 const editForm = reactive({ name: '', isMage: false, parentClassId: undefined as number | undefined })
 
 const query = ref('')
@@ -109,7 +115,7 @@ function edit(record: PlayerClassNode) {
   editForm.name = record.name
   editForm.isMage = record.isMage
   editForm.parentClassId = record.parentClassId ?? undefined
-  editError.value = undefined
+  clearEditError()
   editOpen.value = true
 }
 
@@ -118,18 +124,20 @@ async function save() {
   const name = editForm.name.trim()
   if (!record) return
   if (!name || name.length > 64) {
-    editError.value = 'Name must contain between 1 and 64 characters.'
+    setEditError('Name must contain between 1 and 64 characters.', {
+      definition: ['Name must contain between 1 and 64 characters.']
+    })
     return
   }
   saving.value = true
-  editError.value = undefined
+  clearEditError()
   try {
     await updatePlayerClass(record.id, { name, isMage: editForm.isMage, parentClassId: editForm.parentClassId ?? null })
     editOpen.value = false
     notifications.success({ title: 'Player class saved' })
     emit('refresh')
-  } catch {
-    editError.value = 'Player class could not be saved. The selected parent must be available for every class variant.'
+  } catch (cause) {
+    captureEditError(cause, 'Player class could not be saved. The selected parent must be available for every class variant.')
   } finally {
     saving.value = false
   }
@@ -314,9 +322,9 @@ async function remove(record: PlayerClassNode) {
       <template #body>
         <form class="space-y-4" @submit.prevent="save">
           <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
-          <UFormField label="Name" required><UInput v-model="editForm.name" maxlength="64" class="w-full" /></UFormField>
-          <UFormField label="Archetype"><USelect v-model="editForm.isMage" :items="[{ label: 'Fighter', value: false }, { label: 'Mage', value: true }]" class="w-full" /></UFormField>
-          <UFormField label="Parent class"><USelect v-model="editForm.parentClassId" :items="parentOptions" class="w-full" /></UFormField>
+          <UFormField label="Name" required :error="editFieldError('definition')"><UInput v-model="editForm.name" maxlength="64" class="w-full" /></UFormField>
+          <UFormField label="Archetype" :error="editFieldError('definition')"><USelect v-model="editForm.isMage" :items="[{ label: 'Fighter', value: false }, { label: 'Mage', value: true }]" class="w-full" /></UFormField>
+          <UFormField label="Parent class" :error="editFieldError('definition')"><USelect v-model="editForm.parentClassId" :items="parentOptions" class="w-full" /></UFormField>
           <div class="flex justify-end gap-3 pt-2"><UButton label="Cancel" color="neutral" variant="outline" @click="editOpen = false" /><UButton type="submit" label="Save changes" icon="i-lucide-save" :loading="saving" /></div>
         </form>
       </template>

@@ -33,5 +33,7 @@ export const useAssetImportsStore = defineStore('asset-imports', () => {
     return job
   }
 
-  return { jobs, loading, error, load, start }
+  function reset() { jobs.value = {}; loading.value = false; error.value = undefined }
+
+  return { jobs, loading, error, load, start, reset }
 })

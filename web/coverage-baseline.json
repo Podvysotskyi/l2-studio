@@ -1,0 +1,14 @@
+{
+  "unit": {
+    "lines": 62.75,
+    "statements": 61.62,
+    "functions": 67.74,
+    "branches": 59.97
+  },
+  "nuxt": {
+    "lines": 22.8,
+    "statements": 20.4,
+    "functions": 8.45,
+    "branches": 5.8
+  }
+}

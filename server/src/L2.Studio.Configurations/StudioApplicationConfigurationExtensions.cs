@@ -15,6 +15,7 @@ public static class StudioApplicationConfigurationExtensions
         services.AddStudioPersistence(configuration);
         services.AddAssetImportOptions(configuration);
         services.AddHealthChecks().AddGameContentMigrationHealthCheck();
+        services.AddSingleton<IItemRepository, ItemRepository>();
         services.AddSingleton<IContentDirectoryRepository, ContentDirectoryRepository>();
         services.AddSingleton<IGameVersionRepository, GameVersionRepository>();
         services.AddSingleton<IAssetCatalogRepository, AssetCatalogRepository>();

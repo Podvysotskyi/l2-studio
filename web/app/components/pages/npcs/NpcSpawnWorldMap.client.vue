@@ -3,7 +3,7 @@ import type { NpcSpawnWorldMap } from '~/types/models/npc-spawn-world-map'
 import type { WorldMapOverviewManifest } from '~/types/models/world-map-overview'
 import { getNpcSpawnWorldMap, getWorldMapOverview } from '~/services/studio-api'
 import { getPublishedManifest } from '~/services/published-assets'
-import { NpcSpawnWorldRenderer, type NpcSpawnWorldSelection } from '~/runtime/world/npc-spawn-world-renderer'
+import type { NpcSpawnWorldRenderer, NpcSpawnWorldSelection } from '~/runtime/world/npc-spawn-world-renderer'
 import { worldMapTileName } from '~/utils/world-map-coordinate'
 
 const canvas = ref<HTMLCanvasElement>()
@@ -56,7 +56,9 @@ function applyFilters() {
 
 watch([query, pointsVisible, zonesVisible], applyFilters)
 
-onMounted(() => {
+onMounted(async () => {
+  if (!canvas.value) return
+  const { NpcSpawnWorldRenderer } = await import('~/runtime/world/npc-spawn-world-renderer')
   if (!canvas.value) return
   renderer = new NpcSpawnWorldRenderer(canvas.value, {
     onSelect: value => { selection.value = value }

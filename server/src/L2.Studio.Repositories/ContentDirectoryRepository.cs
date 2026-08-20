@@ -12,8 +12,9 @@ namespace L2.Studio.Repositories;
 
 public sealed partial class ContentDirectoryRepository(
     IDbContextFactory<GameContentDbContext> contextFactory)
-    : IContentDirectoryRepository
+    : IContentDirectoryRepository, IItemRepository
 {
+    private readonly ItemRepository itemRepository = new(contextFactory);
     public async Task<NpcDirectoryPage> SearchNpcsAsync(
         string gameVersion,
         NpcDirectoryRequest request,

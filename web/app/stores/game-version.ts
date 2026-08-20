@@ -7,6 +7,7 @@ import {
   resolveSelectedGameVersionKey,
   selectedGameVersionKey
 } from '../utils/game-version'
+import { resetVersionScopedState } from './version-scoped-state'
 
 export const useGameVersionStore = defineStore('game-version', () => {
   const versions = ref<GameVersionSummary[]>([])
@@ -25,11 +26,13 @@ export const useGameVersionStore = defineStore('game-version', () => {
     error.value = false
     try {
       versions.value = await getGameVersions()
+      const previous = selected.value
       selected.value = resolveSelectedGameVersionKey(
         versions.value,
         selectedGameVersionKey()
       )
       persist()
+      if (selected.value !== previous) resetVersionScopedState()
     } catch (cause) {
       error.value = true
       throw cause
@@ -42,7 +45,7 @@ export const useGameVersionStore = defineStore('game-version', () => {
     if (value === selected.value) return
     selected.value = value
     persist()
-    window.location.reload()
+    resetVersionScopedState()
   }
 
   function persist() {

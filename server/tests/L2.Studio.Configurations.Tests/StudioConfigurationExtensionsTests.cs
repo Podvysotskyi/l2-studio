@@ -152,6 +152,7 @@ public sealed class StudioConfigurationExtensionsTests
         var result = services.AddStudioApiApplication(Configuration());
 
         Assert.Same(services, result);
+        Assert.Contains(services, Service<IItemRepository, ItemRepository>);
         Assert.Contains(services, Service<IContentDirectoryRepository, ContentDirectoryRepository>);
         Assert.Contains(services, Service<IAssetCatalogRepository, AssetCatalogRepository>);
         Assert.Contains(services, Service<IAssetReleaseRepository, AssetReleaseRepository>);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MapManifest } from '~/types/studio'
-import { StudioWorldRenderer } from '~/runtime'
+import type { StudioWorldRenderer } from '~/runtime/preview/studio-world-renderer'
 import { getPublishedManifest } from '../../../services/published-assets'
 import { nextTick, onBeforeUnmount, onMounted } from 'vue'
 
@@ -35,6 +35,7 @@ onMounted(async () => {
       props.manifestUrl,
       props.assetBaseUrl || undefined
     )
+    const { StudioWorldRenderer } = await import('~/runtime/preview/studio-world-renderer')
     preview = new StudioWorldRenderer(target, {
       interactive: false,
       preserveDrawingBuffer: true

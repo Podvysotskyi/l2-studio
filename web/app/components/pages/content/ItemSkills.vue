@@ -24,7 +24,13 @@ const editorOpen = ref(false)
 const editorMode = ref<EditorMode>('add')
 const saving = ref(false)
 const deletingKey = ref<string>()
-const editorError = ref<string>()
+const {
+  pageError: editorError,
+  capture: captureEditorError,
+  clear: clearEditorError,
+  fieldError: editorFieldError,
+  set: setEditorError
+} = useStudioApiError()
 const attachedSkill = ref<ItemSkillRecord>()
 const selectedSkill = ref<SkillRecord>()
 const skillQuery = ref('')
@@ -69,8 +75,8 @@ async function loadSkillTypes() {
   try {
     skillTypes.value = await loadDirectoryOptions((page, pageSize) =>
       getItemLookups('item-skill-types', { page, pageSize }))
-  } catch {
-    editorError.value = 'Item skill trigger types could not be loaded.'
+  } catch (cause) {
+    captureEditorError(cause, 'Item skill trigger types could not be loaded.')
   } finally {
     skillTypesLoading.value = false
   }
@@ -86,8 +92,8 @@ async function searchSkills() {
   try {
     const page = await getSkillDirectory({ query, page: 1, pageSize: 20 })
     skillResults.value = page.items
-  } catch {
-    editorError.value = 'The skill catalog could not be searched.'
+  } catch (cause) {
+    captureEditorError(cause, 'The skill catalog could not be searched.')
   } finally {
     skillSearchLoading.value = false
   }
@@ -106,7 +112,7 @@ async function openEditor(mode: EditorMode, skill?: ItemSkillRecord) {
   selectedSkill.value = undefined
   skillQuery.value = ''
   skillResults.value = []
-  editorError.value = undefined
+  clearEditorError()
   form.skillLevel = skill?.skillLevel ?? 1
   form.itemSkillTypeName = skill?.itemSkillTypeName ?? undefined
   form.chance = skill?.chance ?? null
@@ -121,16 +127,20 @@ function validSelection() {
 async function save() {
   const item = definition.value
   if (editorMode.value !== 'edit' && !validSelection()) {
-    editorError.value = 'Choose a skill and a level supported by that skill.'
+    setEditorError('Choose a skill and a level supported by that skill.', {
+      itemSkill: ['Choose a skill and a level supported by that skill.']
+    })
     return
   }
   if (editorMode.value !== 'primary' && (form.chance == null ? false : form.chance < 0 || form.chance > 100)) {
-    editorError.value = 'Chance must be between 0 and 100.'
+    setEditorError('Chance must be between 0 and 100.', {
+      itemSkill: ['Chance must be between 0 and 100.']
+    })
     return
   }
 
   saving.value = true
-  editorError.value = undefined
+  clearEditorError()
   try {
     if (editorMode.value === 'primary') {
       await setItemPrimarySkill(props.family, item.id, {
@@ -155,8 +165,8 @@ async function save() {
     }
     editorOpen.value = false
     emit('changed')
-  } catch {
-    editorError.value = 'The item skill could not be saved. Check the selected skill, level, and trigger type.'
+  } catch (cause) {
+    captureEditorError(cause, 'The item skill could not be saved. Check the selected skill, level, and trigger type.')
   } finally {
     saving.value = false
   }
@@ -264,11 +274,11 @@ function state(value: boolean | null) {
             </div>
             <UAlert v-if="selectedSkillLabel" color="primary" variant="subtle" :title="selectedSkillLabel" :description="`${selectedSkill!.levels} level${selectedSkill!.levels === 1 ? '' : 's'} available`" />
           </template>
-          <UFormField v-else label="Skill"><UInput :model-value="`${attachedSkill?.skillName ?? `Skill #${attachedSkill?.skillId}`} · Level ${attachedSkill?.skillLevel}`" disabled class="w-full" /></UFormField>
-          <UFormField v-if="editorMode !== 'edit'" label="Level" required><UInput v-model.number="form.skillLevel" type="number" min="1" :max="selectedSkill?.levels" :disabled="!selectedSkill" class="w-full" /></UFormField>
+          <UFormField v-else label="Skill" :error="editorFieldError('itemSkill')"><UInput :model-value="`${attachedSkill?.skillName ?? `Skill #${attachedSkill?.skillId}`} · Level ${attachedSkill?.skillLevel}`" disabled class="w-full" /></UFormField>
+          <UFormField v-if="editorMode !== 'edit'" label="Level" required :error="editorFieldError('itemSkill')"><UInput v-model.number="form.skillLevel" type="number" min="1" :max="selectedSkill?.levels" :disabled="!selectedSkill" class="w-full" /></UFormField>
           <template v-if="editorMode !== 'primary'">
-            <UFormField label="Trigger type"><USelect v-model="form.itemSkillTypeName" :items="skillTypeOptions" :loading="skillTypesLoading" class="w-full" /></UFormField>
-            <UFormField label="Chance (%)"><UInput v-model.number="form.chance" type="number" min="0" max="100" class="w-full" /></UFormField>
+            <UFormField label="Trigger type" :error="editorFieldError('itemSkillTypeName')"><USelect v-model="form.itemSkillTypeName" :items="skillTypeOptions" :loading="skillTypesLoading" class="w-full" /></UFormField>
+            <UFormField label="Chance (%)" :error="editorFieldError('itemSkill')"><UInput v-model.number="form.chance" type="number" min="0" max="100" class="w-full" /></UFormField>
           </template>
           <div class="flex justify-end gap-3 pt-2"><UButton label="Cancel" color="neutral" variant="outline" @click="editorOpen = false" /><UButton type="submit" :label="editorMode === 'add' ? 'Attach skill' : 'Save changes'" icon="i-lucide-save" :loading="saving" :disabled="skillTypesLoading" /></div>
         </form>

@@ -1,7 +1,9 @@
 # Studio server extension guide
 
 Use this guide for HTTP APIs, contracts, persistence, repositories,
-configuration, migrations, and server-owned tests.
+configuration, migrations, and server-owned tests. The target controller split
+is tracked in [the web/API refactor roadmap](../web-refactor-roadmap.md); keep
+existing routes under the version-scoped root while moving actions by aggregate.
 
 ## Contents
 
@@ -57,14 +59,22 @@ Follow this sequence:
 
 1. Define one immutable record per request, response, or model file in
    `L2.Studio.Contracts`. Reuse `DirectoryPage<T>` for standard paging.
-2. Extend the owning repository interface with an asynchronous operation that
+2. Extend the owning aggregate repository interface with an asynchronous operation that
    accepts the game version and `CancellationToken`.
 3. Implement a projection to the public contract in the repository. Do not
    expose tracked entities or persistence navigation properties.
 4. Add a thin controller action. Normalize strings once, validate all inputs,
    delegate work, and map the result to an explicit HTTP status.
-5. Mirror the contract and endpoint in the web service when it is browser
-   facing.
+5. Mirror the named contract and endpoint in a capability-focused web service
+   when it is browser facing. The client receives the game-version context
+   explicitly; it must not look it up from local storage.
+
+Keep repository ownership aggregate-focused. Item definitions, their family
+tables, item sets, recipes, and item-owned lookups belong to `IItemRepository`.
+The remaining `IContentDirectoryRepository` is a temporary compatibility seam
+for unsplit controllers; do not add new operations to it. Shared persistence
+code may contain only generic query primitives such as escaped `ILIKE` patterns
+and paged projections, never aggregate mutation rules.
 
 Use route constraints such as `{id:int}` and `{id:guid}`. Encode composite
 resource identity explicitly in the route. Do not infer the selected game

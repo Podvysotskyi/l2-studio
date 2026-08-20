@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from 'vue'
+import type { StudioStaticMeshRenderer } from '~/runtime/preview/studio-static-mesh-renderer'
 import {
-  StudioStaticMeshRenderer,
-  studioStaticMeshPreviewBackgrounds,
-  type StudioStaticMeshPreviewBackground
-} from '~/runtime'
+  studioPreviewBackgrounds,
+  type StudioPreviewBackground
+} from '~/runtime/preview/studio-preview-background'
 import type {
   StaticMeshMaterialBehavior,
   StaticMeshMaterialInspection,
@@ -18,7 +18,7 @@ const emit = defineEmits<{
   materials: [materials: StaticMeshMaterialInspection[]]
 }>()
 const canvas = ref<HTMLCanvasElement>()
-const background = ref<StudioStaticMeshPreviewBackground>('dark')
+const background = ref<StudioPreviewBackground>('dark')
 let preview: StudioStaticMeshRenderer | undefined
 let resizeObserver: ResizeObserver | undefined
 
@@ -41,7 +41,7 @@ async function loadMesh() {
   }
 }
 
-function setBackground(value: StudioStaticMeshPreviewBackground) {
+function setBackground(value: StudioPreviewBackground) {
   background.value = value
   preview?.setBackground(value)
 }
@@ -62,7 +62,9 @@ function resetMaterialInspections() {
   return preview?.resetMaterialInspections() ?? []
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!canvas.value) return
+  const { StudioStaticMeshRenderer } = await import('~/runtime/preview/studio-static-mesh-renderer')
   if (!canvas.value) return
   preview = new StudioStaticMeshRenderer(canvas.value)
   resizeObserver = new ResizeObserver(() => preview?.resize())
@@ -93,7 +95,7 @@ defineExpose({
     />
     <div class="absolute right-3 top-3 flex rounded-md bg-default/90 p-1 shadow-sm backdrop-blur">
       <UButton
-        v-for="preset in studioStaticMeshPreviewBackgrounds"
+        v-for="preset in studioPreviewBackgrounds"
         :key="preset.id"
         :aria-label="`Use ${preset.label} preview background`"
         :title="preset.label"

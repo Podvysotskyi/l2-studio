@@ -268,7 +268,7 @@ public sealed class ContentDirectoryRepositoryTests
                 });
             await context.SaveChangesAsync();
         }
-        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+        var repository = new ItemRepository(new TestContextFactory(options));
 
         var page = await repository.SearchItemsAsync("c1", ItemFamilyValues.Etc, new ItemDirectoryRequest(HandlerName: "ItemSkills"), CancellationToken.None);
 
@@ -300,7 +300,7 @@ public sealed class ContentDirectoryRepositoryTests
                 new Item { GameVersion = "c1", Id = 1, Name = "Cursed Maingauche", ItemTypeName = type.Name, ItemType = type, Etc = new Item_Etc { GameVersion = "c1", ItemId = 1 } });
             await context.SaveChangesAsync();
         }
-        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+        var repository = new ItemRepository(new TestContextFactory(options));
 
         var primary = await repository.SetItemPrimarySkillAsync(
             "c1", ItemFamilyValues.Etc, 1, new SetItemPrimarySkillRequest(3005, 2), CancellationToken.None);
@@ -362,7 +362,7 @@ public sealed class ContentDirectoryRepositoryTests
                 new Item { GameVersion = "c1", Id = 5, Name = "Potion", ItemTypeName = etcItem.Name, ItemType = etcItem, Etc = new Item_Etc { GameVersion = "c1", ItemId = 5 } });
             await context.SaveChangesAsync();
         }
-        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+        var repository = new ItemRepository(new TestContextFactory(options));
 
         var weapons = await repository.SearchItemsAsync("c1", ItemFamilyValues.Weapon, new ItemDirectoryRequest(ItemTypeName: "Weapon"), CancellationToken.None);
         var swords = await repository.SearchItemsAsync("c1", ItemFamilyValues.Weapon, new ItemDirectoryRequest(ItemTypeName: "SWORD"), CancellationToken.None);
@@ -414,7 +414,7 @@ public sealed class ContentDirectoryRepositoryTests
                 });
             await context.SaveChangesAsync();
         }
-        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+        var repository = new ItemRepository(new TestContextFactory(options));
 
         var recipes = await repository.SearchItemRecipesAsync("c1", new DirectoryRequest(), CancellationToken.None);
         var types = await repository.SearchItemRecipeTypesAsync("c1", new DirectoryRequest(), CancellationToken.None);

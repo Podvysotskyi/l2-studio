@@ -12,7 +12,13 @@ const emit = defineEmits<{ refresh: [] }>()
 const toasts = useStudioToasts()
 const editorOpen = ref(false)
 const saving = ref(false)
-const editorError = ref<string>()
+const {
+  pageError: editorError,
+  capture: captureEditorError,
+  clear: clearEditorError,
+  fieldError: editorFieldError,
+  set: setEditorError
+} = useStudioApiError()
 const selected = ref<ItemSetRecord>()
 const expanded = ref({})
 const form = reactive({
@@ -40,18 +46,20 @@ function openEditor(itemSet: ItemSetRecord) {
     str: itemSet.stats?.str ?? null, dex: itemSet.stats?.dex ?? null, con: itemSet.stats?.con ?? null,
     int: itemSet.stats?.int ?? null, wit: itemSet.stats?.wit ?? null, men: itemSet.stats?.men ?? null
   })
-  editorError.value = undefined
+  clearEditorError()
   editorOpen.value = true
 }
 
 async function save() {
   const itemSet = selected.value
   if (!itemSet?.skill) {
-    editorError.value = 'This item set has no skill to preserve.'
+    setEditorError('This item set has no skill to preserve.', {
+      skill: ['This item set has no skill to preserve.']
+    })
     return
   }
   saving.value = true
-  editorError.value = undefined
+  clearEditorError()
   try {
     await updateItemSet(itemSet.setId, {
       skillId: itemSet.skill.skillId,
@@ -61,8 +69,8 @@ async function save() {
     editorOpen.value = false
     toasts.success({ title: `Item set #${itemSet.setId} saved` })
     emit('refresh')
-  } catch {
-    editorError.value = 'The item set could not be saved. Check the selected skill and level.'
+  } catch (cause) {
+    captureEditorError(cause, 'The item set could not be saved. Check the selected skill and level.')
   } finally {
     saving.value = false
   }
@@ -158,7 +166,7 @@ async function save() {
         <form class="space-y-5" @submit.prevent="save">
           <UAlert v-if="editorError" color="error" variant="subtle" :description="editorError" />
           <div class="grid gap-3 sm:grid-cols-2">
-            <UFormField v-for="[key, label] in statFields" :key="key" :label="label"><UInput v-model.number="form[key]" type="number" placeholder="No modifier" /></UFormField>
+            <UFormField v-for="[key, label] in statFields" :key="key" :label="label" :error="editorFieldError('skill')"><UInput v-model.number="form[key]" type="number" placeholder="No modifier" /></UFormField>
           </div>
           <div class="flex justify-end gap-3">
             <UButton label="Cancel" color="neutral" variant="outline" :disabled="saving" @click="editorOpen = false" />

@@ -3,15 +3,19 @@ using L2.Studio.Contracts;
 using L2.Studio.Contracts.Requests;
 using Microsoft.EntityFrameworkCore;
 using L2.Studio.Repositories.Interfaces.Models;
+using L2.Studio.Context;
+using L2.Studio.Repositories.Interfaces;
 
 namespace L2.Studio.Repositories;
 
-public sealed partial class ContentDirectoryRepository
+public sealed partial class ItemRepository(
+    IDbContextFactory<GameContentDbContext> contextFactory)
+    : IItemRepository
 {
     public async Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken)
     {
         var query = request.Query ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         var offset = ((long)request.Page - 1) * request.PageSize;
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var items = FamilyItems(context.Items.AsNoTracking().Where(item => item.GameVersion == gameVersion &&
@@ -298,9 +302,9 @@ public sealed partial class ContentDirectoryRepository
         CancellationToken cancellationToken)
     {
         var query = request.Query ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        return await PageAsync(context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+        return await ContentDirectoryQueryPrimitives.PageAsync(context.ItemTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
             (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\")))
             .OrderBy(value => value.ParentTypeName == null ? 0 : 1).ThenBy(value => value.ParentTypeName).ThenBy(value => value.Name)
             .Select(value => new ItemTypeSummary(value.Name, value.DisplayName, value.ParentTypeName,
@@ -314,26 +318,26 @@ public sealed partial class ContentDirectoryRepository
         CancellationToken cancellationToken)
     {
         var query = request.Query ?? string.Empty;
-        var pattern = $"%{EscapeLikePattern(query)}%";
+        var pattern = $"%{ContentDirectoryQueryPrimitives.EscapeLikePattern(query)}%";
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         return kind switch
         {
-            "item-actions" => await PageAsync(context.ItemActions.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-actions" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemActions.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
-            "item-body-parts" => await PageAsync(context.ItemBodyParts.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-body-parts" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemBodyParts.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
-            "item-materials" => await PageAsync(context.ItemMaterials.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-materials" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemMaterials.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
-            "item-crystal-types" => await PageAsync(context.ItemCrystalTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-crystal-types" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemCrystalTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
-            "item-handlers" => await PageAsync(context.ItemHandlers.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-handlers" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemHandlers.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
-            "item-skill-types" => await PageAsync(context.ItemSkillTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
+            "item-skill-types" => await ContentDirectoryQueryPrimitives.PageAsync(context.ItemSkillTypes.AsNoTracking().Where(value => value.GameVersion == gameVersion &&
                 (query == string.Empty || EF.Functions.ILike(value.Name, pattern, "\\") || EF.Functions.ILike(value.DisplayName, pattern, "\\"))).OrderBy(value => value.Name)
                 .Select(value => new ItemLookupSummary(value.Name, value.DisplayName)), request.Page, request.PageSize, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))

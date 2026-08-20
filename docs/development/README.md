@@ -1,8 +1,11 @@
 # Extending L2 Studio
 
 This is the canonical implementation guide for new Studio functionality. Use
-it with [architecture.md](../architecture.md) for product boundaries and
-[asset-pipeline.md](../asset-pipeline.md) for published asset contracts.
+it with [architecture.md](../architecture.md), [web-architecture.md](../web-architecture.md),
+and [asset-pipeline.md](../asset-pipeline.md). The current implementation has
+older seams; [the roadmap](../web-refactor-roadmap.md) identifies those seams
+and the target pattern. Do not document or copy a planned pattern as shipped
+behavior until its slice is complete.
 
 ## Contents
 

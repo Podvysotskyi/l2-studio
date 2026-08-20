@@ -36,6 +36,7 @@ import type {
   PlayerAppearanceDirectoryRequest
 } from '../types/requests/directory-request'
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
+import type { UpdateItemConditionRequest } from '../types/requests/update-item-condition-request'
 import type { ItemConditionRecord, ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
 import type { ItemSetPage, ItemSetRecord } from '../types/models/item-set'
 import type { ItemRecipePage, ItemRecipeTypePage } from '../types/models/item-recipe'
@@ -133,10 +134,11 @@ export function updateItemDefinition(family: ItemFamily, id: number, request: {
 export function deleteItemDefinition(family: ItemFamily, id: number): Promise<void> {
   return $fetch<void>(versionPath(`/content/items/${family}/${id}`), { method: 'DELETE' })
 }
-export function updateItemCondition(family: ItemFamily, id: number, request: {
-  messageId: number; addName: boolean; isPvpFlagged: boolean | null
-  playerRaces: string[]; playerCategoryTypes: string[]
-}): Promise<ItemConditionRecord> {
+export function updateItemCondition(
+  family: ItemFamily,
+  id: number,
+  request: UpdateItemConditionRequest
+): Promise<ItemConditionRecord> {
   return $fetch<ItemConditionRecord>(versionPath(`/content/items/${family}/${id}/condition`), { method: 'PUT', body: request })
 }
 export function deleteItemCondition(family: ItemFamily, id: number): Promise<void> {

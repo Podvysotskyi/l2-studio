@@ -28,6 +28,7 @@ export const useItemRecipeTypeDirectoryStore = defineStore('item-recipe-type-dir
       if (version === requestVersion) loading.value = false
     }
   }
+  function reset() { requestVersion++; items.value = []; total.value = 0; loading.value = false; error.value = undefined }
 
-  return { items, total, query, page, pageSize, loading, error, load }
+  return { items, total, query, page, pageSize, loading, error, load, reset }
 })

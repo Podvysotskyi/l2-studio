@@ -5,7 +5,7 @@ import type {
   MapVector,
   SceneManifest
 } from '~/types/studio'
-import { StudioWorldRenderer } from '~/runtime'
+import type { StudioWorldRenderer } from '~/runtime/preview/studio-world-renderer'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 
 const props = withDefaults(
@@ -174,7 +174,9 @@ defineExpose({
   frameBsp
 })
 
-onMounted(() => {
+onMounted(async () => {
+  if (!canvas.value) return
+  const { StudioWorldRenderer } = await import('~/runtime/preview/studio-world-renderer')
   if (!canvas.value) return
   preview = new StudioWorldRenderer(canvas.value, {
     interactive: true,

@@ -36,6 +36,7 @@ export const useNpcLookupDirectoryStore = defineStore('npc-lookup-directory', ()
   function isLoading(kind: NpcLookupKind) {
     return loadingKinds.value.includes(kind)
   }
+  function reset() { records.value = {}; loadingKinds.value = []; errors.value = {} }
 
-  return { records, errors, load, updateDisplayName, isLoading }
+  return { records, errors, load, updateDisplayName, isLoading, reset }
 })

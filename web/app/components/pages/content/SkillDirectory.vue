@@ -22,7 +22,13 @@ const selectedSkill = ref<SkillRecord>()
 const editOpen = ref(false)
 const saving = ref(false)
 const deletingId = ref<number>()
-const editError = ref<string>()
+const {
+  pageError: editError,
+  capture: captureEditError,
+  clear: clearEditError,
+  fieldError: editFieldError,
+  set: setEditError
+} = useStudioApiError()
 const lookupsLoading = ref(false)
 const operateTypes = ref<SkillLookupRecord[]>([])
 const targetTypes = ref<SkillLookupRecord[]>([])
@@ -63,8 +69,8 @@ async function loadLookups() {
     ])
     operateTypes.value = operate
     targetTypes.value = target
-  } catch {
-    editError.value = 'Skill lookup values could not be loaded.'
+  } catch (cause) {
+    captureEditError(cause, 'Skill lookup values could not be loaded.')
   } finally {
     lookupsLoading.value = false
   }
@@ -76,7 +82,7 @@ async function edit(skill: SkillRecord) {
   editForm.levels = skill.levels
   editForm.skillOperateTypeName = skill.skillOperateTypeName ?? undefined
   editForm.skillTargetTypeName = skill.skillTargetTypeName ?? undefined
-  editError.value = undefined
+  clearEditError()
   editOpen.value = true
   await loadLookups()
 }
@@ -86,18 +92,20 @@ async function save() {
   if (!skill) return
   const name = editForm.name.trim()
   if (!name || name.length > 100 || !Number.isInteger(editForm.levels) || editForm.levels < 1 || editForm.levels > 255) {
-    editError.value = 'Name must contain between 1 and 100 characters and levels must be between 1 and 255.'
+    setEditError('Name must contain between 1 and 100 characters and levels must be between 1 and 255.', {
+      definition: ['Name and levels must be valid.']
+    })
     return
   }
   saving.value = true
-  editError.value = undefined
+  clearEditError()
   try {
     await updateSkillDefinition(skill.id, { ...editForm, name })
     editOpen.value = false
     notifications.success({ title: 'Skill definition saved' })
     emit('refresh')
-  } catch {
-    editError.value = 'Skill definition could not be saved. Check the selected lookup values and try again.'
+  } catch (cause) {
+    captureEditError(cause, 'Skill definition could not be saved. Check the selected lookup values and try again.')
   } finally {
     saving.value = false
   }
@@ -219,10 +227,10 @@ async function remove(skill: SkillRecord) {
       <template #body>
         <form class="space-y-4" @submit.prevent="save">
           <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
-          <UFormField label="Name" required><UInput v-model="editForm.name" maxlength="100" class="w-full" /></UFormField>
-          <UFormField label="Levels" required><UInput v-model.number="editForm.levels" type="number" min="1" max="255" class="w-full" /></UFormField>
-          <UFormField label="Operate type"><USelect v-model="editForm.skillOperateTypeName" :items="operateTypeOptions" :loading="lookupsLoading" class="w-full" /></UFormField>
-          <UFormField label="Target type"><USelect v-model="editForm.skillTargetTypeName" :items="targetTypeOptions" :loading="lookupsLoading" class="w-full" /></UFormField>
+          <UFormField label="Name" required :error="editFieldError('definition')"><UInput v-model="editForm.name" maxlength="100" class="w-full" /></UFormField>
+          <UFormField label="Levels" required :error="editFieldError('definition')"><UInput v-model.number="editForm.levels" type="number" min="1" max="255" class="w-full" /></UFormField>
+          <UFormField label="Operate type" :error="editFieldError('definition')"><USelect v-model="editForm.skillOperateTypeName" :items="operateTypeOptions" :loading="lookupsLoading" class="w-full" /></UFormField>
+          <UFormField label="Target type" :error="editFieldError('definition')"><USelect v-model="editForm.skillTargetTypeName" :items="targetTypeOptions" :loading="lookupsLoading" class="w-full" /></UFormField>
           <div class="flex justify-end gap-3 pt-2"><UButton label="Cancel" color="neutral" variant="outline" @click="editOpen = false" /><UButton type="submit" label="Save changes" icon="i-lucide-save" :loading="saving" :disabled="lookupsLoading" /></div>
         </form>
       </template>

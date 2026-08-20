@@ -1,7 +1,9 @@
 # Studio jobs and tooling extension guide
 
 Use this guide for Wolverine messages, persistent import jobs, Worker handlers,
-hosted services, conversion orchestration, and generated source catalogs.
+hosted services, conversion orchestration, and generated source catalogs. API
+and web refactoring must not change the job lifecycle, persistence schema,
+storage rules, or published outputs described here.
 
 ## Contents
 

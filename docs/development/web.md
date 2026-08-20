@@ -1,7 +1,10 @@
 # Studio web extension guide
 
 Use this guide for Nuxt pages, components, Pinia state, browser contracts,
-services, storage routes, and rendering consumers.
+services, storage routes, and rendering consumers. For the shipped baseline and
+the deliberately staged target structure, read
+[web architecture](../web-architecture.md) and the
+[refactor roadmap](../web-refactor-roadmap.md) first.
 
 ## Contents
 
@@ -141,6 +144,10 @@ slots, and use `StudioTableRowActions` for consistent row controls.
 - Use `useStudioDialogs` instead of duplicating confirmation and prompt modals.
 - Use `useStudioToasts` for mutation success and failure. Keep load failures as
   persistent page alerts with a retry path.
+- Use `useStudioApiError` for a form or page API failure. Call `clear()` before
+  a request, `capture(cause, fallback)` in its catch block, show `pageError` in
+  the alert, and bind `fieldError('requestProperty')` to the corresponding
+  `UFormField`. Do not parse `$fetch` errors in individual components.
 - Confirm destructive actions and explain dependency conflicts or restoration
   behavior. Disable or show loading on the exact action in progress.
 - Supply explicit search placeholders, accessible labels, empty states, and
@@ -153,16 +160,20 @@ slots, and use `StudioTableRowActions` for consistent row controls.
 ## Call APIs and model contracts
 
 Add browser calls to the appropriate service rather than pages or components.
-Studio API calls use `versionPath`, which reads the selected game version and
-builds `/api/game-versions/{version}/...`.
+The legacy `studio-api.ts` façade still uses `versionPath` and reads selected
+browser storage; do not add new calls to it. New capability clients receive a
+`createStudioVersionClient(gameVersion)` from route or feature state and build
+`/api/game-versions/{version}/...` from that explicit context.
 
 ```ts
-export function getThingDirectory(
-  request: DirectoryRequest = {}
-): Promise<DirectoryPage<ThingRecord>> {
-  return $fetch<DirectoryPage<ThingRecord>>(versionPath('/content/things'), {
-    query: directoryQuery(request)
-  })
+export function createThingApi(client: StudioVersionClient) {
+  return {
+    getDirectory(request: DirectoryRequest = {}) {
+      return $fetch<DirectoryPage<ThingRecord>>(client.path('/content/things'), {
+        query: directoryQuery(request)
+      })
+    }
+  }
 }
 ```
 
@@ -172,13 +183,23 @@ export function getThingDirectory(
   separators when the route intentionally accepts a relative resource path.
 - Specify the response type, HTTP method, body, and query explicitly.
 - Keep models, requests, and responses in their corresponding `types`
-  directory. Reuse generic `DirectoryPage<T>` and shared job types.
+  directory. Name every mutation request after its C# contract; do not use
+  inline structural bodies or `Record` payloads. Reuse generic
+  `DirectoryPage<T>` and shared job types.
 - Mirror C# property optionality and nullability exactly. ASP.NET Core JSON uses
   camelCase browser properties.
 - Resolve generated asset URLs through published-asset utilities; do not
   concatenate the public asset origin in page components.
 - Use `storage-api.ts` only for Nuxt-owned file operations. Mutations must remain
   limited to original-resource storage; generated assets are read-only.
+- Keep game-version context outside route parameters unless a cross-version URL
+  is an explicit sharing workflow. A selection change persists the selected key,
+  calls `resetVersionScopedState()`, and keys the active page subtree by that
+  key so local inspector state and version-scoped Pinia state cannot leak into
+  the next version.
+- Load renderer implementations with dynamic imports from their `.client.vue`
+  adapters. Route pages lazy-load map, scene, and spawn-map inspectors; do not
+  import the runtime barrel into a browser feature.
 
 ## Register routes and navigation
 
@@ -203,12 +224,32 @@ for generated asset browsing, `/pipeline` for imports and releases, and
   response suppression.
 - Pure utility tests cover route parsing/serialization, pagination, labels, and
   published URL resolution.
-- Component or Nuxt tests cover behavior that cannot be expressed through a
-  store or utility test.
+- Nuxt-runtime tests under `test/nuxt` mount pages, components, and composables
+  with `@nuxt/test-utils`; assert visible state, route synchronization, emitted
+  interactions, and typed API-error projection rather than component source.
 - Navigation tests cover groups, canonical destinations, aliases that must not
   return, and route titles.
-- Playwright covers critical user journeys; keep unit tests as the primary
-  coverage for new state and services.
+- Playwright journeys under `test/e2e` mock same-origin `/api` responses and
+  cover version switching, authoring validation, directory URL state, storage
+  mutability, and lazy inspection surfaces. Run them with
+  `docker build --target browser-tests web`; keep browser mocks deterministic
+  and validate the coordinated deployment separately through Compose.
+- `npm test` runs the policy guard, Node tests, and Nuxt-runtime tests.
+  `npm run test:coverage` writes separate Node and Nuxt V8 reports under
+  `coverage/` and rejects a regression from the tracked baseline. Run the
+  checked workflow as `docker build --target coverage web`.
+
+### Target feature-family matrix
+
+Use this as the required placement for new coverage and migration slices; it
+describes the target suite, not a claim that every cell is already covered.
+
+| Family | Node seam | Nuxt/runtime seam | Browser journey |
+| --- | --- | --- | --- |
+| Shell, version, dashboard, navigation | Version/state and route utilities | Selector, remount, dashboard errors | Version switch clears old results and loads the replacement version |
+| Items, NPCs, players, skills, lookups | Capability calls and directory stores | Detail tabs, forms, query state, typed errors | Item validation/save and directory URL state |
+| Library, pipeline, storage | Catalog/import and storage handlers | Loading, paging, failure, and read-only state | Original resources mutate; generated assets do not |
+| Maps, scenes, spawn map | Manifest/filter/paging/preview helpers | Selection, polling, and cleanup with renderer adapters mocked | Map and scene inspection surfaces lazy-load |
 
 Run the web `validate` Docker target after any web change. It runs Vitest, Nuxt
 type checking, and the production build.

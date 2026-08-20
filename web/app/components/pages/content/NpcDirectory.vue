@@ -50,7 +50,13 @@ const lookupsLoaded = ref(false)
 const lookupsError = ref<string>()
 const saving = ref(false)
 const deletingId = ref<number>()
-const editError = ref<string>()
+const {
+  pageError: editError,
+  capture: captureEditError,
+  clear: clearEditError,
+  fieldError: editFieldError,
+  set: setEditError
+} = useStudioApiError()
 const notifications = useStudioToasts()
 const dialogs = useStudioDialogs()
 const isC1 = selectedGameVersionKey() === 'c1'
@@ -192,10 +198,10 @@ async function edit(record: NpcRecord) {
   editForm.npcTypeName = record.npcTypeName
   editForm.npcRaceName = record.npcRaceName
   editForm.npcSexName = record.npcSexName
-  editError.value = undefined
+  clearEditError()
   editOpen.value = true
   await loadLookups()
-  if (lookupsError.value) editError.value = lookupsError.value
+  if (lookupsError.value) setEditError(lookupsError.value)
 }
 
 async function loadLookups() {
@@ -229,20 +235,27 @@ async function saveNpc() {
   const name = editForm.name.trim()
   if (!npc) return
   if (!name || name.length > 100) {
-    editError.value = 'Name must contain between 1 and 100 characters.'
+    setEditError('Name must contain between 1 and 100 characters.', {
+      name: ['Name must contain between 1 and 100 characters.']
+    })
     return
   }
   if (!Number.isInteger(editForm.level) || editForm.level < 1 || editForm.level > 255) {
-    editError.value = 'Level must be between 1 and 255.'
+    setEditError('Level must be between 1 and 255.', {
+      level: ['Level must be between 1 and 255.']
+    })
     return
   }
   if (!editForm.npcTypeName || !editForm.npcSexName) {
-    editError.value = 'Choose an NPC type and sex.'
+    setEditError('Choose an NPC type and sex.', {
+      npcTypeName: ['Choose an NPC type.'],
+      npcSexName: ['Choose an NPC sex.']
+    })
     return
   }
 
   saving.value = true
-  editError.value = undefined
+  clearEditError()
   try {
     await updateNpcDefinition(npc.id, {
       name,
@@ -254,8 +267,8 @@ async function saveNpc() {
     editOpen.value = false
     notifications.success({ title: 'NPC definition saved' })
     emit('refresh')
-  } catch {
-    editError.value = 'The NPC definition could not be saved. Check the selected lookup values and try again.'
+  } catch (cause) {
+    captureEditError(cause, 'The NPC definition could not be saved. Check the selected lookup values and try again.')
   } finally {
     saving.value = false
   }
@@ -396,19 +409,19 @@ onUnmounted(() => clearTimeout(pollTimer))
       <template #body>
         <form class="space-y-4" @submit.prevent="saveNpc">
           <UAlert v-if="editError" color="error" variant="subtle" :description="editError" />
-          <UFormField label="Name" required>
+          <UFormField label="Name" required :error="editFieldError('name')">
             <UInput v-model="editForm.name" maxlength="100" class="w-full" />
           </UFormField>
-          <UFormField label="Level" required>
+          <UFormField label="Level" required :error="editFieldError('level')">
             <UInput v-model.number="editForm.level" type="number" min="1" max="255" class="w-full" />
           </UFormField>
-          <UFormField label="Type" required>
+          <UFormField label="Type" required :error="editFieldError('npcTypeName')">
             <USelect v-model="editForm.npcTypeName" :items="typeOptions" :loading="lookupsLoading" class="w-full" />
           </UFormField>
-          <UFormField label="Race">
+          <UFormField label="Race" :error="editFieldError('npcRaceName')">
             <USelect v-model="editForm.npcRaceName" :items="raceOptions" :loading="lookupsLoading" class="w-full" />
           </UFormField>
-          <UFormField label="Sex" required>
+          <UFormField label="Sex" required :error="editFieldError('npcSexName')">
             <USelect v-model="editForm.npcSexName" :items="sexOptions" :loading="lookupsLoading" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-3 pt-2">

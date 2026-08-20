@@ -19,6 +19,17 @@ RUN npm test
 RUN npm run typecheck
 RUN npm run build
 
+FROM mcr.microsoft.com/playwright:v1.62.1-noble AS browser-tests
+
+WORKDIR /workspace
+COPY --from=source --chown=pwuser:pwuser /workspace /workspace
+RUN chown -R pwuser:pwuser /workspace
+USER pwuser
+RUN npm run test:e2e
+
+FROM source AS coverage
+RUN npm run test:coverage
+
 FROM source AS build
 RUN npm run build
 

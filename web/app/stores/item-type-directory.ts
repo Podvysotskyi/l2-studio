@@ -22,6 +22,7 @@ export const useItemTypeDirectoryStore = defineStore('item-type-directory', () =
       loading.value = false
     }
   }
+  function reset() { records.value = []; loading.value = false; error.value = undefined }
 
-  return { records, loading, error, load }
+  return { records, loading, error, load, reset }
 })

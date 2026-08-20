@@ -88,7 +88,7 @@ function reloadPage() {
       </template>
 
       <template #body>
-        <div class="studio-page">
+        <div :key="gameVersionStore.selected" class="studio-page">
           <slot />
         </div>
       </template>
