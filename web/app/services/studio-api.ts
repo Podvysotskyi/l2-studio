@@ -37,7 +37,7 @@ import type {
 } from '../types/requests/directory-request'
 import type { UpdateNpcRequest } from '../types/requests/update-npc-request'
 import type { UpdateItemConditionRequest } from '../types/requests/update-item-condition-request'
-import type { ItemConditionRecord, ItemDetailRecord, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
+import type { ItemConditionRecord, ItemDetailRecord, ItemIconRecord, ItemIconReference, ItemLookupKind, ItemLookupRecord, ItemPage, ItemPrimarySkillRecord, ItemRecord, ItemSkillRecord } from '../types/models/item'
 import type { ItemSetPage, ItemSetRecord } from '../types/models/item-set'
 import type { ItemRecipePage, ItemRecipeTypePage } from '../types/models/item-recipe'
 import type { ItemFamily } from '../types/requests/directory-request'
@@ -122,6 +122,14 @@ export function getNpcSpawnWorldMap(): Promise<NpcSpawnWorldMap> {
 
 export function getItemDirectory(family: ItemFamily, request: ItemDirectoryRequest = {}): Promise<ItemPage> {
   return $fetch<ItemPage>(versionPath(`/content/items/${family}`), { query: itemDirectoryQuery(request) })
+}
+
+export async function resolveItemIcons(references: ItemIconReference[]): Promise<ItemIconRecord[]> {
+  const response = await $fetch<ItemIconRecord[]>(versionPath('/content/item-icons/resolve'), {
+    method: 'POST',
+    body: { items: references }
+  })
+  return resolvePublishedAssetUrls(response, String(useRuntimeConfig().public.assetBaseUrl))
 }
 
 export function getItemDefinition(family: ItemFamily, id: number): Promise<ItemDetailRecord> { return $fetch<ItemDetailRecord>(versionPath(`/content/items/${family}/${id}`)) }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getItemDefinition } from '~/services/studio-api'
+import { getItemDefinition, resolveItemIcons } from '~/services/studio-api'
 import type { ItemDetailRecord } from '~/types/models/item'
 import type { ItemFamily } from '~/types/requests/directory-request'
 import { itemFamilyLabels, skillItemFamilies } from '~/utils/item-family'
@@ -8,8 +8,10 @@ const props = defineProps<{ family: ItemFamily }>()
 
 const route = useRoute()
 const item = ref<ItemDetailRecord>()
+const iconUrl = ref<string>()
 const loading = ref(true)
 const error = ref<string>()
+let loadVersion = 0
 const typeLabel = computed(() => {
   if (!item.value) return ''
   if (!item.value.item.itemParentTypeName) return item.value.item.itemTypeDisplayName
@@ -30,8 +32,10 @@ const categoryLabel = computed(() => itemFamilyLabels[props.family])
 const directoryPath = computed(() => `/authoring/items/${props.family}`)
 
 async function load() {
+  const version = ++loadVersion
   if (itemId.value === undefined) {
     item.value = undefined
+    iconUrl.value = undefined
     loading.value = false
     error.value = 'The item identifier is invalid.'
     return
@@ -39,13 +43,32 @@ async function load() {
   loading.value = true
   try {
     const result = await getItemDefinition(props.family, itemId.value)
+    if (version !== loadVersion) return
     item.value = result
+    iconUrl.value = undefined
     error.value = undefined
+    if (result.item.icon)
+      void loadIcon(result, version)
   } catch {
+    if (version !== loadVersion) return
     item.value = undefined
+    iconUrl.value = undefined
     error.value = 'The item definition could not be loaded.'
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
+  }
+}
+
+async function loadIcon(result: ItemDetailRecord, version: number) {
+  try {
+    const [resolved] = await resolveItemIcons([{
+      itemId: result.item.id,
+      icon: result.item.icon!,
+      itemBodyPartName: result.item.itemBodyPartName
+    }])
+    if (version === loadVersion) iconUrl.value = resolved?.url
+  } catch {
+    // Item artwork is supplemental; the definition remains usable without it.
   }
 }
 
@@ -70,6 +93,9 @@ watch(itemId, () => void load(), { immediate: true })
       :description="item ? `ID: ${item.item.id} · ${typeLabel}` : `View and curate a normalized ${categoryLabel.toLowerCase()} record.`"
       icon="i-lucide-swords"
     >
+      <template #icon>
+        <ItemIconThumbnail :url="iconUrl" :alt="item ? item.item.name : `${categoryLabel} definition`" variant="header" />
+      </template>
       <template #actions>
         <UButton :label="`Back to ${categoryLabel.toLowerCase()} definitions`" icon="i-lucide-arrow-left" color="neutral" variant="outline" :to="directoryPath" />
       </template>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getNpcDirectory,
   getItemDirectory,
+  resolveItemIcons,
   getSkillDirectory,
   getItemRecipeDirectory,
   getItemRecipeTypeDirectory
@@ -16,6 +17,7 @@ import { useItemRecipeTypeDirectoryStore } from '../../app/stores/item-recipe-ty
 vi.mock('../../app/services/studio-api', () => ({
   getNpcDirectory: vi.fn(),
   getItemDirectory: vi.fn(),
+  resolveItemIcons: vi.fn(),
   getSkillDirectory: vi.fn(),
   getItemRecipeDirectory: vi.fn(),
   getItemRecipeTypeDirectory: vi.fn()
@@ -26,6 +28,7 @@ describe('Content directory stores', () => {
     setActivePinia(createPinia())
     vi.mocked(getNpcDirectory).mockReset()
     vi.mocked(getItemDirectory).mockReset()
+    vi.mocked(resolveItemIcons).mockReset()
     vi.mocked(getSkillDirectory).mockReset()
     vi.mocked(getItemRecipeDirectory).mockReset()
     vi.mocked(getItemRecipeTypeDirectory).mockReset()
@@ -97,6 +100,46 @@ describe('Content directory stores', () => {
     expect(getItemDirectory).toHaveBeenCalledWith('armor', expect.any(Object))
   })
 
+  it('resolves current item-page icons without failing the directory when artwork is unavailable', async () => {
+    vi.mocked(getItemDirectory).mockResolvedValue({
+      items: [{ ...item('Sword'), icon: 'icon.weapon_sword_i00' }], total: 1, page: 1, pageSize: 25
+    })
+    vi.mocked(resolveItemIcons).mockRejectedValue(new Error('Texture catalog unavailable'))
+    const store = useItemDirectoryStore()
+
+    await store.load()
+
+    expect(resolveItemIcons).toHaveBeenCalledWith([{ itemId: 1, icon: 'icon.weapon_sword_i00', itemBodyPartName: null }])
+    expect(store.items[0]?.name).toBe('Sword')
+    expect(store.iconUrls).toEqual({})
+    expect(store.error).toBeUndefined()
+  })
+
+  it('maps resolved item artwork by item ID when rows share an icon identifier', async () => {
+    vi.mocked(getItemDirectory).mockResolvedValue({
+      items: [
+        { ...item('Hard Leather Shirt'), id: 27, icon: 'icon.armor_hard_leather_shirt_i00', itemBodyPartName: 'chest' },
+        { ...item('Hard Leather Pants'), id: 28, icon: 'icon.armor_hard_leather_shirt_i00', itemBodyPartName: 'legs' }
+      ], total: 2, page: 1, pageSize: 25
+    })
+    vi.mocked(resolveItemIcons).mockResolvedValue([
+      { itemId: 27, url: 'https://assets.test/icons/chest.webp' },
+      { itemId: 28, url: 'https://assets.test/icons/legs.webp' }
+    ])
+    const store = useItemDirectoryStore()
+
+    await store.load()
+
+    expect(resolveItemIcons).toHaveBeenCalledWith([
+      { itemId: 27, icon: 'icon.armor_hard_leather_shirt_i00', itemBodyPartName: 'chest' },
+      { itemId: 28, icon: 'icon.armor_hard_leather_shirt_i00', itemBodyPartName: 'legs' }
+    ])
+    expect(store.iconUrls).toEqual({
+      27: 'https://assets.test/icons/chest.webp',
+      28: 'https://assets.test/icons/legs.webp'
+    })
+  })
+
   it('reports a stable skill-directory failure', async () => {
     vi.mocked(getSkillDirectory).mockRejectedValue(new Error('Unavailable'))
     const store = useSkillDirectoryStore()
@@ -146,5 +189,32 @@ function npc(name: string) {
     npcSexDisplayName: 'Male',
     hasVisuals: true,
     status: null
+  }
+}
+
+function item(name: string) {
+  return {
+    id: 1,
+    name,
+    itemTypeName: 'Weapon',
+    itemTypeDisplayName: 'Weapon',
+    itemParentTypeName: null,
+    itemParentTypeDisplayName: null,
+    itemActionName: null,
+    itemActionDisplayName: null,
+    itemBodyPartName: null,
+    itemBodyPartDisplayName: null,
+    itemMaterialName: null,
+    itemMaterialDisplayName: null,
+    itemCrystalTypeName: null,
+    itemCrystalTypeDisplayName: null,
+    icon: null,
+    weight: null,
+    price: null,
+    handlerName: null,
+    handlerDisplayName: null,
+    skills: [],
+    attackGeometry: null,
+    stats: null
   }
 }

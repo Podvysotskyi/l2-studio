@@ -49,6 +49,15 @@ export interface ItemRecord {
   skills: ItemSkillRecord[]; attackGeometry: ItemAttackGeometryRecord | null
   stats: ItemStatsRecord | null
 }
+export interface ItemIconRecord {
+  itemId: number
+  url: string
+}
+export interface ItemIconReference {
+  itemId: number
+  icon: string
+  itemBodyPartName: string | null
+}
 export interface ItemDetailRecord {
   item: ItemRecord
   properties: ItemPropertiesRecord

@@ -10,11 +10,13 @@ defineProps<{
 <template>
   <header class="flex flex-wrap items-start justify-between gap-6">
     <div class="flex min-w-0 items-start gap-4">
-      <div
-        class="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/20"
-      >
-        <UIcon :name="icon" class="size-5 text-primary" />
-      </div>
+      <slot name="icon">
+        <div
+          class="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/20"
+        >
+          <UIcon :name="icon" class="size-5 text-primary" />
+        </div>
+      </slot>
       <div class="min-w-0">
         <p
           v-if="eyebrow"

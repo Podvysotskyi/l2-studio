@@ -5,6 +5,7 @@ namespace L2.Studio.Repositories;
 
 public sealed partial class ContentDirectoryRepository
 {
+    public Task<IReadOnlyList<ItemIconSummary>> ResolveItemIconsAsync(string gameVersion, IReadOnlyList<ItemIconReference> items, CancellationToken cancellationToken) => itemRepository.ResolveItemIconsAsync(gameVersion, items, cancellationToken);
     public Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken) => itemRepository.SearchItemsAsync(gameVersion, family, request, cancellationToken);
     public Task<ItemDetailSummary?> GetItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken) => itemRepository.GetItemAsync(gameVersion, family, id, cancellationToken);
     public Task<ItemSummary?> UpdateItemAsync(string gameVersion, string family, int id, UpdateItemRequest request, CancellationToken cancellationToken) => itemRepository.UpdateItemAsync(gameVersion, family, id, request, cancellationToken);

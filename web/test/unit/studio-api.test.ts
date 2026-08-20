@@ -13,6 +13,7 @@ import {
   getNpcDirectory,
   getNpcSpawnWorldMap,
   getItemDirectory,
+  resolveItemIcons,
   getItemSet,
   getItemSetDirectory,
   getItemRecipeDirectory,
@@ -143,6 +144,18 @@ describe('Studio API service', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-skill-types', {
       query: { query: 'critical', page: 1, pageSize: 25 }
     })
+  })
+
+  it('resolves item icon artwork through the content API', async () => {
+    vi.stubGlobal('useRuntimeConfig', () => ({ public: { assetBaseUrl: 'https://assets.example' } }))
+    fetchMock.mockResolvedValue([{ itemId: 12, url: '/versions/c1/textures/icon.png' }])
+
+    const icons = await resolveItemIcons([{ itemId: 12, icon: 'icon.weapon_sword_i00', itemBodyPartName: null }])
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/game-versions/c1/content/item-icons/resolve', {
+      method: 'POST', body: { items: [{ itemId: 12, icon: 'icon.weapon_sword_i00', itemBodyPartName: null }] }
+    })
+    expect(icons).toEqual([{ itemId: 12, url: 'https://assets.example/versions/c1/textures/icon.png' }])
   })
 
   it('manages primary and attached item skills through the content API', async () => {

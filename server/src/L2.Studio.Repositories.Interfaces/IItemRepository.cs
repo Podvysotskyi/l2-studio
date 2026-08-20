@@ -8,6 +8,7 @@ namespace L2.Studio.Repositories.Interfaces;
 /// </summary>
 public interface IItemRepository
 {
+    Task<IReadOnlyList<ItemIconSummary>> ResolveItemIconsAsync(string gameVersion, IReadOnlyList<ItemIconReference> items, CancellationToken cancellationToken);
     Task<ItemDirectoryPage> SearchItemsAsync(string gameVersion, string family, ItemDirectoryRequest request, CancellationToken cancellationToken);
     Task<ItemDetailSummary?> GetItemAsync(string gameVersion, string family, int id, CancellationToken cancellationToken);
     Task<ItemSummary?> UpdateItemAsync(string gameVersion, string family, int id, UpdateItemRequest request, CancellationToken cancellationToken);

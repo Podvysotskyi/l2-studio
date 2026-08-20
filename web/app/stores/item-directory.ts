@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getItemDirectory } from '../services/studio-api'
-import type { ItemRecord } from '../types/models/item'
+import { getItemDirectory, resolveItemIcons } from '../services/studio-api'
+import type { ItemIconReference, ItemPage, ItemRecord } from '../types/models/item'
 import type { ItemFamily } from '../types/requests/directory-request'
 
 export const useItemDirectoryStore = defineStore('item-directory', () => {
@@ -17,6 +17,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
   const itemMaterialName = ref<string>()
   const itemCrystalTypeName = ref<string>()
   const handlerName = ref<string>()
+  const iconUrls = ref<Record<number, string>>({})
   const loading = ref(true)
   const error = ref<string>()
   let requestVersion = 0
@@ -24,8 +25,9 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     const version = ++requestVersion
     loading.value = true
     error.value = undefined
+    let response: ItemPage
     try {
-      const response = await getItemDirectory(family.value, {
+      response = await getItemDirectory(family.value, {
         query: query.value,
         page: page.value,
         pageSize: pageSize.value,
@@ -36,16 +38,30 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
         itemCrystalTypeName: itemCrystalTypeName.value,
         handlerName: handlerName.value
       })
-      if (version !== requestVersion) return
-      items.value = response.items
-      total.value = response.total
     } catch {
       if (version === requestVersion) error.value = 'The item directory could not be loaded from the Studio API.'
-    } finally {
       if (version === requestVersion) loading.value = false
+      return
+    }
+    if (version !== requestVersion) return
+    items.value = response.items
+    total.value = response.total
+    iconUrls.value = {}
+    loading.value = false
+
+    const iconReferences: ItemIconReference[] = response.items
+      .filter((item): item is ItemRecord & { icon: string } => item.icon !== null && item.icon.length > 0)
+      .map(item => ({ itemId: item.id, icon: item.icon, itemBodyPartName: item.itemBodyPartName }))
+    if (!iconReferences.length) return
+    try {
+      const resolvedIcons = await resolveItemIcons(iconReferences)
+      if (version === requestVersion)
+        iconUrls.value = Object.fromEntries(resolvedIcons.map(icon => [icon.itemId, icon.url]))
+    } catch {
+      // Icon artwork is supplemental; item definitions remain usable without it.
     }
   }
-  function reset() { requestVersion++; items.value = []; total.value = 0; loading.value = false; error.value = undefined }
+  function reset() { requestVersion++; items.value = []; total.value = 0; iconUrls.value = {}; loading.value = false; error.value = undefined }
   return {
     items,
     total,
@@ -59,6 +75,7 @@ export const useItemDirectoryStore = defineStore('item-directory', () => {
     itemMaterialName,
     itemCrystalTypeName,
     handlerName,
+    iconUrls,
     loading,
     error,
     load,

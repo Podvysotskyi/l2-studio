@@ -10,7 +10,7 @@ const familyValue = Array.isArray(route.params.family) ? route.params.family[0] 
 if (!familyValue || !isItemFamily(familyValue)) throw createError({ statusCode: 404, statusMessage: 'Item family not found' })
 const family = familyValue
 const store = useItemDirectoryStore()
-const { items, total, query, page, pageSize, itemTypeName, itemActionName, itemBodyPartName, itemMaterialName, itemCrystalTypeName, handlerName, loading, error } = storeToRefs(store)
+const { items, iconUrls, total, query, page, pageSize, itemTypeName, itemActionName, itemBodyPartName, itemMaterialName, itemCrystalTypeName, handlerName, loading, error } = storeToRefs(store)
 store.family = family
 
 useDirectoryRouteSync(`/authoring/items/${family}`, { query, page, pageSize }, store.load, {
@@ -34,7 +34,7 @@ useDirectoryRouteSync(`/authoring/items/${family}`, { query, page, pageSize }, s
     v-model:item-type-name="itemTypeName" v-model:item-action-name="itemActionName"
     v-model:item-body-part-name="itemBodyPartName" v-model:item-material-name="itemMaterialName"
     v-model:item-crystal-type-name="itemCrystalTypeName" v-model:handler-name="handlerName"
-    :items="items" :total="total" :loading="loading" :error="error" :family="family"
+    :items="items" :icon-urls="iconUrls" :total="total" :loading="loading" :error="error" :family="family"
     @refresh="store.load"
   />
 </template>

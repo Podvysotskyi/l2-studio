@@ -91,6 +91,30 @@ public sealed class ContentDirectoryControllerTests
     }
 
     [Fact]
+    public async Task NormalizesAndDelegatesItemIconResolution()
+    {
+        var expected = new[] { new ItemIconSummary(12, "/versions/c1/icons/sword.webp") };
+        var repository = new StubContentDirectoryRepository { ItemIcons = expected };
+        var controller = new ContentDirectoryController(repository);
+
+        var result = await controller.ResolveItemIcons(
+            "c1",
+            new ResolveItemIconsRequest([
+                new ItemIconReference(12, " icon.weapon_sword_i00 ", " chest "),
+                new ItemIconReference(12, "ICON.WEAPON_SWORD_I00", "legs")
+            ]),
+            CancellationToken.None);
+
+        var response = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(expected, response.Value);
+        Assert.Equal([new ItemIconReference(12, "icon.weapon_sword_i00", "chest")], repository.IconRequest);
+
+        var invalid = await controller.ResolveItemIcons(
+            "c1", new ResolveItemIconsRequest([new ItemIconReference(0, "item.invalid", null)]), CancellationToken.None);
+        Assert.IsType<BadRequestObjectResult>(invalid.Result);
+    }
+
+    [Fact]
     public async Task SearchesRecipeDirectoriesWithNormalizedQueries()
     {
         var recipes = new DirectoryPage<ItemRecipeSummary>([], 4, 2, 50);
@@ -311,6 +335,13 @@ public sealed class ContentDirectoryControllerTests
 
     private sealed class StubContentDirectoryRepository : IContentDirectoryRepository, IItemRepository
     {
+        public IReadOnlyList<ItemIconSummary> ItemIcons { get; init; } = [];
+        public IReadOnlyList<ItemIconReference>? IconRequest { get; private set; }
+        public Task<IReadOnlyList<ItemIconSummary>> ResolveItemIconsAsync(string gameVersion, IReadOnlyList<ItemIconReference> items, CancellationToken cancellationToken)
+        {
+            IconRequest = items;
+            return Task.FromResult(ItemIcons);
+        }
         public Task<ItemSetDirectoryPage> SearchItemSetsAsync(string gameVersion, DirectoryRequest request, CancellationToken cancellationToken) =>
             Task.FromResult(new ItemSetDirectoryPage([], 0, request.Page, request.PageSize));
         public DirectoryPage<ItemRecipeSummary> ItemRecipes { get; init; } = new([], 0, 1, 25);

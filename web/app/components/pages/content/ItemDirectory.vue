@@ -7,6 +7,7 @@ import { loadDirectoryOptions } from '../../../utils/directory-pages'
 
 const props = defineProps<{
   items: ItemRecord[]
+  iconUrls: Record<number, string>
   total: number
   loading: boolean
   error?: string
@@ -57,6 +58,7 @@ const editForm = reactive({
 const hasBodyAndCrystal = computed(() => ['armor', 'weapon', 'arrow', 'etc'].includes(props.family))
 const hasHandler = computed(() => ['potion', 'recipe', 'enchant', 'scroll', 'pet-collar', 'etc'].includes(props.family))
 const columns = computed<TableColumn<ItemRecord>[]>(() => [
+  { id: 'icon', header: '' },
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'name', header: 'Name' },
   { accessorKey: 'itemTypeDisplayName', header: 'Type' },
@@ -327,6 +329,9 @@ onMounted(() => void loadFilters())
             @edit="edit(row.original)"
             @delete="remove(row.original)"
           />
+        </template>
+        <template #icon-cell="{ row }">
+          <ItemIconThumbnail :url="props.iconUrls[row.original.id]" :alt="row.original.name" />
         </template>
         <template #itemBodyPartDisplayName-cell="{ row }">
           {{ row.original.itemBodyPartDisplayName ?? '—' }}

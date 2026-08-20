@@ -13,6 +13,33 @@ public sealed class ContentDirectoryController(
     IItemRepository? itemRepository = null) : ControllerBase
 {
     private IItemRepository Items => itemRepository ?? (IItemRepository)repository;
+
+    [HttpPost("item-icons/resolve")]
+    public async Task<ActionResult<IReadOnlyList<L2.Studio.Contracts.ItemIconSummary>>> ResolveItemIcons(
+        string gameVersion,
+        ResolveItemIconsRequest request,
+        CancellationToken token)
+    {
+        if (request.Items is null || request.Items.Count > 100 || request.Items.Any(item =>
+                item.ItemId <= 0 || string.IsNullOrWhiteSpace(item.Icon) || item.Icon.Trim().Length > 256 ||
+                !item.Icon.Trim().StartsWith("icon.", StringComparison.OrdinalIgnoreCase) ||
+                item.ItemBodyPartName?.Trim().Length > 64))
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["items"] = ["Provide between 0 and 100 item icon references with a positive item ID, an icon.* identifier no longer than 256 characters, and an optional body part no longer than 64 characters."]
+            }));
+
+        var items = request.Items
+            .Select(item => item with
+            {
+                Icon = item.Icon.Trim(),
+                ItemBodyPartName = TrimOptional(item.ItemBodyPartName)
+            })
+            .DistinctBy(item => item.ItemId)
+            .ToArray();
+        return Ok(await Items.ResolveItemIconsAsync(gameVersion, items, token));
+    }
+
     [HttpGet("npc-spawns/world-map")]
     public Task<L2.Studio.Contracts.NpcSpawnWorldMap> GetNpcSpawnWorldMap(
         string gameVersion,

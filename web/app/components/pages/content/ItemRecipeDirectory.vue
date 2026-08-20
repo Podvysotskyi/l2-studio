@@ -103,7 +103,6 @@ function statUseLabel(recipe: ItemRecipeRecord) {
                   <span>{{ itemLabel(item) }}</span><span class="text-muted">×{{ item.count }}</span>
                 </li>
               </ul>
-              <p class="mt-3 text-sm text-muted">Stat use: {{ statUseLabel(row.original) }}</p>
             </section>
           </div>
         </template>

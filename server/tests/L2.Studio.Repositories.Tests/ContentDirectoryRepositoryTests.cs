@@ -12,6 +12,75 @@ namespace L2.Studio.Repositories.Tests;
 public sealed class ContentDirectoryRepositoryTests
 {
     [Fact]
+    public async Task ResolvesGroupedIconPackageTexturesUsingItemBodyPartContext()
+    {
+        var options = new DbContextOptionsBuilder<GameContentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using (var context = new GameContentDbContext(options))
+        {
+            var catalog = new AssetCatalog
+            {
+                Id = Guid.NewGuid(), GameVersion = "c1", Kind = "textures",
+                SourceFolder = "SysTextures", SourceHash = "catalog-hash", SchemaVersion = 9,
+                MetadataJson = "{}", IsActive = true, PublishedAt = DateTimeOffset.UnixEpoch
+            };
+            var source = new AssetCatalogSource
+            {
+                Id = Guid.NewGuid(), Catalog = catalog, ArtifactId = Guid.NewGuid(), PublishingWorkItemId = Guid.NewGuid(),
+                SourceKey = "SysTextures/Icon.utx", NormalizedSourceKey = "systextures/icon.utx",
+                SourceHash = "source-hash", OutputRoot = "versions/c1/textures/icon", MetadataJson = "{}",
+                ReferencedOutputRootsJson = "[]", PublishedAt = DateTimeOffset.UnixEpoch
+            };
+            context.AddRange(
+                new AssetCatalogItem
+                {
+                    Catalog = catalog, Source = source, Name = "weapon_i.weapon_sword_i00", GroupName = "Icon",
+                    Status = "resolved", MetadataJson = "{\"url\":\"/versions/c1/textures/icon/sword.webp\"}"
+                },
+                new AssetCatalogItem
+                {
+                    Catalog = catalog, Source = source, Name = "upbody_i.armor_hard_leather_shirt_i00", GroupName = "Icon",
+                    Status = "resolved", MetadataJson = "{\"url\":\"/versions/c1/textures/icon/chest.webp\"}"
+                },
+                new AssetCatalogItem
+                {
+                    Catalog = catalog, Source = source, Name = "lowbody_i.armor_hard_leather_shirt_i00", GroupName = "Icon",
+                    Status = "resolved", MetadataJson = "{\"url\":\"/versions/c1/textures/icon/legs.webp\"}"
+                },
+                new AssetCatalogItem
+                {
+                    Catalog = catalog, Source = source, Name = "weapon_i.weapon_other_i00", GroupName = "Other",
+                    Status = "resolved", MetadataJson = "{\"url\":\"/versions/c1/textures/other.webp\"}"
+                },
+                new AssetCatalogItem
+                {
+                    Catalog = catalog, Source = source, Name = "weapon_i.weapon_skipped_i00", GroupName = "Icon",
+                    Status = "skipped", MetadataJson = "{\"url\":\"/versions/c1/textures/skipped.webp\"}"
+                });
+            await context.SaveChangesAsync();
+        }
+        var repository = new ContentDirectoryRepository(new TestContextFactory(options));
+
+        var icons = await repository.ResolveItemIconsAsync(
+            "c1",
+            [
+                new ItemIconReference(1, "icon.weapon_sword_i00", null),
+                new ItemIconReference(2, "icon.armor_hard_leather_shirt_i00", "chest"),
+                new ItemIconReference(3, "icon.armor_hard_leather_shirt_i00", "legs"),
+                new ItemIconReference(4, "icon.weapon_other_i00", null),
+                new ItemIconReference(5, "icon.weapon_skipped_i00", null)
+            ],
+            CancellationToken.None);
+
+        Assert.Equal([
+            new ItemIconSummary(1, "/versions/c1/textures/icon/sword.webp"),
+            new ItemIconSummary(2, "/versions/c1/textures/icon/chest.webp"),
+            new ItemIconSummary(3, "/versions/c1/textures/icon/legs.webp")
+        ], icons);
+    }
+
+    [Fact]
     public async Task MarksOnlyNpcsInTheActiveAppearanceManifestIndexAsVisual()
     {
         var options = new DbContextOptionsBuilder<GameContentDbContext>()
